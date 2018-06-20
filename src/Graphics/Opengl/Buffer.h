@@ -94,9 +94,8 @@ public:
     Buffer() = default; //!< creates an empty buffer without allocating it
     explicit Buffer(nullptr_t) : Handle(nullptr) {} //!< creates no buffer
     template<typename T>
-    explicit Buffer( std::vector<T> data, GLbitfield flags = 0); //!< creates a buffer as a inmutable buffer and allocates it with data from ste std::vector
-    template<typename T>
-    explicit Buffer( T data, GLbitfield flags = 0); //!< creates a buffer as a inmutable buffer and allocates it with one field of type T CAUTION: do not use for arrays or vectors
+    explicit Buffer( std::vector<T> data, const GLbitfield flags = 0); //!< creates a buffer as a inmutable buffer and allocates it with data from ste std::vector
+    explicit Buffer( intptr_t size, const GLbitfield flags = 0); //!< creates a buffer as a inmutable buffer and allocates it to "size" bytes
 
     /**
      * @brief copys a part of this buffers data to another buffer
@@ -162,22 +161,6 @@ public:
     void allocate( intptr_t count, GLbitfield flags = 0) const;
 
     /**
-     * @brief allocate in inmutable mode using glBufferStorage and upload a single element of type T
-     *          CAUTION: do not use for arrays, vectors and so on
-     * @tparam T type of values that will be put in the buffer
-     * @param count the number of fields (size of the buffer)
-     * @param flags flags passed to glBufferStorage <br>
-     *                                      GL_DYNAMIC_STORAGE_BIT  allows the use of the write() function <br>
-     *                                      GL_MAP_READ_BIT         allows mapping for read access <br>
-     *                                      GL_MAP_WRITE_BIT        allows mapping for write access <br>
-     *                                      GL_MAP_PERSISTENT_BIT   allows mapping in persistent mode which allows to maintain a mapping while buffer is used in openGL <br>
-     *                                      GL_MAP_COHERENT_BIT     allows mapping in coherent mode where changes to a persistent buffer are always directly visible <br>
-     *                                      GL_CLIENT_STORAGE_BIT   a hint that the buffer shoulb be created in client memory <br>
-     */
-    template<typename T>
-    void allocate(T data, GLbitfield flags = 0) const;
-
-    /**
      * @brief assign data to the buffer via glBufferSubData only availible when the flag GL_DYNAMIC_STORAGE_BIT was set during allocation
      * @tparam T type of data to be uploaded
      * @param data a vector containing all the data to upload to the buffer
@@ -194,13 +177,6 @@ public:
      */
     template <typename T>
     std::vector<T> read( GLsizei size,  intptr_t offset = 0) const;
-
-    /**
-     * @brief reads one element from the buffer
-     * @param offset the position in the buffer of the element to be read
-     */
-    template <typename T>
-    T read( intptr_t offset = 0) const;
 
     /**
      * @brief use the buffer in mutable mode and stram data to it using glBufferData. Do not use on a buffer which was alreade made unmutable with allocate
@@ -245,7 +221,7 @@ public:
      * @param length length of the subsection
      */
     void invalidate(GLintptr offset, GLsizeiptr length);
-    void invalidate(); //!< invalidate the whle buffers data
+    void invalidate(); //!< invalidate the whole buffers data
 
     /**
      * @brief Generate a adress for the Buffer to access them in the shader without binding.
@@ -264,10 +240,9 @@ Buffer::Buffer(const std::vector<T> data, const GLbitfield flags) : Buffer()
     allocate<T>(data,flags);
 }
 
-template <typename T>
-Buffer::Buffer(const T data, const GLbitfield flags) : Buffer()
+inline Buffer::Buffer( intptr_t size, const GLbitfield flags) : Buffer()
 {
-    allocate<T>(data, flags);
+    allocate<uint8_t>(size,flags);
 }
 
 inline void Buffer::bindBase(const uint32_t binding, const GLenum target) const
@@ -289,6 +264,7 @@ inline void Buffer::copyTo(const Buffer& target, const ptrdiff_t dst_offset) con
 template <typename T>
 Buffer Buffer::clone(const ptrdiff_t count, const ptrdiff_t src_offset, const ptrdiff_t dst_offset) const
 {
+    throw std::logic_error("THIS MIGHT NOT WORK");
     Buffer newBuffer;
     copyTo(newBuffer, count * sizeof(T), src_offset*sizeof(T), dst_offset*sizeof(T));
     return newBuffer;
@@ -311,12 +287,6 @@ void Buffer::allocate(const intptr_t count, const GLbitfield flags) const
     glNamedBufferStorage(*this, count * sizeof(T), nullptr, flags);
 }
 
-template <typename T>
-void Buffer::allocate(const T data, const GLbitfield flags) const
-{
-    glNamedBufferStorage(*this, sizeof(T), &data, flags);
-}
-
 template<typename T>
 void Buffer::write(const std::vector<T> data, const intptr_t offset) const
 {
@@ -329,14 +299,6 @@ std::vector<T> Buffer::read(const GLsizei size, const intptr_t offset) const
     std::vector<T> v(size);
     glGetNamedBufferSubData(*this,offset*sizeof(T), size* sizeof(T),v.data());
     return v;
-}
-
-template <typename T>
-T Buffer::read(const intptr_t offset) const
-{
-    T t;
-    glGetNamedBufferSubData(*this,offset* sizeof(T),sizeof(T),&t);
-    return t;
 }
 
 template<typename T>
