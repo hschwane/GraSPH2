@@ -93,6 +93,21 @@ float gaussian(uint seed, uint samples, float mu, float sigma)
     return root*cos(angle)*sigma+mu;
 }
 
+// Halton Sequence
+// get a value of the Halton Sequence. Base should be a prime. Index specifies what number from the sequence will be computed
+float haltonSeq(int index, int base)
+{
+    float f = 1;
+    float r = 0;
+    while(index > 0)
+    {
+        f = f/base;
+        r = r + f* (index% base);
+        index = index/base;
+    }
+    return r;
+}
+
 // random positions on the surface of a spere with radius 1
 // pass a uniform random value [0,1] to u and v
 vec3 randUniformSphere(float u, float v)
