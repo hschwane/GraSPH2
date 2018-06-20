@@ -75,6 +75,7 @@ GLuint offset_of(TMember T::* field) noexcept
 #include "Opengl/Buffer.h"
 #include "Opengl/VertexArray.h"
 #include "Opengl/Shader.h"
+#include "Opengl/Texture.h"
 #include "Rendering/Camera.h"
 #include "Rendering/screenFillingTri.h"
 //--------------------
