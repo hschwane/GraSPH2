@@ -35,10 +35,11 @@ namespace gph {
 void inline logGlIinfo()
 {
     logINFO("Graphics") << "Printing openGL version information:"
-                        << "\nOpenGL version: " << glGetString(GL_VERSION)
-                        << "\nGLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION)
-                        << "\nVendor: " << glGetString(GL_VENDOR)
-                        << "\nRenderer: " << glGetString(GL_RENDERER);
+                        << "\n\t\tOpenGL version: " << glGetString(GL_VERSION)
+                        << "\n\t\tGLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION)
+                        << "\n\t\tVendor: " << glGetString(GL_VENDOR)
+                        << "\n\t\tRenderer: " << glGetString(GL_RENDERER)
+                        << "\n\t\tGLFW. Version: " << glfwGetVersionString();
 }
 
 /**

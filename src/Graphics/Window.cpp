@@ -94,7 +94,7 @@ Window::Window(const int width, const int height, const std::string &title, GLFW
             glfwSetErrorCallback([](int code, const char * message){
                 logERROR("GLFW") << "Error code: " << code << "Message: " << message;
             });
-            logINFO("Graphics") << "Initialised GLFW. Version: " << glfwGetVersionString();
+            logDEBUG("Graphics") << "Initialised GLFW.";
         }
         ~GLFWinit() { glfwTerminate(); }
     } glfwinit;
@@ -129,12 +129,7 @@ Window::Window(const int width, const int height, const std::string &title, GLFW
                 logFATAL_ERROR("Graphics") << "Error initalising glew. Returned: " << e ;
                 throw std::runtime_error("Could not initalize glew!");
             }
-            logINFO("Graphics") << "Initialised GLEW."
-                                << "\n\t\t\t\tOpenGL version: " << glGetString(GL_VERSION)
-                                << "\n\t\t\t\tGLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION)
-                                << "\n\t\t\t\tVendor: " << glGetString(GL_VENDOR)
-                                << "\n\t\t\t\tRenderer: " << glGetString(GL_RENDERER)
-                                << "\n\t\t\t";
+            logDEBUG("Graphics") << "Initialised GLEW.";
         }
     } glewinit;
 
@@ -159,6 +154,17 @@ void Window::setGlVersion(int major, int minor)
 {
     gl_major = major;
     gl_minor = minor;
+}
+
+void Window::setWindowHint(int hint, int value)
+{
+    glfwWindowHint(hint, value);
+}
+
+Window Window::headlessContext(std::string title)
+{
+    mpu::gph::Window::setWindowHint(GLFW_VISIBLE,false);
+    return mpu::gph::Window(5,5,title);
 }
 
 bool Window::update()

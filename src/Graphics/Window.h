@@ -38,7 +38,7 @@ namespace gph {
  * Most glfw Window functions are implemented in the wrapper, however if you need a glfw Window you can use Window::window()
  * or a cast to obtain a pointer to a glfw Window.
  * In the Windows main loop you shold call Window::update() it handles events and swaps the Framebuffer. It will return false
- * if the operating sistem is asking the window to be closed.
+ * if the operating system is asking the window to be closed.
  * The window is created with the window hints for openGL Version and core profile. To request a specific version call
  * Window::setGlVersion() before creating a window. If you want to use other special options, please use glfwSetWindowHint()
  * to configure all options to your liking before creating a window.
@@ -47,7 +47,9 @@ namespace gph {
 class Window
 {
 public:
-    static void setGlVersion(int major, int minor); //!< change the opengl version you want (bevor creating a window)
+    static void setGlVersion(int major, int minor); //!< change the opengl version you want (befor creating a window)
+    static void setWindowHint(int hint, int value); //!< set glfw window hints (before creating a window)
+    static Window headlessContext(std::string title); //!< create an invisible window for headless rendering
 
     /**
      * @brief Create a new window. The created window needs still to be made the current context
