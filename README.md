@@ -1,3 +1,5 @@
+note: my smoothed particle simulation code was moved to [here](https://github.com/hschwane/GraSPH).
+
 # mpUtils
 a ~~platform independent~~ linux c++ library with some utility classes I use for my personal projects and university assignments
 
