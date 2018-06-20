@@ -37,7 +37,7 @@ Now set up you own project and link mpUtils as a shared library
 --------------------------
 ## features
 
-- wrapper for some  openGl (using GLEW) and glfw functionality
+- wrapper for most openGl (using GLEW) and glfw functionality
 - utilities that help with graphical programming
 - highly customisable thread safe logger
 - ini-Style configuration file parser
@@ -47,12 +47,13 @@ Now set up you own project and link mpUtils as a shared library
 ------------------------
 ## planned features
 
-- wrapper for the remaining openGL features
 - more utilities for graphics programming (maybe game engine style functionality)
+- utils for handling input better
 - include a GUI
 - network communication
 - serial communication
 - jason and/or xml
 - a argument parser for command line apps
+- util for handling general settings
 - windows and mac support
 - improvements to the log (lock-free-queue, more sinks with better format, different depths for massages)
