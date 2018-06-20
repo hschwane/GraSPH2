@@ -38,7 +38,6 @@ public:
     // constructors
     BufferMap()= default;
     BufferMap(const BufferMap &other)=default;
-    BufferMap(BufferMap &&other)=default;
 
     BufferMap(const BufferHandle handle, T* datapointer, const std::size_t size) : m_handle(handle),
                                                                                    m_data(std::shared_ptr<T>(datapointer,[handle](T* t){glUnmapNamedBuffer(handle);})),
@@ -67,8 +66,8 @@ public:
 
 private:
     std::shared_ptr<T> m_data{nullptr};
-    const BufferHandle m_handle{nullptr};
-    const std::size_t m_size{0};
+    BufferHandle m_handle{nullptr};
+    std::size_t m_size{0};
 };
 
 /**
