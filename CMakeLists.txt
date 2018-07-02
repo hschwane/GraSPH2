@@ -101,7 +101,7 @@ endif ()
 # cuda
 if (USE_CUDA)
 #    list(APPEND SOURCE_FILES
-#            "src/Cuda/cuda_utils")
+#            "src/Cuda/...")
 endif ()
 
 # create target
