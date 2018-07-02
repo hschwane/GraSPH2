@@ -102,6 +102,9 @@ endif ()
 if (USE_CUDA)
 #    list(APPEND SOURCE_FILES
 #            "src/Cuda/...")
+    if ($ENV{CLION_IDE})
+        list(APPEND INCLUDE_PATHES "/usr/local/cuda/include")
+    endif ()
 endif ()
 
 # create target
