@@ -12,6 +12,7 @@
  *
  */
 
+#include <mpUtils.h>
 #include <Timer/Stopwatch.h>
 #include <iostream>
 #include <Log/Log.h>
@@ -45,21 +46,23 @@ int main()
 
 //        Log myLog(LogPolicy::CONSOLE, LogLvl::ALL);
 
-        Log myLog( LogLvl::ALL, FileSink("/home/hendrik/test.log"), ConsoleSink());
+        Log myLog( LogLvl::ALL, ConsoleSink());
 
         myLog(LogLvl::INFO, MPU_FILEPOS , "TEST") << "Hi, a log";
-//            myLog.logMessage( "[TEST] Info Hi, this is a log @" MPU_FILEPOS,LogLvl::INFO);
-            //logWARNING("TEST") << "Some log warning";
 
-//        logERROR("MODULE_TEST") << "some stuff has happend";
-//
-//        logDEBUG("some stuff") << "some stuff is debugging stuff";
-//        logDEBUG2("some stuff") << "more debugging stuff";
-
-
+        logINFO("TEST") << "Some generic Info";
+        logWARNING("TEST") << "Some log warning";
+        logERROR("MODULE_TEST") << "some stuff has happend";
+        logDEBUG("some stuff") << "some stuff is debugging stuff";
+        logDEBUG2("some stuff") << "more debugging stuff";
 
     timer.getSeconds();
+
+    yield();
+    sleep(2);
+    yield();
+
     myLog.close();
-    cout << "It took me " << dTime << " seconds on average" << endl;
+    cout << "It took me " << dTime << " seconds" << endl;
     return 0;
 }

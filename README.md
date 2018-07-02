@@ -18,8 +18,10 @@ cd bin
 cmake ..
 make
 ```
-In ``bin/exec/yorExecutable`` should now wait your compiled project.
+In ``bin/exec/yourExecutable`` should now wait your compiled project.
 
+###### HINT
+You can disable cuda or openGL support via the CMakeCache.txt if you don't need it.
 
 
 #### as a library
@@ -38,6 +40,7 @@ Now set up you own project and link mpUtils as a shared library
 ## features
 
 - wrapper for most openGl (using GLEW) and glfw functionality
+- building with cuda including cuda for clion IDE and some cuda heping functions
 - utilities that help with graphical programming
 - highly customisable thread safe logger
 - ini-Style configuration file parser
@@ -56,4 +59,4 @@ Now set up you own project and link mpUtils as a shared library
 - a argument parser for command line apps
 - util for handling general settings
 - windows and mac support
-- improvements to the log (lock-free-queue, more sinks with better format, different depths for massages)
+- improvements to the log (lock-free-queue, more sinks with better format, different depths for messages)
