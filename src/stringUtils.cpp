@@ -5,14 +5,14 @@
  * @author: Hendrik Schwanekamp
  * @mail:   hendrik.schwanekamp@gmx.net
  *
- * Implements some basic mpUtility functions.
+ * Implements some basic string functions.
  *
  * Copyright 2016 Hendrik Schwanekamp
  */
 
 // includes
 //--------------------
-#include "mpUtils.h"
+#include "stringUtils.h"
 //--------------------
 
 // namespace

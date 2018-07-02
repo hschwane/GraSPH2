@@ -59,7 +59,7 @@ endif ()
 # general
 list(APPEND LIBRARIES "stdc++fs")
 list(APPEND SOURCE_FILES
-        "src/mpUtils.cpp"
+        "src/stringUtils.cpp"
         "src/Log/LogStream.cpp"
         "src/Log/FileSink.cpp"
         "src/Log/ConsoleSink.cpp"
