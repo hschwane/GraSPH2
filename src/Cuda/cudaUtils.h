@@ -64,8 +64,12 @@ inline void _cudaAssert(cudaError_t code, std::string&& filepos)
     {
         std::string message("Cuda error: " + std::string(cudaGetErrorString(code)));
 
-        if (!(mpu::Log::noGlobal() || mpu::Log::getGlobal().getLogLevel() < mpu::LogLvl::FATAL_ERROR))
-            mpu::Log::getGlobal()(mpu::LogLvl::FATAL_ERROR, std::move(filepos), "cuda") << message;
+        if (!(mpu::Log::noGlobal()))
+        {
+            if(mpu::Log::getGlobal().getLogLevel() >= mpu::LogLvl::FATAL_ERROR)
+                mpu::Log::getGlobal()(mpu::LogLvl::FATAL_ERROR, std::move(filepos), "cuda") << message;
+            mpu::Log::getGlobal().flush();
+        }
 
         throw std::runtime_error("Cuda error: " + message);
     }

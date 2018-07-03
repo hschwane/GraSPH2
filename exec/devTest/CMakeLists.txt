@@ -7,7 +7,6 @@ set(SOURCE_FILES
 
 # create target
 add_executable(devTest ${SOURCE_FILES})
-#set_target_properties( devTest PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # link libraries
 target_link_libraries(devTest mpUtils)

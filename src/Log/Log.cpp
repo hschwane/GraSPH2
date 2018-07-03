@@ -48,7 +48,7 @@ void Log::close()
     LogLvl oldLvl = logLvl;
     logLvl = LogLvl::NOLOG;
 
-    // wait for the logger to print all queued messages and join the thread
+    // flush it
     std::unique_lock<std::mutex> lck(loggerMtx);
     if(bShouldLoggerRun)
     {
@@ -63,6 +63,34 @@ void Log::close()
     // remove all sinks
     printFunctions.clear();
     logLvl = oldLvl;
+}
+
+void Log::flush()
+{
+    std::unique_lock<std::mutex> lck(loggerMtx);
+
+    // accept no more messages
+    LogLvl oldLvl = logLvl;
+    logLvl = LogLvl::NOLOG;
+
+    // wait for the logger to print all queued messages and join the thread
+    if(bShouldLoggerRun)
+    {
+        bShouldLoggerRun = false;
+        loggerCv.notify_one();
+    }
+    lck.unlock();
+    if(loggerMainThread.joinable())
+        loggerMainThread.join();
+    lck.lock();
+
+    // restart the logger
+    logLvl = oldLvl;
+    if(!bShouldLoggerRun)
+    {
+        bShouldLoggerRun = true;
+        loggerMainThread = std::thread(&Log::loggerMainfunc, this);
+    }
 }
 
 void Log::logMessage(LogMessage* lm)

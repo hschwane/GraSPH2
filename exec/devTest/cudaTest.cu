@@ -58,7 +58,7 @@ void add(size_t n, Array& x, Array& y)
 
 void testCuda()
 {
-    size_t N = 1<<20;
+    size_t N = 1<<28;
     auto x=std::make_unique<Array>(N);
     auto y=std::make_unique<Array>(N);
 

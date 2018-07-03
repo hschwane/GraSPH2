@@ -48,7 +48,9 @@
                     else mpu::Log::getGlobal()(mpu::LogLvl::WARNING, MPU_FILEPOS, MODULE)
 #define logINFO(MODULE) if(mpu::Log::noGlobal() || mpu::Log::getGlobal().getLogLevel() < mpu::LogLvl::INFO) ; \
                     else mpu::Log::getGlobal()(mpu::LogLvl::INFO, MPU_FILEPOS, MODULE)
-#define assert_critical(TEST,MODULE,MESSAGE) if(!( TEST )){ logFATAL_ERROR(MODULE) << "Assert failed: " << (MESSAGE) ; throw std::runtime_error(MESSAGE);}
+#define assert_critical(TEST,MODULE,MESSAGE) if(!( TEST )){ logFATAL_ERROR(MODULE) << "Assert failed: " << (MESSAGE) ; \
+                    if(!mpu::Log::noGlobal()) mpu::Log::getGlobal().flush(); \
+                    throw std::runtime_error(MESSAGE);}
 
 // debug is disabled on release build
 #ifdef NDEBUG
@@ -61,7 +63,9 @@
                         else mpu::Log::getGlobal()(mpu::LogLvl::DEBUG, MPU_FILEPOS, MODULE)
     #define logDEBUG2(MODULE) if(mpu::Log::noGlobal() || mpu::Log::getGlobal().getLogLevel() < mpu::LogLvl::DEBUG2) ; \
                         else mpu::Log::getGlobal()(mpu::LogLvl::DEBUG2, MPU_FILEPOS, MODULE)
-    #define assert_true(TEST,MODULE,MESSAGE) if(!( TEST )){ logERROR(MODULE) << "Assert failed: " << (MESSAGE) ; throw std::runtime_error(MESSAGE);}
+    #define assert_true(TEST,MODULE,MESSAGE) if(!( TEST )){ logERROR(MODULE) << "Assert failed: " << (MESSAGE) ; \
+                        if(!mpu::Log::noGlobal()) mpu::Log::getGlobal().flush(); \
+                        throw std::runtime_error(MESSAGE);}
 #endif
 //--------------------
 
@@ -152,19 +156,20 @@ public:
     ~Log(); // destructor
 
     template <class FIRST_SINK, class... OTHER_SINKS>
-    void addSinks(FIRST_SINK&& sink, OTHER_SINKS&&... tail); // add a number of sinks
+    void addSinks(FIRST_SINK&& sink, OTHER_SINKS&&... tail); //!< add a number of sinks
     void addSinks(){}
-    void removeSink(int index); // removes a given sink (be carefull)
-    void close(); // removes all sinks and closes the logger thread (queue is flushed), is called automatically before open and on destruction
+    void removeSink(int index); //!< removes a given sink (be carefull)
+    void close(); //!< removes all sinks and closes the logger thread (queue is flushed), is called automatically before open and on destruction
+    void flush(); //!< flush the log without closing it. Quite costly. Mainly used before throwing an exception.
 
-    void logMessage(LogMessage* lm); // logs a message to the log
+    void logMessage(LogMessage* lm); //!< logs a message to the log
 
     // getter and setter
-    void setLogLevel(LogLvl lvl) {logLvl = lvl;} // set the current log level
-    LogLvl getLogLevel() const {return logLvl;} // get the current log level
-    void makeGlobal() {globalLog = this;}   // makes the current log global
-    static Log &getGlobal() {return *globalLog;} // gets the global log
-    static bool noGlobal() {return (globalLog == nullptr);} // checks if there is no global log set
+    void setLogLevel(LogLvl lvl) {logLvl = lvl;} //!< set the current log level
+    LogLvl getLogLevel() const {return logLvl;} //!< get the current log level
+    void makeGlobal() {globalLog = this;}   //!< makes the current log global
+    static Log &getGlobal() {return *globalLog;} //!< gets the global log
+    static bool noGlobal() {return (globalLog == nullptr);} //!< checks if there is no global log set
 
     // operators
     LogStream operator()(LogLvl lvl, std::string&& sFilepos ="", std::string&& sModule="");
@@ -176,20 +181,20 @@ public:
     Log& operator=(const Log&& that) = delete;
 
 private:
-    std::atomic<LogLvl> logLvl; // the log level
+    std::atomic<LogLvl> logLvl; //!< the log level
 
-    static Log* globalLog; // point this to the global log
+    static Log* globalLog; //!< point this to the global log
 
-    std::queue< LogMessage*> messageQueue; // queue to collect messages from all threads
+    std::queue< LogMessage*> messageQueue; //!< queue to collect messages from all threads
 
     // thread management
-    std::mutex queueMtx;  // mutex to protect the queue
-    std::mutex loggerMtx; // protect the logging operation
-    std::condition_variable loggerCv; // cv to notify the logger when new messages arrive
-    bool bShouldLoggerRun; // controle if the logger thread is running
+    std::mutex queueMtx;  //!< mutex to protect the queue
+    std::mutex loggerMtx; //!< protect the logging operation
+    std::condition_variable loggerCv; //!< cv to notify the logger when new messages arrive
+    bool bShouldLoggerRun; //!< controle if the logger thread is running
 
-    std::thread loggerMainThread; // the logger main thread
-    void loggerMainfunc(); // the mainfunc of the second thread
+    std::thread loggerMainThread; //!< the logger main thread
+    void loggerMainfunc(); //!< the mainfunc of the second thread
 
     std::vector<std::function<void(const LogMessage& msg)>> printFunctions; // the funtion used to print a message to the log
 };
