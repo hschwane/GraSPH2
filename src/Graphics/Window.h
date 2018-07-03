@@ -82,12 +82,12 @@ public:
     GLFWmonitor* getMonitor(){return glfwGetWindowMonitor(m_w.get());} //!< returns the monitor the window uses for fullscreen mode
 
     // window handling callbacks
-    GLFWwindowposfun setPositionCallback(GLFWwindowposfun cb) {glfwSetWindowPosCallback(m_w.get(),cb);} //!< callback will be called whenever the position is changed
-    GLFWwindowsizefun setSizeCallback(GLFWwindowsizefun cb) {glfwSetWindowSizeCallback(m_w.get(),cb);} //!< callback will be clled whenever the position is changed
-    GLFWwindowclosefun setCloseCallback(GLFWwindowclosefun cb) {glfwSetWindowCloseCallback(m_w.get(),cb);} //!< callback will be called whenever the user tries to close the window
-    GLFWwindowrefreshfun setRefreshCallback(GLFWwindowrefreshfun cb) {glfwSetWindowRefreshCallback(m_w.get(),cb);} //!< callback will be called whenever the wiindow contend needs to be redrawn
-    GLFWwindowfocusfun setFocusCallback(GLFWwindowfocusfun cb) {glfwSetWindowFocusCallback(m_w.get(),cb);} //!< callback will be called when the window gains focus
-    GLFWwindowiconifyfun setMinimizeCallback(GLFWwindowiconifyfun cb) {glfwSetWindowIconifyCallback(m_w.get(),cb);} //!< callback will be called when the window is minimized
+    GLFWwindowposfun setPositionCallback(GLFWwindowposfun cb) {return glfwSetWindowPosCallback(m_w.get(),cb);} //!< callback will be called whenever the position is changed
+    GLFWwindowsizefun setSizeCallback(GLFWwindowsizefun cb) {return glfwSetWindowSizeCallback(m_w.get(),cb);} //!< callback will be clled whenever the position is changed
+    GLFWwindowclosefun setCloseCallback(GLFWwindowclosefun cb) {return glfwSetWindowCloseCallback(m_w.get(),cb);} //!< callback will be called whenever the user tries to close the window
+    GLFWwindowrefreshfun setRefreshCallback(GLFWwindowrefreshfun cb) {return glfwSetWindowRefreshCallback(m_w.get(),cb);} //!< callback will be called whenever the wiindow contend needs to be redrawn
+    GLFWwindowfocusfun setFocusCallback(GLFWwindowfocusfun cb) {return glfwSetWindowFocusCallback(m_w.get(),cb);} //!< callback will be called when the window gains focus
+    GLFWwindowiconifyfun setMinimizeCallback(GLFWwindowiconifyfun cb) {return glfwSetWindowIconifyCallback(m_w.get(),cb);} //!< callback will be called when the window is minimized
 
     // input callbacks
     GLFWkeyfun setKeyCallback(GLFWkeyfun cb) {return glfwSetKeyCallback(m_w.get(),cb);} //!< callback will be called when key input is availible
