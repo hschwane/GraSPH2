@@ -19,6 +19,7 @@
 #include <device_launch_parameters.h>
 #include <cstdio>
 #include <cstdlib>
+#include "../Log/Log.h"
 //--------------------
 
 // make clion understand some cuda specific stuff
@@ -54,5 +55,20 @@ typedef unsigned long long ulonglong;
 typedef long long longlong;
 #endif
 //--------------------
+
+#define assert_cuda(CODE) _cudaAssert((CODE),MPU_FILEPOS);
+
+inline void _cudaAssert(cudaError_t code, std::string&& filepos)
+{
+    if (code != cudaSuccess)
+    {
+        std::string message("Cuda error: " + std::string(cudaGetErrorString(code)));
+
+        if (!(mpu::Log::noGlobal() || mpu::Log::getGlobal().getLogLevel() < mpu::LogLvl::FATAL_ERROR))
+            mpu::Log::getGlobal()(mpu::LogLvl::FATAL_ERROR, std::move(filepos), "cuda") << message;
+
+        throw std::runtime_error("Cuda error: " + message);
+    }
+}
 
 #endif //MPUTILS_CUDAUTILS_H

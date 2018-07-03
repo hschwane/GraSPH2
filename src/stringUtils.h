@@ -122,7 +122,7 @@ auto makeFuncCopyable( F&& f )
     auto spf = std::make_shared<F>(std::forward<F>(f) );
     return [spf](auto&&... args)->decltype(auto)
     {
-        return (*spf)( decltype(args)(args)... );
+        return (*spf)( (args)... );
     };
 }
 

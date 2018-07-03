@@ -12,7 +12,7 @@ include(GNUInstallDirs)
 include(GetVersionFromGit)
 
 # possibility to turn of features with special dependencies
-option(USE_CUDA "Compile with cuda features" OFF)
+option(USE_CUDA "Compile with cuda features" ON)
 option(USE_OPENGL "Compile with openGL features" ON)
 
 # enable languages
@@ -115,6 +115,9 @@ target_link_libraries( mpUtils  ${LIBRARIES})
 
 # set properties
 set_target_properties(mpUtils PROPERTIES VERSION ${VERSION_SHORT} SOVERSION ${VERSION_MAJOR})
+if (USE_CUDA)
+    set_target_properties( mpUtils PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif ()
 
 # set include dir (in this case also the src)
 target_include_directories(mpUtils PUBLIC src ${INCLUDE_PATHES})

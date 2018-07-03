@@ -90,14 +90,14 @@ public:
     GLFWwindowiconifyfun setMinimizeCallback(GLFWwindowiconifyfun cb) {glfwSetWindowIconifyCallback(m_w.get(),cb);} //!< callback will be called when the window is minimized
 
     // input callbacks
-    GLFWkeyfun setKeyCallback(GLFWkeyfun cb) {glfwSetKeyCallback(m_w.get(),cb);} //!< callback will be called when key input is availible
-    GLFWcharfun setCharCallback(GLFWcharfun cb) {glfwSetCharCallback(m_w.get(),cb);} //!< callback provides character input
-    GLFWcharmodsfun setCharmodsCallback(GLFWcharmodsfun cb) {glfwSetCharModsCallback(m_w.get(),cb);} //!< callback provides charater input with modifier keys
-    GLFWmousebuttonfun setMousebuttonCallback(GLFWmousebuttonfun cb) {glfwSetMouseButtonCallback(m_w.get(),cb);} //!< called when a mouse button is pressed
-    GLFWcursorposfun setCoursorposCallback(GLFWcursorposfun cb) {glfwSetCursorPosCallback(m_w.get(),cb);} //!< called when the cursor is moved
-    GLFWcursorenterfun setCoursorenterCallback(GLFWcursorenterfun cb) {glfwSetCursorEnterCallback(m_w.get(),cb);} //!< called when the cursor enters or leaves the window
-    GLFWscrollfun setScrollCallback(GLFWscrollfun cb) {glfwSetScrollCallback(m_w.get(),cb);} //!< called when the scroll wheel is moved
-    GLFWdropfun setDropCallbac(GLFWdropfun cb) {glfwSetDropCallback(m_w.get(),cb);} //!< called when someting is drag'n droped onto the window
+    GLFWkeyfun setKeyCallback(GLFWkeyfun cb) {return glfwSetKeyCallback(m_w.get(),cb);} //!< callback will be called when key input is availible
+    GLFWcharfun setCharCallback(GLFWcharfun cb) {return glfwSetCharCallback(m_w.get(),cb);} //!< callback provides character input
+    GLFWcharmodsfun setCharmodsCallback(GLFWcharmodsfun cb) {return glfwSetCharModsCallback(m_w.get(),cb);} //!< callback provides charater input with modifier keys
+    GLFWmousebuttonfun setMousebuttonCallback(GLFWmousebuttonfun cb) {return glfwSetMouseButtonCallback(m_w.get(),cb);} //!< called when a mouse button is pressed
+    GLFWcursorposfun setCoursorposCallback(GLFWcursorposfun cb) {return glfwSetCursorPosCallback(m_w.get(),cb);} //!< called when the cursor is moved
+    GLFWcursorenterfun setCoursorenterCallback(GLFWcursorenterfun cb) {return glfwSetCursorEnterCallback(m_w.get(),cb);} //!< called when the cursor enters or leaves the window
+    GLFWscrollfun setScrollCallback(GLFWscrollfun cb) {return glfwSetScrollCallback(m_w.get(),cb);} //!< called when the scroll wheel is moved
+    GLFWdropfun setDropCallbac(GLFWdropfun cb) {return glfwSetDropCallback(m_w.get(),cb);} //!< called when someting is drag'n droped onto the window
 
     // input functions
     void setInputMode(int mode, int value) {glfwSetInputMode(m_w.get(),mode,value);} //!< see glfwSetInputMode for reference

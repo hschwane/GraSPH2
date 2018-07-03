@@ -38,10 +38,5 @@
     #include "Graphics/Graphics.h"
 #endif
 
-// include cuda
-#ifdef USE_CUDA
-    #include "Cuda/cudaUtils.h"
-#endif
-
 
 #endif //MPUTILS_MPUTILS_H
