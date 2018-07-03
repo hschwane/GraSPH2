@@ -42,11 +42,13 @@ typedef std::chrono::nanoseconds nanoseconds;
 // aliases for std::this_thread functions
 //--------------------
 inline void yield() { std::this_thread::yield(); }
-inline void sleep_d(auto duration) { std::this_thread::sleep_for(duration); }
+template <typename T>
+inline void sleep_d(T duration) { std::this_thread::sleep_for(duration); }
 inline void sleep(int sec) { sleep_d(seconds(sec)); }
 inline void sleep_ms(int ms) { sleep_d(milliseconds(ms)); }
 inline void sleep_us(int us) { sleep_d(microseconds(us)); }
-inline void sleep_until(auto tp) { std::this_thread::sleep_until(tp); }
+template <typename T>
+inline void sleep_until(T tp) { std::this_thread::sleep_until(tp); }
 
 }
 

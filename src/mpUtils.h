@@ -33,10 +33,4 @@
 #include "Timer/Stopwatch.h"
 #include "Timer/Timer.h"
 
-// include graphics
-#ifdef USE_OPENGL
-    #include "Graphics/Graphics.h"
-#endif
-
-
 #endif //MPUTILS_MPUTILS_H
