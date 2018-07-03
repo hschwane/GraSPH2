@@ -211,7 +211,7 @@ constexpr const std::string &toString(LogLvl lvl)
 /*
  * find end of string at compile time
  */
-constexpr const char * const strEnd(const char * const str)
+constexpr const char * strEnd(const char * const str)
 {
     return *str ? strEnd(str + 1) : str;
 }
@@ -219,7 +219,7 @@ constexpr const char * const strEnd(const char * const str)
 /*
  * shortence a path to contain at most "folders" folder at compile time
  */
-constexpr const char * const processPath(const char * const start, const char * const end, const size_t folders, const size_t path_level = 0)
+constexpr const char * processPath(const char * const start, const char * const end, const size_t folders, const size_t path_level = 0)
 {
     return (start < end && *end != '/' && *end != '\\') ?
            processPath(start, end - 1, folders, path_level) :
@@ -232,7 +232,7 @@ constexpr const char * const processPath(const char * const start, const char * 
 /*
  * shortence a path to contain at most "folders" folder at compile time
  */
-constexpr const char * const shortenPath(const char * const path, const size_t folders)
+constexpr const char * shortenPath(const char * const path, const size_t folders)
 {
     return processPath(path, strEnd(path), folders);
 }

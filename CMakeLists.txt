@@ -37,6 +37,7 @@ if (USE_CUDA)
     set(CUDA_CODE_GEN "-gencode arch=compute_50,code=sm_50" CACHE STRING "Cuda arch for which code should be generated.")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_CODE_GEN} -std=c++14")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G")
+    set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_OMP")
 endif ()
 
 # set defines
@@ -96,6 +97,16 @@ if (USE_OPENGL)
             "src/Graphics/Utils/Transform.cpp"
             "src/Graphics/Utils/ModelViewProjection.cpp"
             "src/Graphics/Window.cpp")
+endif ()
+
+# openMP
+find_package(OpenMP) # openmp
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+if (USE_CUDA)
+    set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fopenmp")
 endif ()
 
 # cuda
