@@ -23,6 +23,7 @@
 // forward declare particles class
 //--------------------
 class Particles;
+template <size_t n, typename... TArgs> class SharedParticles;
 
 //-------------------------------------------------------------------
 // define the data types used for the simulation
@@ -56,9 +57,8 @@ class Particles;
  *  ACC
  *
  */
-
 template <typename... Args>
-struct Particle : Args...
+class Particle : public Args...
 {
 public:
     __host__ __device__ Particle() {}
@@ -68,12 +68,20 @@ public:
     explicit Particle(T &&... args) : Args(std::forward<T>(args))... {}
 
 private:
+    // friends
     friend class Particles;
+    template <size_t n, typename... TArgs> class SharedParticles;
 
+    /**
+     * construct a particle from a particle buffer eg what is listed as friends
+     */
     template <typename T>
     __host__ __device__
     explicit Particle(size_t id,T& buffer) : Args(id,buffer)... {}
 
+    /**
+     * store a particle inside a particle buffer eg what is listed as friends
+     */
     template <typename T>
     __host__ __device__
     void store(size_t id, T& buffer) const
@@ -92,7 +100,7 @@ private:
  *
  *
  */
-class Particles
+class Particles : public mpu::Managed
 {
 public:
     Particles();
@@ -142,7 +150,7 @@ private:
 };
 
 //-------------------------------------------------------------------
-// define template functions of the particles class
+// define template functions of all the classes
 template<typename... Args>
 Particle<Args...> Particles::loadParticle(size_t id)
 {
@@ -155,13 +163,15 @@ void Particles::storeParticle(const Particle<Args...> &p, size_t id)
     p.store(id,*this);
 }
 
+
 //-------------------------------------------------------------------
 // define some classes that hold the members of the particle class
 
 //--------------------
 // hold the position
-struct POS
+class POS
 {
+public:
     f3_t pos;
 
 protected:
@@ -198,8 +208,9 @@ protected:
 
 //--------------------
 // hold the mass
-struct M
+class M
 {
+public:
     f1_t mass;
 
 protected:
@@ -229,8 +240,9 @@ protected:
 
 //--------------------
 // hold the position and mass
-struct POSM
+class POSM
 {
+public:
     f3_t pos;
     f1_t mass;
 
@@ -265,8 +277,9 @@ protected:
 
 //--------------------
 // hold velocity
-struct VEL
+class VEL
 {
+public:
     f3_t vel;
 
 protected:
@@ -299,8 +312,9 @@ protected:
 
 //--------------------
 // hold acceleration
-struct ACC
+class ACC
 {
+public:
     f3_t acc;
 
 protected:

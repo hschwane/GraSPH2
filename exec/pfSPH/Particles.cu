@@ -30,7 +30,7 @@ Particles::Particles() : m_numParticles(0), m_hpos(nullptr), m_hvel(nullptr), m_
 
 Particles::Particles(size_t n) : Particles()
 {
-    allocate(n);
+    reallocate(n);
 }
 
 Particles::~Particles()
@@ -52,11 +52,14 @@ void Particles::reallocate(size_t n)
 
 void Particles::allocate(size_t n)
 {
-    // only allocating memory on host, device memory is allocated on first memory transfer
     m_numParticles = n;
     m_hpos = new f4_t[n];
     m_hvel = new f4_t[n];
     m_hacc = new f4_t[n];
+
+    assert_cuda(cudaMalloc(&m_dpos, m_numParticles*sizeof(f4_t)));
+    assert_cuda(cudaMalloc(&m_dvel, m_numParticles*sizeof(f4_t)));
+    assert_cuda(cudaMalloc(&m_dacc, m_numParticles*sizeof(f4_t)));
 }
 
 void Particles::free()
@@ -78,20 +81,14 @@ void Particles::free()
 
 void Particles::copyToDevice()
 {
-    // get some memory on the gpu if not done already
-    if(!m_dpos) assert_cuda(cudaMalloc(&m_dpos,m_numParticles* sizeof(float)));
-    if(!m_dvel) assert_cuda(cudaMalloc(&m_dvel,m_numParticles* sizeof(float)));
-    if(!m_dacc) assert_cuda(cudaMalloc(&m_dacc,m_numParticles* sizeof(float)));
-
-    // copy everything up there
-    assert_cuda(cudaMemcpy(m_dpos, m_hpos, m_numParticles* sizeof(float), cudaMemcpyHostToDevice));
-    assert_cuda(cudaMemcpy(m_dvel, m_hvel, m_numParticles* sizeof(float), cudaMemcpyHostToDevice));
-    assert_cuda(cudaMemcpy(m_dacc, m_hacc, m_numParticles* sizeof(float), cudaMemcpyHostToDevice));
+    assert_cuda(cudaMemcpy(m_dpos, m_hpos, m_numParticles*sizeof(f4_t), cudaMemcpyHostToDevice));
+    assert_cuda(cudaMemcpy(m_dvel, m_hvel, m_numParticles*sizeof(f4_t), cudaMemcpyHostToDevice));
+    assert_cuda(cudaMemcpy(m_dacc, m_hacc, m_numParticles*sizeof(f4_t), cudaMemcpyHostToDevice));
 }
 
 void Particles::copyFromDevice()
 {
-    if(!m_dpos) assert_cuda(cudaMemcpy(m_hpos, m_dvel, m_numParticles* sizeof(float), cudaMemcpyDeviceToHost));
-    if(!m_dvel) assert_cuda(cudaMemcpy(m_hvel, m_dvel, m_numParticles* sizeof(float), cudaMemcpyDeviceToHost));
-    if(!m_dpos) assert_cuda(cudaMemcpy(m_hacc, m_dacc, m_numParticles* sizeof(float), cudaMemcpyDeviceToHost));
+    if(m_dpos) assert_cuda(cudaMemcpy(m_hpos, m_dpos, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
+    if(m_dvel) assert_cuda(cudaMemcpy(m_hvel, m_dvel, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
+    if(m_dpos) assert_cuda(cudaMemcpy(m_hacc, m_dacc, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
 }

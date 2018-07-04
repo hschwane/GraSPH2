@@ -17,6 +17,18 @@
 
 #include "Particles.h"
 
+__global__ void test(Particles* from, Particles* to)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+
+
+    auto p = from->loadParticle<M>(index);
+
+    to->storeParticle(p,index);
+}
+
 int main()
 {
 
@@ -24,21 +36,25 @@ int main()
 
     logINFO("pfSPH") << "Welcome to planetformSPH!";
 
-    Particles pb(1000);
+    Particles* pb1 = new Particles(100);
+    Particles* pb2 = new Particles(100);
 
-    auto p = pb.loadParticle<POSM,VEL,ACC>(1);
+    Particle<M> p;
+    p.mass = 10.0f;
+    pb1->storeParticle(p,10);
 
-    p.mass = 100;
-    p.vel = {5,2,0};
-
-    pb.copyToDevice();
-    pb.copyFromDevice();
+    assert_cuda(cudaDeviceSynchronize());
+    pb1->copyToDevice();
     assert_cuda(cudaDeviceSynchronize());
 
-    pb.storeParticle(p,1);
-    pb.storeParticle(p,2);
+    test<<<1,100>>>(pb1,pb2);
 
+    assert_cuda(cudaDeviceSynchronize());
+    pb2->copyFromDevice();
+    assert_cuda(cudaDeviceSynchronize());
+    p = pb2->loadParticle<M>(10);
 
-    logINFO("test") << pb.loadParticle<VEL>(2).vel.x;
+    logINFO("test") << pb2->loadParticle<M>(10).mass;
+    logINFO("test") << pb1->loadParticle<M>(10).mass;
     return 0;
 }
