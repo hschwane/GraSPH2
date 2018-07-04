@@ -47,8 +47,13 @@ class Particles;
  * enables handling and manipulation of the attributes uf a single Particle
  *
  * usage:
- * Specify which particle attributes you want to manipulate by passing type names of the trivial struct above
- * as template parameters.
+ * Specify which particle attributes you want to manipulate by passing type names of the trivial classes below
+ * as template parameters. You can use:
+ *  POS  <- only use when register memory is low, use POSM instead
+ *  M
+ *  POSM <- combines position and mass, much faster!
+ *  VEL
+ *  ACC
  *
  */
 
@@ -82,6 +87,9 @@ private:
  * class Particles
  *
  * usage:
+ * Manages the storage of a lot of particles in Global Device Memory or Host Memory.
+ * you can manipulate the particles by calling loadParticle() and storeParticle()
+ *
  *
  */
 class Particles
@@ -97,10 +105,14 @@ public:
     void copyFromDevice();  //!< initiate copying of data from host to device
 
     template<typename... Args>
+    __host__ __device__
     Particle<Args...> loadParticle(size_t id); //!< get a particle object with the requested members
 
     template<typename... Args>
+    __host__ __device__
     void storeParticle(const Particle<Args...>& p,size_t id); //!< set the attributes of particle id according to the particle object
+
+    __host__ __device__ size_t size() {return m_numParticles;} //!< return the number of particles
 
     // make particles non copyable
     Particles(const Particles& that) = delete;
@@ -153,8 +165,8 @@ struct POS
     f3_t pos;
 
 protected:
-    POS() : pos({0,0,0}) {}
-    POS(f3_t val) : pos(val) {}
+    __host__ __device__ POS() : pos({0,0,0}) {}
+    __host__ __device__ POS(f3_t val) : pos(val) {}
 
     template <typename T>
     __host__ __device__
@@ -191,8 +203,8 @@ struct M
     f1_t mass;
 
 protected:
-    M() : mass(0) {}
-    M(f1_t val) : mass(val) {}
+    __host__ __device__ M() : mass(0) {}
+    __host__ __device__ M(f1_t val) : mass(val) {}
 
     template <typename T>
     __host__ __device__
@@ -223,8 +235,8 @@ struct POSM
     f1_t mass;
 
 protected:
-    POSM() : pos({0,0,0}), mass(0) {}
-    POSM(f4_t val) : pos(mpu::toDim3<f3_t>(val)), mass(val.w)  {}
+    __host__ __device__ POSM() : pos({0,0,0}), mass(0) {}
+    __host__ __device__ POSM(f4_t val) : pos(mpu::toDim3<f3_t>(val)), mass(val.w)  {}
 
     template <typename T>
     __host__ __device__
@@ -258,8 +270,8 @@ struct VEL
     f3_t vel;
 
 protected:
-    VEL() : vel({0,0,0}) {}
-    VEL(f3_t val) : vel(val) {}
+    __host__ __device__ VEL() : vel({0,0,0}) {}
+    __host__ __device__ VEL(f3_t val) : vel(val) {}
 
     template <typename T>
     __host__ __device__
@@ -292,8 +304,8 @@ struct ACC
     f3_t acc;
 
 protected:
-    ACC() : acc({0,0,0}) {}
-    ACC(f3_t val) : acc(val) {}
+    __host__ __device__ ACC() : acc({0,0,0}) {}
+    __host__ __device__ ACC(f3_t val) : acc(val) {}
 
     template <typename T>
     __host__ __device__
