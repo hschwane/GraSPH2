@@ -56,15 +56,18 @@ typedef long long longlong;
 #endif
 //--------------------
 
-#define assert_cuda(CODE) _cudaAssert((CODE),MPU_FILEPOS)
 
-inline void _cudaAssert(cudaError_t code, std::string&& filepos)
+namespace mpu {
+
+#define assert_cuda(CODE) mpu::_cudaAssert((CODE),MPU_FILEPOS)
+
+inline void _cudaAssert(cudaError_t code, std::string &&filepos)
 {
-    if (code != cudaSuccess)
+    if(code != cudaSuccess)
     {
         std::string message("Cuda error: " + std::string(cudaGetErrorString(code)));
 
-        if (!(mpu::Log::noGlobal()))
+        if(!(mpu::Log::noGlobal()))
         {
             if(mpu::Log::getGlobal().getLogLevel() >= mpu::LogLvl::FATAL_ERROR)
                 mpu::Log::getGlobal()(mpu::LogLvl::FATAL_ERROR, std::move(filepos), "cuda") << message;
@@ -77,18 +80,38 @@ inline void _cudaAssert(cudaError_t code, std::string&& filepos)
 
 
 // some converting functions
-template <typename d1, typename d2>
+template<typename d1, typename d2>
 __host__ __device__
 d1 toDim2(d2 rhs)
 {
     return {rhs.x, rhs.y};
 };
 
-template <typename d1, typename d2>
+template<typename d1, typename d2>
 __host__ __device__
 d1 toDim3(d2 rhs)
 {
     return {rhs.x, rhs.y, rhs.z};
 };
+
+class Managed
+{
+public:
+    void *operator new(size_t len)
+    {
+        void *ptr;
+        assert_cuda(cudaMallocManaged(&ptr, len));
+        assert_cuda(cudaDeviceSynchronize());
+        return ptr;
+    }
+
+    void operator delete(void *ptr)
+    {
+        assert_cuda(cudaDeviceSynchronize());
+        assert_cuda(cudaFree(ptr));
+    }
+};
+
+}
 
 #endif //MPUTILS_CUDAUTILS_H
