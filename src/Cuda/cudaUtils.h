@@ -56,7 +56,7 @@ typedef long long longlong;
 #endif
 //--------------------
 
-#define assert_cuda(CODE) _cudaAssert((CODE),MPU_FILEPOS);
+#define assert_cuda(CODE) _cudaAssert((CODE),MPU_FILEPOS)
 
 inline void _cudaAssert(cudaError_t code, std::string&& filepos)
 {
@@ -74,5 +74,21 @@ inline void _cudaAssert(cudaError_t code, std::string&& filepos)
         throw std::runtime_error("Cuda error: " + message);
     }
 }
+
+
+// some converting functions
+template <typename d1, typename d2>
+__host__ __device__
+d1 toDim2(d2 rhs)
+{
+    return {rhs.x, rhs.y};
+};
+
+template <typename d1, typename d2>
+__host__ __device__
+d1 toDim3(d2 rhs)
+{
+    return {rhs.x, rhs.y, rhs.z};
+};
 
 #endif //MPUTILS_CUDAUTILS_H
