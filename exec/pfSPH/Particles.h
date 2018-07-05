@@ -23,7 +23,7 @@
 // forward declare particles class
 //--------------------
 class Particles;
-template <size_t n, typename... TArgs> class SharedParticles;
+template <size_t n, template <size_t> class... TArgs> class SharedParticles;
 
 //-------------------------------------------------------------------
 // define the data types used for the simulation
@@ -70,7 +70,7 @@ public:
 private:
     // friends
     friend class Particles;
-    template <size_t n, typename... TArgs> friend class SharedParticles;
+    template <size_t n, template <size_t> class... TArgs> friend class SharedParticles;
 
     /**
      * construct a particle from a particle buffer eg what is listed as friends
@@ -106,11 +106,11 @@ private:
  * SHARED_ACC
  *
  */
-template <size_t n, typename... TArgs>
-class SharedParticles : public TArgs...
+template <size_t n, template <size_t> class... TArgs>
+class SharedParticles : public TArgs<n>...
 {
 public:
-    __host__ __device__ SharedParticles() : TArgs()... {}
+    __host__ __device__ SharedParticles() : TArgs<n>()... {}
 
     __device__ void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< load particle from global to shared memory
     __device__ void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< store a particle in global memory
@@ -199,21 +199,21 @@ private:
 
 //-------------------------------------------------------------------
 // define template functions of all the classes
-template<size_t n, typename... TArgs>
+template <size_t n, template <size_t> class... TArgs>
 __device__
 void SharedParticles<n, TArgs...>::copyFromGlobal(size_t shared_id, size_t global_id, const Particles &global)
 {
-    int t[] = {0, ((void)TArgs::copyFromGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
+    int t[] = {0, ((void)TArgs<n>::copyFromGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
 }
 
-template<size_t n, typename... TArgs>
+template <size_t n, template <size_t> class... TArgs>
 __device__
 void SharedParticles<n, TArgs...>::copyToGlobal(size_t shared_id, size_t global_id, const Particles &global)
 {
-    int t[] = {0, ((void)TArgs::copyToGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
+    int t[] = {0, ((void)TArgs<n>::copyToGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
 }
 
-template<size_t n, typename... TArgs>
+template <size_t n, template <size_t> class... TArgs>
 template<typename... particleArgs>
 __device__
 Particle<particleArgs...> SharedParticles<n, TArgs...>::loadParticle(size_t id)
@@ -221,7 +221,7 @@ Particle<particleArgs...> SharedParticles<n, TArgs...>::loadParticle(size_t id)
     return Particle<particleArgs...>(id,*this);
 }
 
-template<size_t n, typename... TArgs>
+template <size_t n, template <size_t> class... TArgs>
 template<typename... particleArgs>
 __device__
 void SharedParticles<n, TArgs...>::storeParticle(const Particle<particleArgs...> &p, size_t id)

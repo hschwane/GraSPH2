@@ -22,7 +22,7 @@ __global__ void test(Particles* from, Particles* to)
     unsigned index = blockIdx.x * blockDim.x + threadIdx.x;
 //    int stride = blockDim.x * gridDim.x;
 
-    SharedParticles<100,SHARED_POSM<100>> sp;
+    SharedParticles<100,SHARED_POSM> sp;
     sp.copyFromGlobal(threadIdx.x, index, *from);
 
     auto p = sp.loadParticle<POSM>(index);
@@ -40,7 +40,8 @@ int main()
     Particles* pb1 = new Particles(100);
     Particles* pb2 = new Particles(100);
 
-    Particle<M> p;
+    Particle<M,VEL> p;
+    p.vel = {12,56,85};
     p.mass = 10.0f;
     pb1->storeParticle(p,10);
 
@@ -53,7 +54,7 @@ int main()
     assert_cuda(cudaDeviceSynchronize());
     pb2->copyFromDevice();
     assert_cuda(cudaDeviceSynchronize());
-    p = pb2->loadParticle<M>(10);
+    p = pb2->loadParticle<M, VEL>(10);
 
     logINFO("test") << pb2->loadParticle<M>(10).mass;
     return 0;
