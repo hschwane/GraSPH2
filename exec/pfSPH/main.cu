@@ -19,12 +19,13 @@
 
 __global__ void test(Particles* from, Particles* to)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
+    unsigned index = blockIdx.x * blockDim.x + threadIdx.x;
+//    int stride = blockDim.x * gridDim.x;
 
+    SharedParticles<100,SHARED_POSM<100>> sp;
+    sp.copyFromGlobal(threadIdx.x, index, *from);
 
-
-    auto p = from->loadParticle<M>(index);
+    auto p = sp.loadParticle<POSM>(index);
 
     to->storeParticle(p,index);
 }
@@ -55,6 +56,5 @@ int main()
     p = pb2->loadParticle<M>(10);
 
     logINFO("test") << pb2->loadParticle<M>(10).mass;
-    logINFO("test") << pb1->loadParticle<M>(10).mass;
     return 0;
 }

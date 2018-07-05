@@ -70,7 +70,7 @@ public:
 private:
     // friends
     friend class Particles;
-    template <size_t n, typename... TArgs> class SharedParticles;
+    template <size_t n, typename... TArgs> friend class SharedParticles;
 
     /**
      * construct a particle from a particle buffer eg what is listed as friends
@@ -88,6 +88,50 @@ private:
     {
         int t[] = {0, ((void)Args::store(id,buffer),1)...}; // call store functions of all the base classes
     }
+};
+
+
+//-------------------------------------------------------------------
+/**
+ * class SharedParticles
+ *
+ * handles particles in shared memory on the device
+ *
+ * usage:
+ * Specify how many particles should be stored in shared memory and what attributes should be defined for them.
+ * Beware that you have to take care of synchronization yourself.
+ * Supported particle attributes are:
+ * SHARED_POSM
+ * SHARED_VEL
+ * SHARED_ACC
+ *
+ */
+template <size_t n, typename... TArgs>
+class SharedParticles : public TArgs...
+{
+public:
+    __host__ __device__ SharedParticles() : TArgs()... {}
+
+    __device__ void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< load particle from global to shared memory
+    __device__ void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< store a particle in global memory
+
+    template<typename... particleArgs>
+    __device__
+    Particle<particleArgs...> loadParticle(size_t id); //!< get a particle object with the requested members
+
+    template<typename... particleArgs>
+    __device__
+    void storeParticle(const Particle<particleArgs...>& p,size_t id); //!< set the attributes of particle id according to the particle object
+
+    __device__ size_t size() {return n;}
+
+private:
+    // particles have lots of friends ^^
+    friend class POS;
+    friend class M;
+    friend class POSM;
+    friend class VEL;
+    friend class ACC;
 };
 
 //-------------------------------------------------------------------
@@ -147,10 +191,44 @@ private:
     friend class POSM;
     friend class VEL;
     friend class ACC;
+
+    template <size_t n> friend class SHARED_POSM;
+    template <size_t n> friend class SHARED_VEL;
+    template <size_t n> friend class SHARED_ACC;
 };
 
 //-------------------------------------------------------------------
 // define template functions of all the classes
+template<size_t n, typename... TArgs>
+__device__
+void SharedParticles<n, TArgs...>::copyFromGlobal(size_t shared_id, size_t global_id, const Particles &global)
+{
+    int t[] = {0, ((void)TArgs::copyFromGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
+}
+
+template<size_t n, typename... TArgs>
+__device__
+void SharedParticles<n, TArgs...>::copyToGlobal(size_t shared_id, size_t global_id, const Particles &global)
+{
+    int t[] = {0, ((void)TArgs::copyToGlobal(shared_id,global_id,global),1)...}; // call copy functions of all the base classes
+}
+
+template<size_t n, typename... TArgs>
+template<typename... particleArgs>
+__device__
+Particle<particleArgs...> SharedParticles<n, TArgs...>::loadParticle(size_t id)
+{
+    return Particle<particleArgs...>(id,*this);
+}
+
+template<size_t n, typename... TArgs>
+template<typename... particleArgs>
+__device__
+void SharedParticles<n, TArgs...>::storeParticle(const Particle<particleArgs...> &p, size_t id)
+{
+    p.store(id,*this);
+}
+
 template<typename... Args>
 Particle<Args...> Particles::loadParticle(size_t id)
 {
@@ -342,6 +420,94 @@ protected:
 #else
         buffer.m_hacc[id] = {acc.x, acc.y, acc.z, 0};
 #endif
+    }
+};
+
+//-------------------------------------------------------------------
+// define some classes that hold the members of the sharedParticles class
+
+//--------------------
+// hold  position and mass
+template <size_t n>
+class SHARED_POSM
+{
+public:
+    __device__
+    SHARED_POSM()
+    {
+        __shared__ f4_t mem[n];
+        m_dpos = mem;
+    }
+
+protected:
+    f4_t* m_dpos;
+
+    __device__
+    void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        m_dpos[shared_id] = global.m_dpos[global_id];
+    }
+
+    __device__
+    void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        global.m_dpos[global_id] = m_dpos[shared_id];
+    }
+};
+
+//--------------------
+// hold the velocity
+template <size_t n>
+class SHARED_VEL
+{
+public:
+    __device__
+    SHARED_VEL()
+    {
+        __shared__ f4_t mem[n];
+        m_dvel = mem;
+    }
+protected:
+    f4_t* m_dvel;
+
+    __device__
+    void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        m_dvel[shared_id] = global.m_dvel[global_id];
+    }
+
+    __device__
+    void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        global.m_dvel[global_id] = m_dvel[shared_id];
+    }
+};
+
+//--------------------
+// hold the acceleration
+template <size_t n>
+class SHARED_ACC
+{
+public:
+    __device__
+    SHARED_ACC()
+    {
+        __shared__ f4_t mem[n];
+        m_dacc = mem;
+    }
+protected:
+    f4_t* m_dacc;
+
+    __device__
+    void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        m_dacc[shared_id] = global.m_dacc[global_id];
+    }
+
+    __device__
+    void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global)
+    {
+        global.m_dacc[global_id] = m_dacc[shared_id];
     }
 };
 
