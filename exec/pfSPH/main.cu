@@ -16,6 +16,7 @@
 #include <Cuda/cudaUtils.h>
 
 #include "Particles.h"
+#include "frontends/frontendInterface.h"
 
 __global__ void test(Particles* from, Particles* to)
 {
@@ -35,7 +36,9 @@ int main()
 
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
+
     logINFO("pfSPH") << "Welcome to planetformSPH!";
+    fnd::initializeFrontend();
 
     Particles* pb1 = new Particles(100);
     Particles* pb2 = new Particles(100);
@@ -57,5 +60,12 @@ int main()
     p = pb2->loadParticle<M, VEL>(10);
 
     logINFO("test") << pb2->loadParticle<M>(10).mass;
+
+    mpu::DeltaTimer dt;
+    while(fnd::handleFrontend(dt.getDeltaTime()))
+    {
+        ; // run the simulation here
+    }
+
     return 0;
 }
