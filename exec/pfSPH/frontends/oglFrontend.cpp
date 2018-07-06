@@ -26,9 +26,9 @@ namespace oglFronted {
 glm::uvec2 SIZE = {800,800};
 constexpr char TITLE[] = "Planetform";
 
-const glm::vec4 BG_COLOR = {1,1,1,1};
+const glm::vec4 BG_COLOR = {0,0,0,1};
 
-constexpr float particleRenderSize = 0.8f;
+constexpr float particleRenderSize = 0.01f;
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
@@ -69,15 +69,15 @@ void initializeFrontend()
     mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
 
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     vao.recreate();
 
     shader.recreate();
-    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH}},{{"PARTICLES_PERSPECTIVE"}});
+    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH}},{{"PARTICLES_PERSPECTIVE"},{"PARTICLES_ROUND"}});
 
-    shader.uniform2f("viewport_size", SIZE);
-    shader.uniform1f("renderSize", particleRenderSize);
-
+    shader.uniform2f("viewport_size", glm::vec2(SIZE));
+    shader.uniform1f("render_size", particleRenderSize);
     shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
     shader.uniformMat4("projection", glm::mat4(1.0f));
 
@@ -94,9 +94,8 @@ uint32_t getPositionBuffer(size_t n)
                     "You can not initialize position and velocity buffer with different particle numbers.");
     }
     else
-    {
         particleCount = n;
-    }
+
 
     positionBuffer.recreate();
     positionBuffer.allocate<glm::vec4>(n);
@@ -115,9 +114,8 @@ uint32_t getVelocityBuffer(size_t n)
                     "You can not initialize position and velocity buffer with different particle numbers.");
     }
     else
-    {
         particleCount = n;
-    }
+
 
     velocityBuffer.recreate();
     velocityBuffer.allocate<glm::vec4>(particleCount);
