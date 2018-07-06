@@ -29,6 +29,7 @@ constexpr char TITLE[] = "Planetform";
 const glm::vec4 BG_COLOR = {0,0,0,1};
 
 constexpr float particleRenderSize = 0.01f;
+constexpr float particleBrightness = 1.0f;
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
@@ -78,6 +79,7 @@ void initializeFrontend()
 
     shader.uniform2f("viewport_size", glm::vec2(SIZE));
     shader.uniform1f("render_size", particleRenderSize);
+    shader.uniform1f("brightness", particleBrightness);
     shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
     shader.uniformMat4("projection", glm::mat4(1.0f));
 

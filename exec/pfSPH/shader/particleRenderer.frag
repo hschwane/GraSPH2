@@ -5,7 +5,7 @@ in float radius;
 in vec4 vel_color;
 
 //uniform vec4 color;
-//uniform float brightness;
+uniform float brightness;
 
 out vec4 fragment_color;
 
@@ -22,6 +22,5 @@ void main()
 
 //    vec4 falloffColor;
 //    PARTICLE_FALLOFF(); // this is defined via preprocessor macros when compiling
-//	fragment_color = falloffColor*brightness;
-    fragment_color = vel_color;
+	fragment_color = vel_color*brightness;
 }
