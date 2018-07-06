@@ -40,6 +40,9 @@ int main()
     logINFO("pfSPH") << "Welcome to planetformSPH!";
     fnd::initializeFrontend();
 
+    bool simShouldRun = false;
+    fnd::setPauseHandler([simShouldRun](bool pause){simShouldRun = !pause;});
+
     Particles* pb1 = new Particles(100);
     Particles* pb2 = new Particles(100);
 
@@ -64,7 +67,10 @@ int main()
     mpu::DeltaTimer dt;
     while(fnd::handleFrontend(dt.getDeltaTime()))
     {
-        ; // run the simulation here
+        if(simShouldRun)
+        {
+            // run simulation here
+        }
     }
 
     return 0;
