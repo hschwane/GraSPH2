@@ -392,7 +392,7 @@ protected:
     void store(size_t id, T& buffer) const
     {
 #if defined(__CUDA_ARCH__)
-        buffer.m_hvel[id] = {vel.x, vel.y, vel.z, 0};
+        buffer.m_dvel[id] = {vel.x, vel.y, vel.z, 0};
 #else
         buffer.m_hvel[id] = {vel.x, vel.y, vel.z, 0};
 #endif
@@ -427,7 +427,7 @@ protected:
     void store(size_t id, T& buffer) const
     {
 #if defined(__CUDA_ARCH__)
-        buffer.m_hacc[id] = {acc.x, acc.y, acc.z, 0};
+        buffer.m_dacc[id] = {acc.x, acc.y, acc.z, 0};
 #else
         buffer.m_hacc[id] = {acc.x, acc.y, acc.z, 0};
 #endif
