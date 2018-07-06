@@ -9,6 +9,7 @@ uniform mat4 model_view_projection;
 uniform mat4 projection;
 uniform vec2 viewport_size;
 uniform float render_size;
+uniform vec4 defaultColor;
 
 out vec2 center;
 out float radius;
@@ -26,10 +27,14 @@ void main()
     gl_PointSize = size;
 #endif
 
+#ifdef COLORCODE_VELOCITY
     if(iszero(input_velocity.xyz))
-        vel_color = vec4(1,1,1,1);
+        vel_color = defaultColor;
     else
         vel_color = vec4(normalize(input_velocity.xyz), 1);
+#else
+    vel_color = defaultColor;
+#endif
 
 	center = (0.5 * gl_Position.xy/gl_Position.w +0.5) * viewport_size;
 	radius = gl_PointSize / 2;

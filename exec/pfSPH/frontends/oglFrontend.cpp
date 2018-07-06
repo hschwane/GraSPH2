@@ -20,6 +20,14 @@
 namespace fnd {
 namespace oglFronted {
 
+enum class Falloff
+{
+    NONE,
+    LINEAR,
+    SQUARED,
+    CUBED,
+    ROOT
+};
 
 // settings
 //--------------------
@@ -28,8 +36,15 @@ constexpr char TITLE[] = "Planetform";
 
 const glm::vec4 BG_COLOR = {0,0,0,1};
 
-constexpr float particleRenderSize = 0.01f;
-constexpr float particleBrightness = 1.0f;
+float particleRenderSize    = 0.01f;
+float particleBrightness    = 1.0f;
+Falloff falloffStyle        = Falloff::NONE;
+bool perspectiveSize        = true;
+bool roundParticles         = true;
+bool additiveBlending       = false;
+bool depthTest              = false;
+bool colorcodeVelocity      = true;
+glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
@@ -56,6 +71,45 @@ mpu::gph::VertexArray vao(nullptr);
 mpu::gph::ShaderProgram shader(nullptr);
 //--------------------
 
+void recompileShader()
+{
+    std::vector<mpu::gph::glsl::Definition> definitions;
+    if(perspectiveSize)
+        definitions.push_back({"PARTICLES_PERSPECTIVE"});
+    if(roundParticles)
+        definitions.push_back({"PARTICLES_ROUND"});
+    if(colorcodeVelocity)
+        definitions.push_back({"COLORCODE_VELOCITY"});
+
+    switch(falloffStyle)
+    {
+        case Falloff::LINEAR:
+            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter)"}});
+            break;
+        case Falloff::SQUARED:
+            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter*distFromCenter)"}});
+            break;
+        case Falloff::CUBED:
+            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter*distFromCenter*distFromCenter)"}});
+            break;
+        case Falloff::ROOT:
+            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-sqrt(distFromCenter))"}});
+            break;
+        case Falloff::NONE:
+        default:
+            definitions.push_back({"PARTICLE_FALLOFF",{""}});
+            break;
+    }
+
+    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH}},definitions);
+    shader.uniform2f("viewport_size", glm::vec2(SIZE));
+    shader.uniform1f("render_size", particleRenderSize);
+    shader.uniform1f("brightness", particleBrightness);
+    shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
+    shader.uniformMat4("projection", glm::mat4(1.0f));
+    shader.uniform4f("defaultColor",particleColor);
+}
+
 }
 
 //-------------------------------------------------------------------
@@ -71,17 +125,20 @@ void initializeFrontend()
 
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
     glEnable(GL_PROGRAM_POINT_SIZE);
+    if(additiveBlending)
+    {
+        glBlendFunc(GL_ONE, GL_ONE);
+        glEnable(GL_BLEND);
+    }
+    if(depthTest)
+    {
+        glEnable(GL_DEPTH_TEST);
+    }
 
     vao.recreate();
 
     shader.recreate();
-    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH}},{{"PARTICLES_PERSPECTIVE"},{"PARTICLES_ROUND"}});
-
-    shader.uniform2f("viewport_size", glm::vec2(SIZE));
-    shader.uniform1f("render_size", particleRenderSize);
-    shader.uniform1f("brightness", particleBrightness);
-    shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
-    shader.uniformMat4("projection", glm::mat4(1.0f));
+    recompileShader();
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }

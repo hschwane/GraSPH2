@@ -57,12 +57,16 @@ int main()
 
     Particle<POS,VEL> p;
     p.pos = {0.5f,0.5f,0.0f};
-    p.vel = {0.5,0.5,0.0};
+    p.vel = {1.0,0.,0.0};
     pb->storeParticle(p,9);
 
     p.pos = {-0.5f,-0.5f,0.0f};
     p.vel = {0.0,1.0,0.0};
     pb->storeParticle(p,10);
+
+    p.pos = {0.5f,-0.5f,0.0f};
+    p.vel = {0.0,0.0,1.0};
+    pb->storeParticle(p,11);
 
     pb->copyToDevice();
     assert_cuda(cudaDeviceSynchronize());
