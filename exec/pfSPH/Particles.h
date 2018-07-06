@@ -156,6 +156,12 @@ public:
     void copyToDevice();    //!< initiate copy of data from host to device
     void copyFromDevice();  //!< initiate copying of data from host to device
 
+    void registerGLPositionBuffer(uint32_t posBufferID); //!< register an openGL buffer to be used for positions (optional)
+    void registerGLVelocityBuffer(uint32_t velBufferID); //!< register an openGL buffer to be used for positions (optional)
+    void mapRegisteredBuffers();    //!< map the registered buffers before performing any cuda operations
+    void unmapRegisteredBuffes();     //!< unmap the registered buffers before performing any openGL operations
+    void unregisterBuffers(); //!< unregister all external buffers
+
     template<typename... Args>
     __host__ __device__
     Particle<Args...> loadParticle(size_t id); //!< get a particle object with the requested members
@@ -184,6 +190,11 @@ private:
     f4_t* m_dpos;
     f4_t* m_dvel;
     f4_t* m_dacc;
+
+    // external maped resources
+    cudaGraphicsResource* VBO_CUDA[2];
+    bool registeredPosBuffer;
+    bool registeredVelBuffer;
 
     // particles have lots of friends ^^
     friend class POS;

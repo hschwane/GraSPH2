@@ -13,6 +13,7 @@
 
 // includes
 //--------------------
+#include <cuda_gl_interop.h>
 #include "Particles.h"
 //--------------------
 
@@ -24,8 +25,10 @@
 // function definitions of the Particles class
 //-------------------------------------------------------------------
 Particles::Particles() : m_numParticles(0), m_hpos(nullptr), m_hvel(nullptr), m_hacc(nullptr), m_dpos(nullptr),
-                         m_dvel(nullptr), m_dacc(nullptr)
+                         m_dvel(nullptr), m_dacc(nullptr), registeredPosBuffer(false), registeredVelBuffer(false)
 {
+    VBO_CUDA[0] = nullptr;
+    VBO_CUDA[1] = nullptr;
 }
 
 Particles::Particles(size_t n) : Particles()
@@ -36,6 +39,8 @@ Particles::Particles(size_t n) : Particles()
 Particles::~Particles()
 {
     free();
+    unmapRegisteredBuffes();
+    unregisterBuffers();
 }
 
 void Particles::reallocate(size_t n)
@@ -71,10 +76,16 @@ void Particles::free()
     delete[] m_hacc;
     m_hacc = nullptr;
 
-    assert_cuda(cudaFree(m_dpos));
-    m_dpos = nullptr;
-    assert_cuda(cudaFree(m_dvel));
-    m_dvel = nullptr;
+    if(!registeredPosBuffer)
+    {
+        assert_cuda(cudaFree(m_dpos));
+        m_dpos = nullptr;
+    }
+    if(!registeredVelBuffer)
+    {
+        assert_cuda(cudaFree(m_dvel));
+        m_dvel = nullptr;
+    }
     assert_cuda(cudaFree(m_dacc));
     m_dacc = nullptr;
 }
@@ -91,4 +102,68 @@ void Particles::copyFromDevice()
     if(m_dpos) assert_cuda(cudaMemcpy(m_hpos, m_dpos, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
     if(m_dvel) assert_cuda(cudaMemcpy(m_hvel, m_dvel, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
     if(m_dpos) assert_cuda(cudaMemcpy(m_hacc, m_dacc, m_numParticles*sizeof(f4_t), cudaMemcpyDeviceToHost));
+}
+
+void Particles::registerGLPositionBuffer(uint32_t posBufferID)
+{
+    assert_cuda(cudaFree(m_dpos));
+    m_dpos = nullptr;
+    assert_cuda(cudaGraphicsGLRegisterBuffer(&VBO_CUDA[0], posBufferID, cudaGraphicsMapFlagsWriteDiscard));
+    registeredPosBuffer = true;
+}
+
+void Particles::registerGLVelocityBuffer(uint32_t velBufferID)
+{
+    assert_cuda(cudaFree(m_dvel));
+    m_dpos = nullptr;
+    assert_cuda(cudaGraphicsGLRegisterBuffer(&VBO_CUDA[1], velBufferID, cudaGraphicsMapFlagsWriteDiscard));
+    registeredVelBuffer = true;
+}
+
+void Particles::mapRegisteredBuffers()
+{
+    size_t mappedBufferSize;
+
+    if(registeredPosBuffer)
+    {
+        assert_cuda(cudaGraphicsMapResources(1, &VBO_CUDA[0]));
+        assert_cuda(cudaGraphicsResourceGetMappedPointer((void**)&m_dpos, &mappedBufferSize, VBO_CUDA[0]));
+        assert_true(mappedBufferSize == m_numParticles*sizeof(f4_t), "Paticles",
+                    "opengl buffer size is not equal to particle number");
+    }
+    if(registeredVelBuffer)
+    {
+        assert_cuda(cudaGraphicsMapResources(1, &VBO_CUDA[1]));
+        assert_cuda(cudaGraphicsResourceGetMappedPointer((void**)&m_dvel, &mappedBufferSize, VBO_CUDA[1]));
+        assert_true(mappedBufferSize == m_numParticles*sizeof(f4_t), "Paticles",
+                    "opengl buffer size is not equal to particle number");
+    }
+}
+
+void Particles::unmapRegisteredBuffes()
+{
+    if(registeredPosBuffer)
+    {
+        assert_cuda(cudaGraphicsUnmapResources(1, &VBO_CUDA[0]));
+        m_dpos = nullptr;
+    }
+    if(registeredVelBuffer)
+    {
+        assert_cuda(cudaGraphicsUnmapResources(1, &VBO_CUDA[1]));
+        m_dvel = nullptr;
+    }
+}
+
+void Particles::unregisterBuffers()
+{
+    if(registeredPosBuffer)
+    {
+        cudaGraphicsUnregisterResource(VBO_CUDA[0]);
+        registeredPosBuffer = false;
+    }
+    if(registeredVelBuffer)
+    {
+        cudaGraphicsUnregisterResource(VBO_CUDA[1]);
+        registeredVelBuffer = false;
+    }
 }

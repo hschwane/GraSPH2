@@ -14,6 +14,7 @@
 
 #include <mpUtils.h>
 #include <Cuda/cudaUtils.h>
+#include <cuda_gl_interop.h>
 
 #include "Particles.h"
 #include "frontends/frontendInterface.h"
@@ -36,42 +37,44 @@ int main()
 
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
-
     logINFO("pfSPH") << "Welcome to planetformSPH!";
-    fnd::initializeFrontend();
+    assert_cuda(cudaSetDevice(0));
 
+    // handle frontend
+    fnd::initializeFrontend();
     bool simShouldRun = false;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
-    Particles* pb1 = new Particles(100);
-    Particles* pb2 = new Particles(100);
+    // generate 100 particles
+    std::unique_ptr<Particles> pb(new Particles(100));
 
-    Particle<M,VEL> p;
-    p.vel = {12,56,85};
-    p.mass = 10.0f;
-    pb1->storeParticle(p,10);
+    // register position and velocity buffer with cuda
+#if defined(FRONTEND_OPENGL)
+    pb->registerGLPositionBuffer(fnd::getPositionBuffer(pb->size()));
+    pb->registerGLVelocityBuffer(fnd::getVelocityBuffer(pb->size()));
+    pb->mapRegisteredBuffers();
+#endif
 
+    Particle<POS,VEL> p;
+    p.pos = {0.5f,0.5f,0.0f};
+    p.vel = {1.0,0.0,0.0};
+    pb->storeParticle(p,10);
+
+    pb->copyToDevice();
     assert_cuda(cudaDeviceSynchronize());
-    pb1->copyToDevice();
-    assert_cuda(cudaDeviceSynchronize());
-
-    test<<<1,100>>>(pb1,pb2);
-
-    assert_cuda(cudaDeviceSynchronize());
-    pb2->copyFromDevice();
-    assert_cuda(cudaDeviceSynchronize());
-    p = pb2->loadParticle<M, VEL>(10);
-
-    logINFO("test") << pb2->loadParticle<M>(10).mass;
 
     mpu::DeltaTimer dt;
+//    pb->unmapRegisteredBuffes(); // used for frontend stuff
     while(fnd::handleFrontend(dt.getDeltaTime()))
     {
         if(simShouldRun)
         {
+            pb->mapRegisteredBuffers(); // used for frontend stuff
             // run simulation here
+            pb->unmapRegisteredBuffes(); // used for frontend stuff
         }
     }
 
+    pb->unregisterBuffers(); // probably not needed since it is done in destructor
     return 0;
 }
