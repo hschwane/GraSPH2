@@ -87,14 +87,14 @@ Window::Window(const int width, const int height, const std::string &title, GLFW
             int e =glfwInit();
             if(e  != GL_TRUE)
             {
-                logFATAL_ERROR("Graphics") << "Error initalising glfw. Returned: " << e ;
-                throw std::runtime_error("Could not initalize glfw!");
+                logFATAL_ERROR("Graphics") << "Error initializing glfw. Returned: " << e ;
+                throw std::runtime_error("Could not initializing glfw!");
             }
 
             glfwSetErrorCallback([](int code, const char * message){
                 logERROR("GLFW") << "Error code: " << code << "Message: " << message;
             });
-            logDEBUG("Graphics") << "Initialised GLFW.";
+            logDEBUG("Graphics") << "initialized GLFW.";
         }
         ~GLFWinit() { glfwTerminate(); }
     } glfwinit;
@@ -126,8 +126,8 @@ Window::Window(const int width, const int height, const std::string &title, GLFW
             GLenum e = glewInit();
             if(e != GLEW_OK)
             {
-                logFATAL_ERROR("Graphics") << "Error initalising glew. Returned: " << e ;
-                throw std::runtime_error("Could not initalize glew!");
+                logFATAL_ERROR("Graphics") << "Error initializing glew. Returned: " << e ;
+                throw std::runtime_error("Could not initialized glew!");
             }
             logDEBUG("Graphics") << "Initialised GLEW.";
         }
