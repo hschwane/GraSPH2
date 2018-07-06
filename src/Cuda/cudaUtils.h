@@ -13,10 +13,10 @@
 
 // includes
 //--------------------
-// most of those are mainly needed for clion and not actual compiling
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <device_launch_parameters.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include "../Log/Log.h"
