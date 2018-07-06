@@ -41,7 +41,7 @@ int main()
     fnd::initializeFrontend();
 
     bool simShouldRun = false;
-    fnd::setPauseHandler([simShouldRun](bool pause){simShouldRun = !pause;});
+    fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     Particles* pb1 = new Particles(100);
     Particles* pb2 = new Particles(100);
