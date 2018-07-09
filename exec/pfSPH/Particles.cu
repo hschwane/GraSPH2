@@ -25,7 +25,8 @@
 // function definitions of the Particles class
 //-------------------------------------------------------------------
 Particles::Particles() : m_numParticles(0), m_hpos(nullptr), m_hvel(nullptr), m_hacc(nullptr), m_dpos(nullptr),
-                         m_dvel(nullptr), m_dacc(nullptr), registeredPosBuffer(false), registeredVelBuffer(false)
+                         m_dvel(nullptr), m_dacc(nullptr), registeredPosBuffer(false), registeredVelBuffer(false),
+                         m_isDeviceCopy(false)
 {
     VBO_CUDA[0] = nullptr;
     VBO_CUDA[1] = nullptr;
@@ -38,6 +39,9 @@ Particles::Particles(size_t n) : Particles()
 
 Particles::~Particles()
 {
+    // if this is just a device copy do nothing
+    if(m_isDeviceCopy)
+        return;
     free();
     unmapRegisteredBuffes();
     unregisterBuffers();
@@ -166,4 +170,16 @@ void Particles::unregisterBuffers()
         cudaGraphicsUnregisterResource(VBO_CUDA[1]);
         registeredVelBuffer = false;
     }
+}
+
+Particles Particles::createDeviceClone() const
+{
+    Particles other;
+    // only copy device pointer to the device copy of particles
+    other.m_dpos = m_dpos;
+    other.m_dvel = m_dvel;
+    other.m_dacc = m_dacc;
+    other.m_numParticles = m_numParticles;
+    other.m_isDeviceCopy = true;
+    return std::move(other);
 }
