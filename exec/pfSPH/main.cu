@@ -13,11 +13,15 @@
  */
 
 #include <mpUtils.h>
-#include <Cuda/cudaUtils.h>
 #include <cuda_gl_interop.h>
+#include <thrust/random.h>
 
 #include "Particles.h"
 #include "frontends/frontendInterface.h"
+#include <Cuda/cudaUtils.h>
+
+constexpr int FORCES_BLOCK_SIZE = 256;
+constexpr int PARTICLES = 16384;
 
 template <typename T>
 __host__ __device__
@@ -26,12 +30,76 @@ const T operator+(const T& lhs, const T& rhs)
     return {lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
 
+template <typename T>
+__host__ __device__
+const T operator-(const T& lhs, const T& rhs)
+{
+    return {lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
+}
+
 template <typename T, typename SC>
 __host__ __device__
 const T operator*(const T& lhs, const SC& rhs)
 {
     return {lhs.x * rhs, lhs.y * rhs, lhs.z * rhs};
 }
+
+__global__ void generate2DNBSystem(Particles particles)
+{
+    int indexX = blockIdx.x * blockDim.x + threadIdx.x;
+    int strideX = blockDim.x * gridDim.x;
+
+    thrust::random::default_random_engine rng;
+    rng.discard(indexX);
+    thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
+
+    Particle<POSM,VEL,ACC> p;
+    p.mass = 1.0f/particles.size();
+
+    for(int i= indexX; i < particles.size(); i+=strideX)
+    {
+        p.pos.x = dist(rng);
+        p.pos.y = dist(rng);
+        p.pos.z = 0.0f;
+        particles.storeParticle(p,i);
+    }
+}
+
+
+__global__ void nbodyForces(Particles particles, f1_t eps2)
+{
+    SharedParticles<FORCES_BLOCK_SIZE,SHARED_POSM,SHARED_VEL> shared;
+
+    const unsigned indexX = blockIdx.x * blockDim.x + threadIdx.x;
+    int strideX = blockDim.x * gridDim.x;
+
+    for(int i= indexX; i < particles.size(); i+=strideX)
+    {
+        const auto pi = particles.loadParticle<POSM,VEL>(i);
+        Particle<ACC> piacc;
+
+        for(int k= indexX; k < particles.size(); k += blockDim.x)
+        {
+            shared.copyFromGlobal(threadIdx.x,k,particles);
+            __syncthreads();
+
+            for(int j = 0; j<blockDim.x;j++)
+            {
+                auto pj = shared.loadParticle<POSM,VEL>(j);
+
+                const f3_t rij = pi.pos - pj.pos;
+                const f1_t r2 = rij.x * rij.x + rij.y * rij.y + rij.z * rij.z;
+                const f1_t r2e = r2 + eps2;
+                const f1_t s = pj.mass/(r2e*sqrt(r2e));
+                piacc.acc = piacc.acc - rij * s;
+
+//                f3_t velij = pi.vel - pj.vel;
+            }
+        }
+        particles.storeParticle(piacc,i);
+    }
+}
+
 
 __global__ void integrateLeapfrog(Particles particles, f1_t dt, bool not_first_step)
 {
@@ -73,7 +141,7 @@ int main()
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate 100 particles
-    Particles pb(100);
+    Particles pb(PARTICLES);
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
@@ -82,21 +150,10 @@ int main()
     pb.mapRegisteredBuffers();
 #endif
 
-    Particle<POS,VEL> p;
-    p.pos = {0.5f,0.5f,0.0f};
-    p.vel = {1.0,0.,0.0};
-    pb.storeParticle(p,0);
-
-    p.pos = {-0.5f,-0.5f,0.0f};
-    p.vel = {0.0,1.0,0.0};
-    pb.storeParticle(p,1);
-
-    p.pos = {0.5f,-0.5f,0.0f};
-    p.vel = {1.0,1.0,0.0};
-    pb.storeParticle(p,2);
-
-    pb.copyToDevice();
+    generate2DNBSystem<<<(PARTICLES+FORCES_BLOCK_SIZE-1)/FORCES_BLOCK_SIZE,FORCES_BLOCK_SIZE>>>(pb.createDeviceClone());
+    assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
+
 
     pb.unmapRegisteredBuffes(); // used for frontend stuff
     mpu::DeltaTimer dt;
@@ -106,7 +163,8 @@ int main()
         {
             pb.mapRegisteredBuffers(); // used for frontend stuff
             // run simulation here
-            integrateLeapfrog<<<1,100>>>(std::move(pb.createDeviceClone()),0.01f,true);
+            nbodyForces<<<(PARTICLES+FORCES_BLOCK_SIZE-1)/FORCES_BLOCK_SIZE,FORCES_BLOCK_SIZE>>>(pb.createDeviceClone(),0.01f);
+            integrateLeapfrog<<<(PARTICLES+FORCES_BLOCK_SIZE-1)/FORCES_BLOCK_SIZE,FORCES_BLOCK_SIZE>>>(std::move(pb.createDeviceClone()),0.01f,true);
             assert_cuda(cudaGetLastError());
 //            assert_cuda(cudaDeviceSynchronize());
             pb.unmapRegisteredBuffes(); // used for frontend stuff
