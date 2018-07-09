@@ -73,8 +73,7 @@ int main()
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate 100 particles
-    Particles* __pb = new Particles(10);
-    Particles& pb = *__pb;
+    Particles pb(100);
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
@@ -107,11 +106,11 @@ int main()
         {
             pb.mapRegisteredBuffers(); // used for frontend stuff
             // run simulation here
-            integrateLeapfrog<<<1,100>>>(pb.createDeviceClone(),0.01f,true);
+            integrateLeapfrog<<<1,100>>>(std::move(pb.createDeviceClone()),0.01f,true);
             assert_cuda(cudaGetLastError());
 //            assert_cuda(cudaDeviceSynchronize());
-            mpu::sleep_ms(1);
             pb.unmapRegisteredBuffes(); // used for frontend stuff
+            mpu::sleep_ms(1);
         }
     }
 

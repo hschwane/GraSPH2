@@ -144,7 +144,7 @@ private:
  *
  *
  */
-class Particles : public mpu::Managed
+class Particles
 {
 public:
     Particles();
