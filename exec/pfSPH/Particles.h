@@ -172,7 +172,7 @@ public:
 
     __host__ __device__ size_t size() {return m_numParticles;} //!< return the number of particles
 
-    Particles createDeviceClone(); //!< create a copy which only holds device pointer and can be moved to the device
+    Particles createDeviceClone() const; //!< create a copy which only holds device pointer and can be moved to the device
 
     // make particles non copyable, but moveable
     Particles(Particles&& that) = default;

@@ -109,7 +109,7 @@ int main()
             // run simulation here
             integrateLeapfrog<<<1,100>>>(pb.createDeviceClone(),0.01f,true);
             assert_cuda(cudaGetLastError());
-            assert_cuda(cudaDeviceSynchronize());
+//            assert_cuda(cudaDeviceSynchronize());
             mpu::sleep_ms(1);
             pb.unmapRegisteredBuffes(); // used for frontend stuff
         }
