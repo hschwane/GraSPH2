@@ -36,7 +36,7 @@ constexpr char TITLE[] = "Planetform";
 
 const glm::vec4 BG_COLOR = {0,0,0,1};
 
-float particleRenderSize    = 0.01f;
+float particleRenderSize    = 0.005f;
 float particleBrightness    = 1.0f;
 Falloff falloffStyle        = Falloff::NONE;
 bool perspectiveSize        = true;

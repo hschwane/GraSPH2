@@ -31,7 +31,10 @@ void main()
     if(iszero(input_velocity.xyz))
         vel_color = defaultColor;
     else
-        vel_color = vec4(normalize(input_velocity.xyz), 1);
+    {
+        vec3 nv = 0.5f*normalize(input_velocity.xyz)+vec3(0.5f);
+        vel_color = vec4( nv, 1);
+    }
 #else
     vel_color = defaultColor;
 #endif
