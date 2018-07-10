@@ -164,7 +164,7 @@ public:
 
     template<typename... Args>
     __host__ __device__
-    Particle<Args...> loadParticle(size_t id); //!< get a particle object with the requested members
+    Particle<Args...> loadParticle(size_t id) const; //!< get a particle object with the requested members
 
     template<typename... Args>
     __host__ __device__
@@ -248,7 +248,7 @@ void SharedParticles<n, TArgs...>::storeParticle(const Particle<particleArgs...>
 }
 
 template<typename... Args>
-Particle<Args...> Particles::loadParticle(size_t id)
+Particle<Args...> Particles::loadParticle(size_t id) const
 {
     return Particle<Args...>(id,*this);
 }
