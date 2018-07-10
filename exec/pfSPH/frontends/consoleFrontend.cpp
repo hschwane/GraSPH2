@@ -11,8 +11,19 @@
 
 #include "frontendInterface.h"
 #include <mpUtils.h>
+#include <iostream>
 
 namespace fnd {
+
+namespace cmdFrontend {
+
+    // sttings
+    const double maxTime = 10.0f;
+
+    // variables
+    double totalTime = 0;
+    double timeSincePrint = 0;
+}
 
 void initializeFrontend()
 {
@@ -36,7 +47,22 @@ void setPauseHandler(std::function<void(bool)> f)
 
 bool handleFrontend(double dt)
 {
-    return true;
+    using namespace cmdFrontend;
+
+    totalTime += dt;
+    timeSincePrint += dt;
+
+    if(timeSincePrint > 4.0f)
+    {
+        timeSincePrint = 0;
+        logINFO("Frontend") << "Simulation ran for " << totalTime << "seconds.";
+    }
+
+    if(totalTime < maxTime)
+        return true;
+    else
+        return false;
+
 }
 
 }
