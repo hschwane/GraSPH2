@@ -16,6 +16,7 @@
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <device_launch_parameters.h>
+#include <inc/helper_math.h>
 
 #include <cstdio>
 #include <cstdlib>

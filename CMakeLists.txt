@@ -116,6 +116,7 @@ if (USE_CUDA)
     if ($ENV{CLION_IDE})
         list(APPEND INCLUDE_PATHES "/usr/local/cuda/include")
     endif ()
+    list(APPEND INCLUDE_PATHES "/usr/local/cuda/samples/common")
 endif ()
 
 # create target
