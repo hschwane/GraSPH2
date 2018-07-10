@@ -163,11 +163,13 @@ void Particles::unregisterBuffers()
     if(registeredPosBuffer)
     {
         cudaGraphicsUnregisterResource(VBO_CUDA[0]);
+        m_dvel=nullptr;
         registeredPosBuffer = false;
     }
     if(registeredVelBuffer)
     {
         cudaGraphicsUnregisterResource(VBO_CUDA[1]);
+        m_dvel=nullptr;
         registeredVelBuffer = false;
     }
 }
