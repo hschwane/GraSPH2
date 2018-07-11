@@ -51,32 +51,6 @@ __global__ void generate2DNBSystem(Particles particles)
     particles.storeParticle(p,idx);
 }
 
-__device__ void interaction(const Particle<POSM,VEL>& bi, const Particle<POSM>& bj, f3_t& ai, f1_t eps2)
-{
-    f3_t r;
-
-    // r_ij  [3 FLOPS]
-    r.x = bj.pos.x - bi.pos.x;
-    r.y = bj.pos.y - bi.pos.y;
-    r.z = bj.pos.z - bi.pos.z;
-
-    // distSqr = dot(r_ij, r_ij) + EPS^2  [6 FLOPS]
-    f1_t distSqr = r.x * r.x + r.y * r.y + r.z * r.z;
-    distSqr += eps2;
-
-    // invDistCube =1/distSqr^(3/2)  [4 FLOPS (2 mul, 1 sqrt, 1 inv)]
-    f1_t invDist = rsqrt(distSqr);
-    f1_t invDistCube =  invDist * invDist * invDist;
-
-    // s = m_j * invDistCube [1 FLOP]
-    f1_t s = bj.mass * invDistCube;
-
-    // a_i =  a_i + s * r_ij [6 FLOPS]
-    ai.x += r.x * s;
-    ai.y += r.y * s;
-    ai.z += r.z * s;
-}
-
 __global__ void nbodyForces(Particles particles, f1_t eps2, const int numTiles)
 {
     SharedParticles<BLOCK_SIZE,SHARED_POSM> shared;
@@ -86,7 +60,6 @@ __global__ void nbodyForces(Particles particles, f1_t eps2, const int numTiles)
     const auto pi = particles.loadParticle<POSM,VEL>(idx);
     Particle<ACC> piacc;
 
-//    int numTiles = particles.size() / BLOCK_SIZE;
     for (int tile = 0; tile < numTiles; tile++)
     {
         shared.copyFromGlobal(threadIdx.x, tile*blockDim.x+threadIdx.x, particles);
@@ -94,7 +67,14 @@ __global__ void nbodyForces(Particles particles, f1_t eps2, const int numTiles)
 
         for(int j = 0; j<blockDim.x;j++)
         {
-            interaction(pi,shared.loadParticle<POSM>(j),piacc.acc,eps2);
+            auto pj = shared.loadParticle<POSM>(j);
+            f3_t r = pi.pos-pj.pos;
+            f1_t distSqr = dot(r,r) + eps2;
+
+            f1_t invDist = rsqrt(distSqr);
+            f1_t invDistCube =  invDist * invDist * invDist;
+            piacc.acc -= r * pj.mass * invDistCube;
+
         }
         __syncthreads();
     }
