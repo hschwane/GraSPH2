@@ -57,6 +57,20 @@ template< class Base, class Derived >
 inline constexpr bool is_base_of_v = std::is_base_of<Base, Derived>::value;
 
 //-------------------------------------------------------------------
+/**
+ * @brief Forms logical conjunction of type traits.
+ *      This is availible in std since c++17.
+ */
+template<class...> struct conjunction : std::true_type { };
+template<class B1> struct conjunction<B1> : B1 { };
+template<class B1, class... Bn>
+struct conjunction<B1, Bn...>
+        : std::conditional_t<bool(B1::value), conjunction<Bn...>, B1> {};
+
+template<class... B>
+inline constexpr bool conjunction_v = conjunction<B...>::value;
+
+//-------------------------------------------------------------------
 // is_list_initable
 // Thanks to Francesco Biscani!
 namespace detail {

@@ -11,6 +11,14 @@
 #ifndef MPUTILS_CUDAUTILS_H
 #define MPUTILS_CUDAUTILS_H
 
+
+// only include this file in *.cu files
+//--------------------
+#ifndef __CUDACC__
+    #error "Only use the cudaUtils.h if compiling *.cu files with nvcc"
+#endif
+//--------------------
+
 // includes
 //--------------------
 #include <cuda_runtime_api.h>
@@ -57,10 +65,17 @@ typedef long long longlong;
 #endif
 //--------------------
 
+// some defines
+//--------------------
+// wrap cuda function calls in this to check for errors
+#define assert_cuda(CODE) mpu::_cudaAssert((CODE),MPU_FILEPOS)
+// use this to define a function as usable on host and device
+#ifndef CUDAHOSTDEV
+#define CUDAHOSTDEV __host__ __device__
+#endif
+//--------------------
 
 namespace mpu {
-
-#define assert_cuda(CODE) mpu::_cudaAssert((CODE),MPU_FILEPOS)
 
 inline void _cudaAssert(cudaError_t code, std::string &&filepos)
 {
@@ -82,14 +97,14 @@ inline void _cudaAssert(cudaError_t code, std::string &&filepos)
 
 // some converting functions
 template<typename d1, typename d2>
-__host__ __device__
+CUDAHOSTDEV
 d1 toDim2(const d2& rhs)
 {
     return {rhs.x, rhs.y};
 };
 
 template<typename d1, typename d2>
-__host__ __device__
+CUDAHOSTDEV
 d1 toDim3(const d2& rhs)
 {
     return {rhs.x, rhs.y, rhs.z};

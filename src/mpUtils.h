@@ -35,4 +35,10 @@
 #include "Timer/Stopwatch.h"
 #include "Timer/Timer.h"
 
+// include cuda utils
+#if defined(__CUDACC__) || defined(__JETBRAINS_IDE__)
+    #include "Cuda/cudaUtils.h"
+#endif
+
+
 #endif //MPUTILS_MPUTILS_H
