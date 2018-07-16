@@ -15,7 +15,7 @@
 // only include this file in *.cu files
 //--------------------
 #ifndef __CUDACC__
-    #error "Only use the cudaUtils.h if compiling *.cu files with nvcc"
+    #error "Only use the cudaUtils.h if compiling *.cu files with nvcc!"
 #endif
 //--------------------
 
@@ -24,10 +24,10 @@
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <device_launch_parameters.h>
-#include <inc/helper_math.h>
 
 #include <cstdio>
 #include <cstdlib>
+#include "../../external/cuda/helper_math.h"
 #include "../Log/Log.h"
 //--------------------
 
