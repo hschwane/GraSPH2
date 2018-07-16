@@ -162,7 +162,7 @@ if (USE_CUDA)
 #    list(APPEND SOURCE_FILES
 #            "src/Cuda/...")
     if ($ENV{CLION_IDE})
-        list(APPEND INCLUDE_PATHES CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+        list(APPEND INCLUDE_PATHES ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     endif ()
     # enable openmp for the cuda compiler
     if(USE_OPENMP)
