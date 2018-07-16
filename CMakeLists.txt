@@ -30,7 +30,7 @@ endif()
 enable_language(CXX)
 if (USE_CUDA)
     enable_language(CUDA)
-    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+#    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 endif()
 
 # create project

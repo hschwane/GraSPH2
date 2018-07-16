@@ -49,7 +49,7 @@ namespace detail {
 
     // Machinery to cast the input reference x to one of its bases B.
     // This overload is selected only if B is a base of T.
-    template<typename B, typename T, std::enable_if_t<mpu::is_base_of_v<B, T>, int> = 0>
+    template<typename B, typename T, std::enable_if_t<std::is_base_of<B, T>::value, int> = 0>
     CUDAHOSTDEV const B &base_cast(const T &x)
     {
         return static_cast<const B &>(x);
@@ -57,7 +57,7 @@ namespace detail {
 
     // Overload taken if B is not a base of T. In this case we return
     // an object that can be converted to anything.
-    template<typename B, typename T, std::enable_if_t<!mpu::is_base_of_v<B, T>, int> = 0>
+    template<typename B, typename T, std::enable_if_t<!std::is_base_of<B, T>::value, int> = 0>
     CUDAHOSTDEV all_conv base_cast(const T &)
     {
         return all_conv{};
