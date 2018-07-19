@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 
 # set src files
 set(SOURCE_FILES
-        main.cu Particles.cu dummy.cpp)
+        main.cu dummy.cpp)
 
 # have different frontends
 option(OPENGL_FRONTEND "Use the opengl frontend" ON)

@@ -16,10 +16,12 @@
 #include <cuda_gl_interop.h>
 #include <thrust/random.h>
 
-#include "Particles.h"
+#include "particles/Particles.h"
 #include "frontends/frontendInterface.h"
 #include <Cuda/cudaUtils.h>
 #include <crt/math_functions.hpp>
+
+#if 0
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<15;
@@ -162,4 +164,51 @@ int main()
 
     pb.unregisterBuffers(); // probably not needed since it is done in destructor
     return 0;
+}
+
+#endif
+
+
+
+
+
+struct mass_impl
+{
+    CUDAHOSTDEV static Particle<MASS> load(const float & v) { return Particle<MASS>(v); }
+
+    template <typename T> CUDAHOSTDEV static void store(float & v, const T& p) {}
+    CUDAHOSTDEV static void store(float & v, const MASS& p) {v=p.mass;}
+};
+
+using HOST_MASS = HOST_BASE<float, mass_impl>;
+using DEV_MASS = DEVICE_BASE<float, mass_impl>;
+
+__global__ void test(DEV_MASS a, DEV_MASS b)
+{
+    const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
+    Particle<MASS> p;
+    a.loadParticle(idx,p);
+    b.storeParticle(idx,p);
+}
+
+int main()
+{
+
+    HOST_MASS host(100);
+    DEV_MASS dev1(100);
+    DEV_MASS dev2(100);
+
+    Particle<MASS> p(10.0f);
+    host.storeParticle(10,p);
+
+    dev1 = host;
+
+    test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
+
+    host = dev2;
+
+    Particle<MASS> p2;
+    host.loadParticle(10, p2);
+
+    std::cout << p.mass;
 }
