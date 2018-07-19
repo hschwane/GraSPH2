@@ -171,18 +171,6 @@ int main()
 
 
 
-
-struct mass_impl
-{
-    CUDAHOSTDEV static Particle<MASS> load(const float & v) { return Particle<MASS>(v); }
-
-    template <typename T> CUDAHOSTDEV static void store(float & v, const T& p) {}
-    CUDAHOSTDEV static void store(float & v, const MASS& p) {v=p.mass;}
-};
-
-using HOST_MASS = HOST_BASE<float, mass_impl>;
-using DEV_MASS = DEVICE_BASE<float, mass_impl>;
-
 __global__ void test(DEV_MASS a, DEV_MASS b)
 {
     const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
