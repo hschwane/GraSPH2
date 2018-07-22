@@ -47,16 +47,16 @@ class Particles : public Args...
 public:
     // constructors
     CUDAHOSTDEV Particles() : m_numParticles(0), m_isDeviceCopy(false), Args(0)... {} //!< default constructor
-    explicit __host__ Particles(size_t n) : m_numParticles(n), m_isDeviceCopy(false), Args(n)... {} //!< construct particle buffer which can contain n particles
+    explicit Particles(size_t n) : m_numParticles(n), m_isDeviceCopy(false), Args(n)... {} //!< construct particle buffer which can contain n particles
 
     // shallow copying
     CUDAHOSTDEV auto createDeviceCopy() const; //!< creates a shallow copy which only include device bases to be used on the device
 
     // conversions
     template <typename... TArgs>
-    __host__ Particles(const Particles<TArgs...>& other);  //!< construct this from a particle buffer with different attributes
+    Particles(const Particles<TArgs...>& other);  //!< construct this from a particle buffer with different attributes
     template <typename... TArgs>
-    __host__ Particles& operator=(const Particles<TArgs...> &b); //!< assignment between particles buffers with different atributes
+    Particles& operator=(const Particles<TArgs...> &b); //!< assignment between particles buffers with different atributes
 
     // particle handling
     template<typename... particleArgs>
@@ -110,15 +110,15 @@ class HOST_BASE
 {
 public:
     // constructors and destructor
-    __host__ HOST_BASE() : m_size(0), m_data(nullptr) {}
-    __host__ explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new T[m_size] : nullptr) {}
-    __host__ ~HOST_BASE() {delete[] m_data;}
+    HOST_BASE() : m_size(0), m_data(nullptr) {}
+    explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new T[m_size] : nullptr) {}
+    ~HOST_BASE() {delete[] m_data;}
 
     // copy swap idom for copy an move construction and assignment
-    __host__ HOST_BASE(const HOST_BASE & other) : HOST_BASE(other.m_size) {std::copy(other.m_data,other.m_data+other.m_size,m_data);}
-    __host__ HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
-    __host__ HOST_BASE& operator=(HOST_BASE other) {swap(*this,other); return *this;}
-    __host__ friend void swap(HOST_BASE & first, HOST_BASE & second)
+    HOST_BASE(const HOST_BASE & other) : HOST_BASE(other.m_size) {std::copy(other.m_data,other.m_data+other.m_size,m_data);}
+    HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
+    HOST_BASE& operator=(HOST_BASE other) {swap(*this,other); return *this;}
+    friend void swap(HOST_BASE & first, HOST_BASE & second)
     {
         using thrust::swap;
         swap(first.m_data,second.m_data);
@@ -127,19 +127,19 @@ public:
 
     // particle handling
     template<typename ... Args>
-    __host__ void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members
+    void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members
     template<typename ... Args>
-    __host__ void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
+    void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
 
     // status checks
-    __host__ size_t size() { return m_size;} //!< return the number of particles in this buffer
+    size_t size() { return m_size;} //!< returns the number of particles
 
     // friends and types
     template <typename Type, typename Functor> friend class DEVICE_BASE; // be friends with the corresponding device base
     using bind_ref_to_t = DEVICE_BASE<T,lsFunctor>; //!< show to which device_base this can be assigned
 
 protected:
-    __host__ HOST_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class
+    HOST_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class
 
 private:
     size_t m_size; //!< the number of particles stored in this buffer
@@ -164,12 +164,12 @@ class DEVICE_BASE
 public:
     //construction and destruction
     CUDAHOSTDEV DEVICE_BASE() : m_size(0), m_data(nullptr), m_isDeviceCopy(false) {}
-    __host__ explicit DEVICE_BASE(size_t n);
-    __host__ ~DEVICE_BASE() {if(!m_isDeviceCopy) assert_cuda(cudaFree(m_data));}
+    explicit DEVICE_BASE(size_t n);
+    ~DEVICE_BASE() {if(!m_isDeviceCopy) assert_cuda(cudaFree(m_data));}
 
     // copy swap idom where copy construction is only allowed on th host
     // to copy on the device use device copy
-    __host__ DEVICE_BASE(const DEVICE_BASE & other);
+    DEVICE_BASE(const DEVICE_BASE & other);
     CUDAHOSTDEV DEVICE_BASE( DEVICE_BASE&& other) noexcept : DEVICE_BASE() {swap(*this,other);}
     CUDAHOSTDEV DEVICE_BASE& operator=(DEVICE_BASE other) {swap(*this,other); return *this;}
     CUDAHOSTDEV friend void swap(DEVICE_BASE & first, DEVICE_BASE & second)
@@ -182,8 +182,8 @@ public:
 
     // converting from and to a compatible host base
     using host_type = HOST_BASE<T,lsFunctor>; //!< the type of host base this device base can be converted to
-    __host__ DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
-    __host__ operator host_type() const; //!< convert to a compatible host base
+    DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
+    operator host_type() const; //!< convert to a compatible host base
 
     // shallow copying
     CUDAHOSTDEV DEVICE_BASE createDeviceCopy() const; //!< create a shallow copy for usage on the device
@@ -201,7 +201,7 @@ public:
     using bind_ref_to_t = host_type; //!< the type of host base this device base can be converted to
 
 protected:
-    __host__ DEVICE_BASE & operator=(const size_t & f) {return *this;}
+    DEVICE_BASE & operator=(const size_t & f) {return *this;}
 
 private:
     bool m_isDeviceCopy; //!< if this is a shallow copy no memory is freed on destruction
