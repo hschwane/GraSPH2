@@ -29,47 +29,62 @@
  *
  *
  */
-class Particles
+template <typename ... Args>
+class Particles : public Args...
 {
 public:
-    Particles();
-    Particles(size_t n);
-    ~Particles();
+    CUDAHOSTDEV Particles() : m_numParticles(0), m_isDeviceCopy(false), Args(0)... {}
+    explicit __host__ Particles(size_t n) : m_numParticles(0), m_isDeviceCopy(false), Args(n)... {}
 
-    void free(); //!< free all memory
-    void reallocate(size_t n); //!< reallocate all particle data and initialize to zero
-    void copyToDevice();    //!< initiate copy of data from host to device
-    void copyFromDevice();  //!< initiate copying of data from host to device
+    template <typename... TArgs>
+    __host__ Particles(const Particles<TArgs...>& other)
+            : m_numParticles(other.size()),
+              m_isDeviceCopy(other.isDeviceCopy()),
+              Args(ext_base_cast<Args>(other))... {}
 
-    void registerGLPositionBuffer(uint32_t posBufferID); //!< register an openGL buffer to be used for positions (optional)
-    void registerGLVelocityBuffer(uint32_t velBufferID); //!< register an openGL buffer to be used for positions (optional)
-    void mapRegisteredBuffers();    //!< map the registered buffers before performing any cuda operations
-    void unmapRegisteredBuffes();     //!< unmap the registered buffers before performing any openGL operations
-    void unregisterBuffers(); //!< unregister all external buffers
+    template <typename... TArgs>
+    __host__ Particles& operator=(const Particles<TArgs...> &b)
+    {
+        int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
+        (void)t[0]; // silence compiler warning abut t being unused
+        return *this;
+    }
 
-//    template<typename... Args>
-//    __host__ __device__
-//    Particle<Args...> loadParticle(size_t id) const; //!< get a particle object with the requested members
-//
-//    template<typename... Args>
-//    __host__ __device__
-//    void storeParticle(const Particle<Args...>& p,size_t id); //!< set the attributes of particle id according to the particle object
+    template<typename... particleArgs>
+    CUDAHOSTDEV
+    Particle<particleArgs...> loadParticle(size_t id) const //!< get a particle object with the requested members
+    {
+        Particle<particleArgs...> p{};
+        int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
+        (void)t[0]; // silence compiler warning abut t being unused
+        return p;
+    }
 
-    __host__ __device__ size_t size() {return m_numParticles;} //!< return the number of particles
+    template<typename... particleArgs>
+    CUDAHOSTDEV
+    void storeParticle(size_t id, const Particle<particleArgs...>& p) //!< set the attributes of particle id according to the particle object
+    {
+        int t[] = {0, ((void)Args::storeParticle(id,p),1)...};
+        (void)t[0]; // silence compiler warning abut t being unused
+    }
 
-    Particles createDeviceClone() const; //!< create a copy which only holds device pointer and can be moved to the device
+    CUDAHOSTDEV size_t size() const {return m_numParticles;} //!< return the number of particles
+    CUDAHOSTDEV bool isDeviceCopy() const {return m_isDeviceCopy;} //!< check if the particle object is a shallow copy only containing device pointers
+
+    CUDAHOSTDEV Particles createDeviceCopy() const
+    {
+        return Particles(*this,true);
+    }
 
 private:
-    void allocate(size_t n);
+    CUDAHOSTDEV Particles(const Particles& other, bool devCopy)
+            : m_numParticles(other.m_numParticles),
+              m_isDeviceCopy(true),
+              Args(ext_base_cast<Args>(other).createDeviceCopy())... {}
 
     // allow this to be copied to the device without freeing memory on destruction
     bool m_isDeviceCopy;
     size_t m_numParticles;
-
-    // external maped resources
-    cudaGraphicsResource* VBO_CUDA[2];
-    bool registeredPosBuffer;
-    bool registeredVelBuffer;
 };
 
 //-------------------------------------------------------------------
@@ -83,13 +98,11 @@ class HOST_BASE
 public:
     __host__ HOST_BASE() : m_size(0), m_data(nullptr) {}
     __host__ explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new T[m_size] : nullptr) {}
+
     __host__ HOST_BASE(const HOST_BASE & other) : HOST_BASE(other.m_size) {std::copy(other.m_data,other.m_data+other.m_size,m_data);}
     __host__ HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
-
     __host__ ~HOST_BASE() {delete[] m_data;}
-
     __host__ HOST_BASE& operator=(HOST_BASE other) {swap(*this,other); return *this;}
-
     __host__ friend void swap(HOST_BASE & first, HOST_BASE & second)
     {
         using thrust::swap;
@@ -98,12 +111,18 @@ public:
     }
 
     template<typename ... Args>
-    __host__ void loadParticle(size_t id, Particle<Args ...> & p) {p = lsFunctor::load(m_data[id]);}
+    __host__ void loadParticle(size_t id, Particle<Args ...> & p) const {p = lsFunctor::load(m_data[id]);}
     template<typename ... Args>
     __host__ void storeParticle(size_t id, const Particle<Args ...> & p) {int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};}
 
+    __host__ size_t size() { return m_size;}
+
     template <typename Type, typename Functor> friend class DEVICE_BASE;
     using bind_ref_to_t = DEVICE_BASE<T,lsFunctor>;
+
+protected:
+    __host__ HOST_BASE & operator=(const size_t & f) {return *this;}
+
 private:
     size_t m_size;
     T* m_data;
@@ -133,7 +152,7 @@ public:
         assert_cuda( cudaMemcpy(m_data, other.m_data, m_size, cudaMemcpyHostToDevice));
     }
 
-    __host__ operator host_type()
+    __host__ operator host_type() const
     {
         host_type host(m_size);
         logDEBUG("PARTICLES") << m_size;
@@ -152,14 +171,19 @@ public:
         swap(first.m_isDeviceCopy,second.m_isDeviceCopy);
     }
 
-    __host__ DEVICE_BASE createDeviceCopy() {DEVICE_BASE b; b.m_data=m_data; b.m_size = m_size; b.m_isDeviceCopy=true; return std::move(b);}; //!< shallow copy to be moved to the device
+    __host__ DEVICE_BASE createDeviceCopy() const {DEVICE_BASE b; b.m_data=m_data; b.m_size = m_size; b.m_isDeviceCopy=true; return std::move(b);}; //!< shallow copy to be moved to the device
 
     template<typename ... Args>
-    __device__ void loadParticle(size_t id, Particle<Args ...> & p) {p = lsFunctor::load(m_data[id]);}
+    __device__ void loadParticle(size_t id, Particle<Args ...> & p) const {p = lsFunctor::load(m_data[id]);}
     template<typename ... Args>
     __device__ void storeParticle(size_t id, const Particle<Args ...> & p) {int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};}
 
+    CUDAHOSTDEV size_t size() { return m_size;}
+
     using bind_ref_to_t = host_type;
+
+protected:
+    __host__ DEVICE_BASE & operator=(const size_t & f) {return *this;}
 private:
     bool m_isDeviceCopy;
     size_t m_size;

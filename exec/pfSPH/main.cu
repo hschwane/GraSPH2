@@ -168,35 +168,37 @@ int main()
 
 #endif
 
-
-
-
-__global__ void test(DEV_MASS a, DEV_MASS b)
+/*
+__global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> b)
 {
     const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
-    Particle<MASS> p;
-    a.loadParticle(idx,p);
+    Particle<MASS, POS> p = a.loadParticle(idx);
+    Particle<MASS, POS> p2 = a.loadParticle(idx / 2);
+
+    p.pos = p.pos + p2.pos;
+
     b.storeParticle(idx,p);
 }
+ */
 
 int main()
 {
 
-    HOST_MASS host(100);
-    DEV_MASS dev1(100);
-    DEV_MASS dev2(100);
+    Particles<HOST_MASS,HOST_POS> host(100);
+    Particles<DEV_MASS,DEV_POS> dev1(100);
+    Particles<DEV_MASS> dev2(100);
 
     Particle<MASS> p(10.0f);
-    host.storeParticle(10,p);
+    host.storeParticle(10, Particle<MASS>(p));
 
     dev1 = host;
 
-    test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
+  //  test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
 
     host = dev2;
 
     Particle<MASS> p2;
-    host.loadParticle(10, p2);
+    p2 = host.loadParticle(10);
 
     std::cout << p.mass;
 }

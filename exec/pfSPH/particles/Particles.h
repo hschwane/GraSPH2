@@ -47,7 +47,7 @@
 MAKE_PARTICLE_BASE(POS,pos,f3_t);
 MAKE_PARTICLE_BASE(MASS,mass,f1_t);
 MAKE_PARTICLE_BASE(VEL,vel,f3_t);
-MAKE_PARTICLE_BASE(ACC,acc,f3_t);
+
 
 struct mass_impl
 {
@@ -61,5 +61,18 @@ template <size_t n>
 using SHARED_MASS = SHARED_BASE<n,float, mass_impl>;
 using HOST_MASS = HOST_BASE<float, mass_impl>;
 using DEV_MASS = DEVICE_BASE<float, mass_impl>;
+
+struct pos_impl
+{
+    CUDAHOSTDEV static Particle<POS> load(const f4_t & v) { return Particle<POS>(f3_t{v.x,v.y,v.z}); }
+
+    template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p) {}
+    CUDAHOSTDEV static void store(f4_t & v, const POS& p) {v=f4_t{p.pos.x,p.pos.y,p.pos.z,0.0f};}
+};
+
+template <size_t n>
+using SHARED_POS = SHARED_BASE<n,f4_t, pos_impl>;
+using HOST_POS = HOST_BASE<f4_t, pos_impl>;
+using DEV_POS = DEVICE_BASE<f4_t, pos_impl>;
 
 #endif //MPUTILS_PARTICLES_H

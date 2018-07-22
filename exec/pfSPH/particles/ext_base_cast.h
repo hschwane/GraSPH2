@@ -22,6 +22,9 @@
 // A flag structure that will be returned if no suitable base class was found.
 struct no_baseclass_flag {};
 
+template <class T>
+using sizeMember_t = decltype(std::declval<T>().size());
+
 // This overload is selected only if B is a base of T.
 template <typename B, typename T, std::enable_if_t<mpu::is_base_of_v<B,T>, int> = 0>
 CUDAHOSTDEV inline const B &ext_base_cast(const T &x)
@@ -30,7 +33,7 @@ CUDAHOSTDEV inline const B &ext_base_cast(const T &x)
 }
 
 // this overload is selected B has a type bind_ref_to_t which is a base of B and x is const
-template <typename B, typename T, std::enable_if_t<mpu::is_base_of_v<typename B::bind_ref_to_t,T>, int> = 0>
+template <typename B, typename T, std::enable_if_t<mpu::is_base_of_v<typename B::bind_ref_to_t,T> && !std::is_base_of<B,T>::value , int> = 0>
 CUDAHOSTDEV inline auto &ext_base_cast(const T &x)
 {
     return static_cast<const typename B::bind_ref_to_t &>(x);
@@ -43,13 +46,24 @@ CUDAHOSTDEV inline auto &base_cast(T &x)
     return static_cast<typename B::bind_ref_to_t &>(x);
 }
 
-// Overload taken if B is not a base of T. In this case we return
-// an object that can be converted to anything.
-template <typename B, typename T, std::enable_if_t<!std::is_base_of<B,T>::value && !std::is_base_of<typename B::bind_ref_to_t,T>::value, int> = 0>
-CUDAHOSTDEV inline no_baseclass_flag ext_base_cast(const T &)
+// Overload taken if B is not a base of T. In this case we return the no baseclass flag
+template <typename B, typename T, std::enable_if_t< !std::is_base_of<B,T>::value
+                                                    && !std::is_base_of<typename B::bind_ref_to_t,T>::value
+                                                    && !mpu::is_detected<sizeMember_t,B>(), int> = 0>
+CUDAHOSTDEV inline no_baseclass_flag ext_base_cast(const T &x)
 {
     return no_baseclass_flag{};
 }
 
+// Overload taken if B is not a base of T and B has a member called size.
+// In this case we return the size so the new object can
+// be constructed with an appropriate size
+template <typename B, typename T, std::enable_if_t< !std::is_base_of<B,T>::value
+                                                    && !std::is_base_of<typename B::bind_ref_to_t,T>::value
+                                                    && mpu::is_detected<sizeMember_t,B>(), int> = 0>
+CUDAHOSTDEV inline size_t ext_base_cast(const T &x)
+{
+    return x.size();
+}
 
 #endif //MPUTILS_EXT_BASE_CAST_H

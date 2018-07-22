@@ -83,7 +83,11 @@ public:
     template<typename ... Args>
     __device__ void loadParticle(size_t id, Particle<Args ...> & p) {p = lsFunctor::load(m_data[id]);}
     template<typename ... Args>
-    __device__ void storeParticle(size_t id, const Particle<Args ...> & p) {int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};}
+    __device__ void storeParticle(size_t id, const Particle<Args ...> & p)
+    {
+        int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
+        (void)i[0]; // silence compiler warning abut i being unused
+    }
 
 private:
     T * m_data;

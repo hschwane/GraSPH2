@@ -49,6 +49,7 @@ public:
             Particle<Args...>& operator=(const Particle<T...> &b)
     {
         int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
+        (void)t[0]; // silence compiler warning about t being unused
         return *this;
     }
 };
