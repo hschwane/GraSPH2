@@ -14,6 +14,7 @@
 // includes
 //--------------------
 #include <thrust/swap.h>
+#include <tuple>
 #include <mpUtils.h>
 #include "ext_base_cast.h"
 #include "Particle.h"
@@ -49,8 +50,7 @@ public:
     explicit __host__ Particles(size_t n) : m_numParticles(n), m_isDeviceCopy(false), Args(n)... {} //!< construct particle buffer which can contain n particles
 
     // shallow copying
-    CUDAHOSTDEV Particles createDeviceCopy() const {return Particles(*this,true);} //!< creates a shallow copy to be used on the device
-
+    CUDAHOSTDEV auto createDeviceCopy() const; //!< creates a shallow copy which only include device bases to be used on the device
 
     // conversions
     template <typename... TArgs>
@@ -73,6 +73,15 @@ private:
             : m_numParticles(other.m_numParticles),
               m_isDeviceCopy(true),
               Args(ext_base_cast<Args>(other).createDeviceCopy())... {}
+
+    template <class T>
+    using create_dev_copy_t = decltype(std::declval<T>().createDeviceCopy()); //!< helper for copy condition
+
+    template <class T>
+    using copy_condition = mpu::is_detected<create_dev_copy_t,T>; //!< check if T has member "is device copy"
+
+    template <typename...Ts>
+    CUDAHOSTDEV Particles<Ts...> deviceCopyHelper(std::tuple<Ts...>&&) const; //!< returns a particles object hat was constructed using Particles<Ts...>(*this,true)
 
     bool m_isDeviceCopy; //!< if this is a device copy no memory will be freed on destruction
     size_t m_numParticles; //!< the number of particles stored in this buffer
@@ -237,6 +246,23 @@ void Particles<Args...>::storeParticle(size_t id, const Particle<particleArgs...
     (void)t[0]; // silence compiler warning abut t being unused
 }
 
+template<typename... Args>
+template <typename...Ts>
+Particles<Ts...> Particles<Args...>::deviceCopyHelper(std::tuple<Ts...>&&) const
+{
+    static_assert(sizeof...(Ts)>0,"You can not create a device copy if there is no device base.");
+    return Particles<Ts...>(*this,true);
+};
+
+template<typename T>
+using is_int=std::is_same<int,T>;
+
+template<typename... Args>
+auto Particles<Args...>::createDeviceCopy() const
+{
+    return deviceCopyHelper(mpu::remove_t<copy_condition,Args...>());
+}
+
 //-------------------------------------------------------------------
 // function definitions for HOST_BASE class
 template<typename T, typename lsFunctor>
@@ -261,7 +287,6 @@ DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(size_t n) :  m_size(n), m_data(nullptr), 
 {
     assert_cuda(cudaMalloc(&m_data, m_size*sizeof(T)));
 }
-
 
 template<typename T, typename lsFunctor>
 DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE &other) : DEVICE_BASE(other.m_size)

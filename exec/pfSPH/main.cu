@@ -184,12 +184,15 @@ __global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> 
 int main()
 {
 
-    Particles<HOST_MASS,HOST_POS> host(100);
+    Particles<DEV_MASS,HOST_POS> host(100);
     Particles<DEV_MASS,DEV_POS> dev1(100);
     Particles<DEV_MASS> dev2(100);
 
     Particle<MASS> p(10.0f);
-    host.storeParticle(10, Particle<MASS>(p));
+    host.storeParticle( 10, Particle<MASS>(p));
+
+    //host.createDeviceCopy();
+    dev1.createDeviceCopy();
 
     dev1 = host;
 
