@@ -183,7 +183,7 @@ __global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> 
 int main()
 {
 
-    Particles<DEV_MASS,HOST_POS> host(100);
+    Particles<HOST_POSM,HOST_VEL,HOST_ACC> host(100);
     Particles<DEV_MASS,DEV_POS> dev1(100);
     Particles<DEV_MASS> dev2(100);
 
