@@ -34,8 +34,9 @@
  * To access the particles object on the device define a __global__ function that takes a Particles object which has only DEV bases by Value.
  * Then call the function and pass a shallow copy created with the createDeviceCopy() function.
  * If you assign a Particles object with HOST based to another one with DEV bases or vice versa data will be copied automatically
- * between host and device using. Data copying will also work for HOST-HOST and DEV-DEV assignment. If you mix HOST and DEV Bases
- * in one Particles Object you can use the uploadData and downloadData member functions to control memory transfer.
+ * between host and device using. Data copying will also work for HOST-HOST and DEV-DEV assignment.
+ *
+ * Do NOT mix host and device bases.
  *
  * Supported particle attributes are:
  * HOST_POSM
@@ -70,9 +71,6 @@ public:
     template<typename... particleArgs>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
 
-    void uploadData(); //!< if this object contains HOST_ and DEV_ base classes data will be uploaded from the host to the device
-    void downloadData(); //!< if this object contains HOST_ and DEV_ base classes data will be downloaded from the device to the host
-
     // status checks
     CUDAHOSTDEV size_t size() const {return m_numParticles;} //!< return the number of particles in this buffer
     CUDAHOSTDEV bool isDeviceCopy() const {return m_isDeviceCopy;} //!< check if the particle object is a shallow copy only containing device pointers
@@ -94,12 +92,6 @@ private:
 
     template <typename...Ts>
     Particles<Ts...> deviceCopyHelper(std::tuple<Ts...>&&) const; //!< returns a particles object hat was constructed using Particles<Ts...>(*this,true)
-
-    template <typename...Ts, typename...Us>
-    void updownhelper(std::tuple<Ts...>&&, std::tuple<Us...>&&ust); //!< calls operator = to assign all base classed of Ts to base classes of type Us
-
-    template <typename T, typename...Us>
-    void updownhelper(std::tuple<Us...>&&); //!< calls operator = to assign all base classes Us to T
 
     bool m_isDeviceCopy; //!< if this is a device copy no memory will be freed on destruction
     size_t m_numParticles; //!< the number of particles stored in this buffer
@@ -280,34 +272,6 @@ auto Particles<Args...>::createDeviceCopy() const
 #else
     return deviceCopyHelper(mpu::remove_t<copy_condition,Args...>());
 #endif
-}
-
-template<typename... Args>
-template<typename T, typename... Us>
-void Particles<Args...>::updownhelper(std::tuple<Us...> &&)
-{
-    int t[] = {0, ((void)T::operator=(static_cast<Us>(*this)),1)...};
-    (void)t[0]; // silence compiler warning abut t being unused
-}
-
-template<typename... Args>
-template<typename... Ts, typename... Us>
-void Particles<Args...>::updownhelper(std::tuple<Ts...> &&, std::tuple<Us...> && ust)
-{
-    int t[] = {0, ((void)updownhelper<Ts>(ust),1)...};
-    (void)t[0]; // silence compiler warning abut t being unused
-}
-
-template<typename... Args>
-void Particles<Args...>::uploadData()
-{
-    updownhelper(mpu::remove_t<copy_condition,Args...>(),mpu::remove_t<inv_copy_condition,Args...>());
-}
-
-template<typename... Args>
-void Particles<Args...>::downloadData()
-{
-    updownhelper(mpu::remove_t<inv_copy_condition,Args...>(),mpu::remove_t<copy_condition,Args...>());
 }
 
 //-------------------------------------------------------------------
