@@ -168,7 +168,7 @@ int main()
 
 #endif
 
-/*
+
 __global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> b)
 {
     const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -179,7 +179,6 @@ __global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> 
 
     b.storeParticle(idx,p);
 }
- */
 
 int main()
 {
@@ -191,12 +190,10 @@ int main()
     Particle<MASS> p(10.0f);
     host.storeParticle( 10, Particle<MASS>(p));
 
-    //host.createDeviceCopy();
-    dev1.createDeviceCopy();
 
     dev1 = host;
 
-  //  test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
+    test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
 
     host = dev2;
 

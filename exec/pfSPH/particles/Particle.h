@@ -45,8 +45,7 @@ public:
     Particle(const Particle<T...> &b) : Args(ext_base_cast<Args>(b))... {} //!< construct a particle from another particle with different attributes
 
     template <typename... T>
-    CUDAHOSTDEV
-            Particle<Args...>& operator=(const Particle<T...> &b)
+    CUDAHOSTDEV Particle<Args...>& operator=(const Particle<T...> &b)
     {
         int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
         (void)t[0]; // silence compiler warning about t being unused

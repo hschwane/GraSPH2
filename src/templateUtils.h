@@ -89,6 +89,18 @@ using remove_t = tuple_cat_t<
         >::type...
 >;
 
+/**
+ * @brief shorthand for integral constant of type bool
+ */
+template <bool B>
+using bool_constant = std::integral_constant<bool, B>;
+
+/**
+ * @brief negate the type trait B
+ */
+template<class B>
+struct negation : bool_constant<!bool(B::value)> { };
+
 }
 
 #endif //MPUTILS_TEMPLATEUTILS_H

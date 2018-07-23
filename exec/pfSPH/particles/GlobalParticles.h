@@ -22,14 +22,20 @@
 
 //-------------------------------------------------------------------
 /**
- * class Particles
+ * class template Particles
  *
  * Manages the storage of a lot of particles in Global Device Memory or Host Memory.
  *
  * usage:
  * The required number of particles should be passed to the constructor.
- * You can manipulate the particles by calling loadParticle() and storeParticle().
+ * You can manipulate the particles by calling loadParticle() and storeParticle(). Only attributes from HOST bases will be returned
+ * when calling from host code and DEV bases when calling from device code.
  * Specify what particles attributes you want by setting the corresponding template parameters.
+ * To access the particles object on the device define a __global__ function that takes a Particles object which has only DEV bases by Value.
+ * Then call the function and pass a shallow copy created with the createDeviceCopy() function.
+ * If you assign a Particles object with HOST based to another one with DEV bases or vice versa data will be copied automatically
+ * between host and device using. Data copying will also work for HOST-HOST and DEV-DEV assignment. If you mix HOST and DEV Bases
+ * in one Particles Object you can use the uploadData and downloadData member functions to control memory transfer.
  *
  * Supported particle attributes are:
  * HOST_POSM
@@ -64,6 +70,9 @@ public:
     template<typename... particleArgs>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
 
+    void uploadData(); //!< if this object contains HOST_ and DEV_ base classes data will be uploaded from the host to the device
+    void downloadData(); //!< if this object contains HOST_ and DEV_ base classes data will be downloaded from the device to the host
+
     // status checks
     CUDAHOSTDEV size_t size() const {return m_numParticles;} //!< return the number of particles in this buffer
     CUDAHOSTDEV bool isDeviceCopy() const {return m_isDeviceCopy;} //!< check if the particle object is a shallow copy only containing device pointers
@@ -78,10 +87,19 @@ private:
     using create_dev_copy_t = decltype(std::declval<T>().createDeviceCopy()); //!< helper for copy condition
 
     template <class T>
-    using copy_condition = mpu::is_detected<create_dev_copy_t,T>; //!< check if T has member "is device copy"
+    using copy_condition = mpu::is_detected<create_dev_copy_t,T>; //!< check if T has member "createDeviceCopy"
+
+    template <class T>
+    using inv_copy_condition = mpu::negation<mpu::is_detected<create_dev_copy_t,T>>; //!< check if T has no member "createDeviceCopy"
 
     template <typename...Ts>
-    CUDAHOSTDEV Particles<Ts...> deviceCopyHelper(std::tuple<Ts...>&&) const; //!< returns a particles object hat was constructed using Particles<Ts...>(*this,true)
+    Particles<Ts...> deviceCopyHelper(std::tuple<Ts...>&&) const; //!< returns a particles object hat was constructed using Particles<Ts...>(*this,true)
+
+    template <typename...Ts, typename...Us>
+    void updownhelper(std::tuple<Ts...>&&, std::tuple<Us...>&&ust); //!< calls operator = to assign all base classed of Ts to base classes of type Us
+
+    template <typename T, typename...Us>
+    void updownhelper(std::tuple<Us...>&&); //!< calls operator = to assign all base classes Us to T
 
     bool m_isDeviceCopy; //!< if this is a device copy no memory will be freed on destruction
     size_t m_numParticles; //!< the number of particles stored in this buffer
@@ -127,9 +145,9 @@ public:
 
     // particle handling
     template<typename ... Args>
-    void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members
+    CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members Note: while this is a host device function, calling it on the device will have no effect
     template<typename ... Args>
-    void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
+    CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
 
     // status checks
     size_t size() { return m_size;} //!< returns the number of particles
@@ -190,9 +208,9 @@ public:
 
     // particle handling
     template<typename ... Args>
-    __device__ void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members
+    CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members  Note: while this is a host device function, calling it on the host will have no effect
     template<typename ... Args>
-    __device__ void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
+    CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
 
     // status checks
     CUDAHOSTDEV size_t size() { return m_size;} //!< returns the number of particles
@@ -254,13 +272,42 @@ Particles<Ts...> Particles<Args...>::deviceCopyHelper(std::tuple<Ts...>&&) const
     return Particles<Ts...>(*this,true);
 };
 
-template<typename T>
-using is_int=std::is_same<int,T>;
-
 template<typename... Args>
 auto Particles<Args...>::createDeviceCopy() const
 {
+#if defined(__CUDA_ARCH__)
+    return Particles<Args...>(*this,true);
+#else
     return deviceCopyHelper(mpu::remove_t<copy_condition,Args...>());
+#endif
+}
+
+template<typename... Args>
+template<typename T, typename... Us>
+void Particles<Args...>::updownhelper(std::tuple<Us...> &&)
+{
+    int t[] = {0, ((void)T::operator=(static_cast<Us>(*this)),1)...};
+    (void)t[0]; // silence compiler warning abut t being unused
+}
+
+template<typename... Args>
+template<typename... Ts, typename... Us>
+void Particles<Args...>::updownhelper(std::tuple<Ts...> &&, std::tuple<Us...> && ust)
+{
+    int t[] = {0, ((void)updownhelper<Ts>(ust),1)...};
+    (void)t[0]; // silence compiler warning abut t being unused
+}
+
+template<typename... Args>
+void Particles<Args...>::uploadData()
+{
+    updownhelper(mpu::remove_t<copy_condition,Args...>(),mpu::remove_t<inv_copy_condition,Args...>());
+}
+
+template<typename... Args>
+void Particles<Args...>::downloadData()
+{
+    updownhelper(mpu::remove_t<inv_copy_condition,Args...>(),mpu::remove_t<copy_condition,Args...>());
 }
 
 //-------------------------------------------------------------------
@@ -269,15 +316,19 @@ template<typename T, typename lsFunctor>
 template<typename... Args>
 void HOST_BASE<T, lsFunctor>::loadParticle(size_t id, Particle<Args ...> &p) const
 {
+#if !defined(__CUDA_ARCH__)
     p = lsFunctor::load(m_data[id]);
+#endif
 }
 
 template<typename T, typename lsFunctor>
 template<typename... Args>
 void HOST_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> &p)
 {
+#if !defined(__CUDA_ARCH__)
     int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
+#endif
 }
 
 //-------------------------------------------------------------------
@@ -319,22 +370,26 @@ DEVICE_BASE<T, lsFunctor> DEVICE_BASE<T, lsFunctor>::createDeviceCopy() const
     b.m_data=m_data;
     b.m_size = m_size;
     b.m_isDeviceCopy=true;
-    return std::move(b);
+    return b;
 };
 
 template<typename T, typename lsFunctor>
 template<typename... Args>
 __device__ void DEVICE_BASE<T, lsFunctor>::loadParticle(size_t id, Particle<Args ...> &p) const
 {
+#if defined(__CUDA_ARCH__)
     p = lsFunctor::load(m_data[id]);
+#endif
 }
 
 template<typename T, typename lsFunctor>
 template<typename... Args>
 __device__ void DEVICE_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> &p)
 {
+#if defined(__CUDA_ARCH__)
     int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
+#endif
 }
 
 
