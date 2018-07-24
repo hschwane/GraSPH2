@@ -16,6 +16,7 @@
 #include "timeUtils.h"
 #include "type_traitUtils.h"
 #include "templateUtils.h"
+#include "range.h"
 
 // include configuration util
 #include "Cfg/CfgFile.h"
