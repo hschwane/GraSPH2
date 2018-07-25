@@ -22,9 +22,6 @@
 #include <mpUtils.h>
 //--------------------
 
-// forward declarations
-//--------------------
-
 //-------------------------------------------------------------------
 // define the data types used for the simulation
 #define SINGLE_PRECISION

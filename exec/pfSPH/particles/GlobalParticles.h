@@ -16,6 +16,7 @@
 #include <thrust/swap.h>
 #include <tuple>
 #include <mpUtils.h>
+#include <cuda_gl_interop.h>
 #include "ext_base_cast.h"
 #include "Particle.h"
 //--------------------
@@ -70,6 +71,9 @@ public:
     CUDAHOSTDEV Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
     template<typename... particleArgs>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
+
+    void mapGraphicsResource(); //!< if an opengl buffer is used in any base class, map the buffer to enable cuda usage
+    void unmapGraphicsResource(); //!< unmap the opengl buffer of all bases so it can be used by openGL again
 
     // status checks
     CUDAHOSTDEV size_t size() const {return m_numParticles;} //!< return the number of particles in this buffer
@@ -141,6 +145,9 @@ public:
     template<typename ... Args>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
 
+    void mapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
+    void unmapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
+
     // status checks
     size_t size() { return m_size;} //!< returns the number of particles
 
@@ -154,13 +161,19 @@ protected:
 private:
     size_t m_size; //!< the number of particles stored in this buffer
     T* m_data;  //!< the actual data
+
+
 };
 
 //-------------------------------------------------------------------
 /**
  * class template DEVICE_BASE
  *
- * @brief Class Template that holds particle attributes in device memory
+ * @brief Class Template that holds particle attributes in device memory. You can use an openGL Buffer instead of the
+ *              managed memory by casting the Particles object to the specific device base and calling the registerGLGraphics Resource.
+ *              You can then use the map and unmap functions of the particles class to map or unmap the openGL Buffers of all its device bases.
+ *              The resource will be automatically unregistered in the destructer. To unregister maually cast the Particles object to the base type
+ *              and assign a new base object.
  * @tparam T type of the attribute
  * @tparam lsFunctor a struct that contains the following functions:
  *          - public static Particle< ...>load(const T& v) the attribute value v should be copied into the returned particle.
@@ -173,9 +186,9 @@ class DEVICE_BASE
 {
 public:
     //construction and destruction
-    CUDAHOSTDEV DEVICE_BASE() : m_size(0), m_data(nullptr), m_isDeviceCopy(false) {}
+    CUDAHOSTDEV DEVICE_BASE() : m_size(0), m_data(nullptr), m_isDeviceCopy(false), m_graphicsResource(nullptr) {}
     explicit DEVICE_BASE(size_t n);
-    ~DEVICE_BASE() {if(!m_isDeviceCopy) assert_cuda(cudaFree(m_data));}
+    ~DEVICE_BASE();
 
     // copy swap idom where copy construction is only allowed on th host
     // to copy on the device use device copy
@@ -198,6 +211,11 @@ public:
     // shallow copying
     CUDAHOSTDEV DEVICE_BASE createDeviceCopy() const; //!< create a shallow copy for usage on the device
 
+    // mapping of graphics resources
+    void registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag = cudaGraphicsMapFlagsNone); //!< register an openGL Buffer to be used instead of the allocated memory
+    void mapGraphicsResource(); //!< if an opengl buffer is used map the buffer to enable cuda usage
+    void unmapGraphicsResource(); //!< unmap the opengl buffer so it can be used by openGL again
+
     // particle handling
     template<typename ... Args>
     CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members  Note: while this is a host device function, calling it on the host will have no effect
@@ -214,9 +232,12 @@ protected:
     DEVICE_BASE & operator=(const size_t & f) {return *this;}
 
 private:
+    void unregisterGraphicsResource(); //!< unregister the opengl resource from cuda
+
     bool m_isDeviceCopy; //!< if this is a shallow copy no memory is freed on destruction
     size_t m_size; //!< the umber of particles
     T* m_data; //!< the actual data
+    cudaGraphicsResource* m_graphicsResource; //!< a cuda graphics resource that can be used as memory
 };
 
 //-------------------------------------------------------------------
@@ -274,6 +295,20 @@ auto Particles<Args...>::createDeviceCopy() const
 #endif
 }
 
+template<typename... Args>
+void Particles<Args...>::mapGraphicsResource()
+{
+    int t[] = {0, ((void)Args::mapGraphicsResource(),1)...};
+    (void)t[0]; // silence compiler warning abut t being unused
+}
+
+template<typename... Args>
+void Particles<Args...>::unmapGraphicsResource()
+{
+    int t[] = {0, ((void)Args::unmapGraphicsResource(),1)...};
+    (void)t[0]; // silence compiler warning abut t being unused
+}
+
 //-------------------------------------------------------------------
 // function definitions for HOST_BASE class
 template<typename T, typename lsFunctor>
@@ -316,6 +351,13 @@ DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : DE
 }
 
 template<typename T, typename lsFunctor>
+DEVICE_BASE<T, lsFunctor>::~DEVICE_BASE()
+{
+    if(!m_isDeviceCopy && !m_graphicsResource) assert_cuda(cudaFree(m_data));
+    if(m_graphicsResource) unregisterGraphicsResource();
+}
+
+template<typename T, typename lsFunctor>
 DEVICE_BASE<T, lsFunctor>::operator host_type() const
 {
     host_type host(m_size);
@@ -354,6 +396,45 @@ __device__ void DEVICE_BASE<T, lsFunctor>::storeParticle(size_t id, const Partic
     int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
 #endif
+}
+
+template<typename T, typename lsFunctor>
+void DEVICE_BASE<T, lsFunctor>::registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag)
+{
+    assert_cuda(cudaFree(m_data));
+    m_data = nullptr;
+    assert_cuda(cudaGraphicsGLRegisterBuffer(&m_graphicsResource, resourceID, flag));
+}
+
+template<typename T, typename lsFunctor>
+void DEVICE_BASE<T, lsFunctor>::mapGraphicsResource()
+{
+    if(m_graphicsResource)
+    {
+        size_t mappedBufferSize;
+        assert_cuda(cudaGraphicsMapResources(1, &m_graphicsResource));
+        assert_cuda(cudaGraphicsResourceGetMappedPointer((void **)&m_data, &mappedBufferSize, m_graphicsResource));
+        assert_true(mappedBufferSize == m_size * sizeof(T), "Paticles",
+                    "opengl buffer size is not equal to particle number");
+    }
+}
+
+template<typename T, typename lsFunctor>
+void DEVICE_BASE<T, lsFunctor>::unmapGraphicsResource()
+{
+    if(m_graphicsResource)
+    {
+        assert_cuda(cudaGraphicsUnmapResources(1, &m_graphicsResource));
+        m_data = nullptr;
+    }
+}
+
+template<typename T, typename lsFunctor>
+void DEVICE_BASE<T, lsFunctor>::unregisterGraphicsResource()
+{
+    cudaGraphicsUnregisterResource(m_graphicsResource);
+    m_data=nullptr;
+    m_graphicsResource = nullptr;
 }
 
 
