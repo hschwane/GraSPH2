@@ -41,23 +41,22 @@ public:
     SharedParticles(const SharedParticles&)=delete;
     SharedParticles& operator=(const SharedParticles&)=delete;
 
-//    __device__ void copyFromGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< load particle from global to shared memory
-//    __device__ void copyToGlobal(size_t shared_id, size_t global_id, const Particles& global); //!< store a particle in global memory
-
     template<typename... particleArgs>
     __device__
-            Particle<particleArgs...> loadParticle(size_t id) //!< get a particle object with the requested members
+    Particle<particleArgs...> loadParticle(size_t id) //!< get a particle object with the requested members
     {
         Particle<particleArgs...> p{};
         int t[] = {0, ((void)TArgs<n>::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
+        (void)t[0]; // silence compiler warning abut t being unused
         return p;
     }
 
     template<typename... particleArgs>
     __device__
-    void storeParticle(const Particle<particleArgs...>& p,size_t id) //!< set the attributes of particle id according to the particle object
+    void storeParticle(size_t id, const Particle<particleArgs...>& p) //!< set the attributes of particle id according to the particle object
     {
         int t[] = {0, ((void)TArgs<n>::storeParticle(id,p),1)...};
+        (void)t[0]; // silence compiler warning abut t being unused
     }
 
     __device__ size_t size() {return n;}

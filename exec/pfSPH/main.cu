@@ -21,14 +21,14 @@
 #include <Cuda/cudaUtils.h>
 #include <crt/math_functions.hpp>
 
-#if 0
+
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<15;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-__global__ void generate2DNBSystem(Particles particles)
+__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx>=particles.size())
@@ -41,7 +41,7 @@ __global__ void generate2DNBSystem(Particles particles)
     rng.discard(idx);
     thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
 
-    Particle<POSM,VEL,ACC> p;
+    Particle<POS,MASS,VEL,ACC> p;
 
     p.pos.x = dist(rng);
     p.pos.y = dist(rng);
@@ -50,42 +50,43 @@ __global__ void generate2DNBSystem(Particles particles)
 
     p.vel = cross(p.pos,{0.0f,0.0f, 0.75f});
 
-    particles.storeParticle(p,idx);
+    particles.storeParticle(idx,p);
 }
 
-__global__ void nbodyForces(Particles particles, f1_t eps2, const int numTiles)
+__global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t eps2, const int numTiles)
 {
     SharedParticles<BLOCK_SIZE,SHARED_POSM> shared;
 
     const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    const auto pi = particles.loadParticle<POSM,VEL>(idx);
-    Particle<ACC> piacc;
+    Particle<POS,MASS,VEL,ACC> pi = particles.loadParticle<POS,VEL,MASS>(idx);
 
     for (int tile = 0; tile < numTiles; tile++)
     {
-        shared.copyFromGlobal(threadIdx.x, tile*blockDim.x+threadIdx.x, particles);
+        const auto p = particles.loadParticle<POS,MASS>(tile*blockDim.x+threadIdx.x);
+        shared.storeParticle(threadIdx.x,p);
+
         __syncthreads();
 
         for(int j = 0; j<blockDim.x;j++)
         {
-            auto pj = shared.loadParticle<POSM>(j);
+            auto pj = shared.loadParticle<POS,MASS>(j);
             f3_t r = pi.pos-pj.pos;
             f1_t distSqr = dot(r,r) + eps2;
 
             f1_t invDist = rsqrt(distSqr);
             f1_t invDistCube =  invDist * invDist * invDist;
-            piacc.acc -= r * pj.mass * invDistCube;
+            pi.acc -= r * pj.mass * invDistCube;
 
         }
         __syncthreads();
     }
-    piacc.acc -= pi.vel * 0.1;
-    particles.storeParticle(piacc,idx);
+    pi.acc -= pi.vel * 0.1;
+    particles.storeParticle(idx,Particle<ACC>(pi));
 }
 
 
-__global__ void integrateLeapfrog(Particles particles, f1_t dt, bool not_first_step)
+__global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t dt, bool not_first_step)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx>=particles.size())
@@ -94,14 +95,12 @@ __global__ void integrateLeapfrog(Particles particles, f1_t dt, bool not_first_s
         return;
     }
 
-    auto pi = particles.loadParticle<POSM,VEL,ACC>(idx);
+    auto pi = particles.loadParticle<POS,MASS,VEL,ACC>(idx);
 
     //   calculate velocity a_t
     pi.vel  = pi.vel + pi.acc * (dt*0.5f);
 
     // we could now change delta t here
-
-    f1_t next_dt = dt;
 
     // calculate velocity a_t+1/2
     pi.vel = pi.vel + pi.acc * (dt*0.5f) * not_first_step;
@@ -109,7 +108,7 @@ __global__ void integrateLeapfrog(Particles particles, f1_t dt, bool not_first_s
     // calculate position r_t+1
     pi.pos = pi.pos + pi.vel * dt;
 
-    particles.storeParticle(pi,idx);
+    particles.storeParticle(idx,pi);
 }
 
 int main()
@@ -120,85 +119,46 @@ int main()
     logINFO("pfSPH") << "Welcome to planetformSPH!";
     assert_cuda(cudaSetDevice(0));
 
-    // handle frontend
+    // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = true;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
-    // generate 100 particles
-    Particles pb(PARTICLES);
+    // generate some particles
+    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
-    pb.registerGLPositionBuffer(fnd::getPositionBuffer(pb.size()));
-    pb.registerGLVelocityBuffer(fnd::getVelocityBuffer(pb.size()));
-    pb.mapRegisteredBuffers();
+    static_cast<DEV_POSM>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
+    static_cast<DEV_VEL>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
+    pb.mapGraphicsResource();
 #endif
 
-    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone());
+    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
-    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone(),0.01f, PARTICLES/ BLOCK_SIZE);
+    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.01f, PARTICLES/ BLOCK_SIZE);
     assert_cuda(cudaGetLastError());
-    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceClone()),0.005f,false);
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.005f,false);
     assert_cuda(cudaGetLastError());
 
-    pb.unmapRegisteredBuffes(); // used for frontend stuff
+    pb.unmapGraphicsResource(); // used for frontend stuff
     mpu::DeltaTimer dt;
     while(fnd::handleFrontend(dt.getDeltaTime()))
     {
         if(simShouldRun)
         {
-            pb.mapRegisteredBuffers(); // used for frontend stuff
+            pb.mapGraphicsResource(); // used for frontend stuff
 
-            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone(),0.00001f, PARTICLES/ BLOCK_SIZE);
+            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.00001f, PARTICLES/ BLOCK_SIZE);
             assert_cuda(cudaGetLastError());
-            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceClone()),0.0025f,true);
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f,true);
             assert_cuda(cudaGetLastError());
 
-            pb.unmapRegisteredBuffes(); // used for frontend stuff
-            assert_cuda(cudaDeviceSynchronize());
+            pb.unmapGraphicsResource(); // used for frontend stuff
         }
     }
 
-    pb.unregisterBuffers(); // probably not needed since it is done in destructor
     return 0;
-}
-
-#endif
-
-
-__global__ void test(Particles<DEV_MASS,DEV_POS> a, Particles<DEV_MASS,DEV_POS> b)
-{
-    const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
-    Particle<MASS, POS> p = a.loadParticle(idx);
-    Particle<MASS, POS> p2 = a.loadParticle(idx / 2);
-
-    p.pos = p.pos + p2.pos;
-
-    b.storeParticle(idx,p);
-}
-
-int main()
-{
-
-    Particles<HOST_POSM,HOST_VEL,HOST_ACC> host(100);
-    Particles<DEV_MASS,DEV_POS> dev1(100);
-    Particles<DEV_MASS> dev2(100);
-
-    Particle<MASS> p(10.0f);
-    host.storeParticle( 10, Particle<MASS>(p));
-
-
-    dev1 = host;
-
-    test<<<1,100>>>(dev1.createDeviceCopy(), dev2.createDeviceCopy());
-
-    host = dev2;
-
-    Particle<MASS> p2;
-    p2 = host.loadParticle(10);
-
-    std::cout << p.mass;
 }
