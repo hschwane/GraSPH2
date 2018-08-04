@@ -36,6 +36,8 @@ constexpr char TITLE[] = "Planetform";
 
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
+const bool enableVsync    = false;
+
 float particleRenderSize    = 0.005f;
 float particleBrightness    = 1.0f;
 Falloff falloffStyle        = Falloff::NONE;
@@ -123,6 +125,7 @@ void initializeFrontend()
     mpu::gph::addShaderIncludePath(LIB_SHADER_PATH);
     mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
 
+    mpu::gph::enableVsync(enableVsync);
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
     glEnable(GL_PROGRAM_POINT_SIZE);
     if(additiveBlending)
