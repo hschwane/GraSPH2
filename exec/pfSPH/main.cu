@@ -125,38 +125,69 @@ int main()
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate some particles
-    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
+//    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
+
+    DEV_POSM dp(5);
 
     // register position and velocity buffer with cuda
-#if defined(FRONTEND_OPENGL)
-    static_cast<DEV_POSM>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
-    static_cast<DEV_VEL>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
-    pb.mapGraphicsResource();
-#endif
+//#if defined(FRONTEND_OPENGL)
+//    static_cast<DEV_POSM>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
+//    static_cast<DEV_VEL>(pb).registerGLGraphicsResource(fnd::getVelocityBuffer(pb.size()));
+//    pb.mapGraphicsResource();
+//#endif
 
-    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    dp.registerGLGraphicsResource(fnd::getPositionBuffer(5));
+    dp.mapGraphicsResource();
+
+    Particle<POS,MASS,VEL> p;
+    HOST_POSM hp(5);
+    p.pos = {0.5,0.5,0};
+    p.vel = {1,0,0};
+    hp.storeParticle(2,p);
+
+    p.pos = {-0.5,0.5,0};
+    p.vel = {1,0,0};
+    hp.storeParticle(1,p);
+
+    p.pos = {0.5,-0.5,0};
+    p.vel = {1,0,0};
+    hp.storeParticle(0,p);
+
+    p.pos = {-0.5,-0.5,0};
+    p.vel = {1,0,0};
+    hp.storeParticle(3,p);
+
+    dp = hp;
+    hp=dp;
+
+    hp.loadParticle(2,p);
+    std::cout << p.pos.x << " " << p.pos.y << " " << p.pos.z <<std::endl;
+
+    dp.unmapGraphicsResource();
+
+//    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
-    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.01f, PARTICLES/ BLOCK_SIZE);
-    assert_cuda(cudaGetLastError());
-    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.005f,false);
-    assert_cuda(cudaGetLastError());
+//    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.01f, PARTICLES/ BLOCK_SIZE);
+//    assert_cuda(cudaGetLastError());
+//    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.005f,false);
+//    assert_cuda(cudaGetLastError());
 
-    pb.unmapGraphicsResource(); // used for frontend stuff
+//    pb.unmapGraphicsResource(); // used for frontend stuff
     mpu::DeltaTimer dt;
     while(fnd::handleFrontend(dt.getDeltaTime()))
     {
         if(simShouldRun)
         {
-            pb.mapGraphicsResource(); // used for frontend stuff
+//            pb.mapGraphicsResource(); // used for frontend stuff
 
-            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.00001f, PARTICLES/ BLOCK_SIZE);
-            assert_cuda(cudaGetLastError());
-            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f,true);
-            assert_cuda(cudaGetLastError());
+//            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.00001f, PARTICLES/ BLOCK_SIZE);
+//            assert_cuda(cudaGetLastError());
+//            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f,true);
+//            assert_cuda(cudaGetLastError());
 
-            pb.unmapGraphicsResource(); // used for frontend stuff
+//            pb.unmapGraphicsResource(); // used for frontend stuff
         }
     }
 
