@@ -43,7 +43,7 @@ set(LIB_RESOURCE_PATH ${CMAKE_SOURCE_DIR}/resources CACHE PATH "Library Resource
 # set compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 if (USE_CUDA)
-    set(CUDA_CODE_GEN "-gencode arch=compute_50,code=sm_50" CACHE STRING "Cuda arch for which code should be generated.")
+    set(CUDA_CODE_GEN "-gencode arch=compute_61,code=sm_61" CACHE STRING "Cuda arch for which code should be generated.")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_CODE_GEN} -std=c++14")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_OMP")
