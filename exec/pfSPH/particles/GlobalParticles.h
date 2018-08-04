@@ -72,6 +72,9 @@ public:
     template<typename... particleArgs>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
 
+    // graphics interop
+    template <class base>
+    void registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag = cudaGraphicsMapFlagsNone); //!< register an openGL vbo to be used for the particle attribute "base" instead of the internal storage
     void mapGraphicsResource(); //!< if an opengl buffer is used in any base class, map the buffer to enable cuda usage
     void unmapGraphicsResource(); //!< unmap the opengl buffer of all bases so it can be used by openGL again
 
@@ -307,6 +310,13 @@ void Particles<Args...>::unmapGraphicsResource()
 {
     int t[] = {0, ((void)Args::unmapGraphicsResource(),1)...};
     (void)t[0]; // silence compiler warning abut t being unused
+}
+
+template<typename... Args>
+template<class base>
+void Particles<Args...>::registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag)
+{
+    static_cast<base*>(this)->registerGLGraphicsResource(resourceID,flag);
 }
 
 //-------------------------------------------------------------------

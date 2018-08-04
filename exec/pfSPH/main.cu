@@ -127,7 +127,8 @@ int main()
     // generate some particles
 //    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
 
-    DEV_POSM dp(5);
+//    DEV_POSM dp(5);
+    Particles<DEV_POSM> pb(5);
 
     // register position and velocity buffer with cuda
 //#if defined(FRONTEND_OPENGL)
@@ -136,11 +137,11 @@ int main()
 //    pb.mapGraphicsResource();
 //#endif
 
-    dp.registerGLGraphicsResource(fnd::getPositionBuffer(5));
-    dp.mapGraphicsResource();
+    pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(5));
+    pb.mapGraphicsResource();
 
     Particle<POS,MASS,VEL> p;
-    HOST_POSM hp(5);
+    Particles<HOST_POSM > hp(5);
     p.pos = {0.5,0.5,0};
     p.vel = {1,0,0};
     hp.storeParticle(2,p);
@@ -157,13 +158,13 @@ int main()
     p.vel = {1,0,0};
     hp.storeParticle(3,p);
 
-    dp = hp;
-    hp=dp;
+    pb = hp;
+    hp = pb;
 
-    hp.loadParticle(2,p);
+    p = hp.loadParticle(2);
     std::cout << p.pos.x << " " << p.pos.y << " " << p.pos.z <<std::endl;
 
-    dp.unmapGraphicsResource();
+    pb.unmapGraphicsResource();
 
 //    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
