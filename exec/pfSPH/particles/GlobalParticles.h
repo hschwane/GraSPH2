@@ -54,7 +54,7 @@ class Particles : public Args...
 {
 public:
     // constructors
-    CUDAHOSTDEV Particles() : m_numParticles(0), m_isDeviceCopy(false), Args(0)... {} //!< default constructor
+    CUDAHOSTDEV Particles() : m_numParticles(0), m_isDeviceCopy(false), Args()... {} //!< default constructor
     explicit Particles(size_t n) : m_numParticles(n), m_isDeviceCopy(false), Args(n)... {} //!< construct particle buffer which can contain n particles
 
     // shallow copying
@@ -149,7 +149,7 @@ public:
     void unmapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
 
     // status checks
-    size_t size() { return m_size;} //!< returns the number of particles
+    size_t size() const { return m_size;} //!< returns the number of particles
 
     // friends and types
     template <typename Type, typename Functor> friend class DEVICE_BASE; // be friends with the corresponding device base
@@ -158,11 +158,9 @@ public:
 protected:
     HOST_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class
 
-private:
+public:
     size_t m_size; //!< the number of particles stored in this buffer
     T* m_data;  //!< the actual data
-
-
 };
 
 //-------------------------------------------------------------------
@@ -201,11 +199,13 @@ public:
         swap(first.m_data,second.m_data);
         swap(first.m_size,second.m_size);
         swap(first.m_isDeviceCopy,second.m_isDeviceCopy);
+        swap(first.m_graphicsResource,second.m_graphicsResource);
     }
 
     // converting from and to a compatible host base
     using host_type = HOST_BASE<T,lsFunctor>; //!< the type of host base this device base can be converted to
     DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
+    DEVICE_BASE& operator=(const host_type& other); //!< assign from compatible host base
     operator host_type() const; //!< convert to a compatible host base
 
     // shallow copying
@@ -231,7 +231,7 @@ public:
 protected:
     DEVICE_BASE & operator=(const size_t & f) {return *this;}
 
-private:
+public:
     void unregisterGraphicsResource(); //!< unregister the opengl resource from cuda
 
     bool m_isDeviceCopy; //!< if this is a shallow copy no memory is freed on destruction
@@ -333,7 +333,7 @@ void HOST_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> 
 //-------------------------------------------------------------------
 // function definitions for DEVICE_BASE class
 template<typename T, typename lsFunctor>
-DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(size_t n) :  m_size(n), m_data(nullptr), m_isDeviceCopy(false)
+DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(size_t n) :  m_size(n), m_data(nullptr), m_isDeviceCopy(false), m_graphicsResource(nullptr)
 {
     assert_cuda(cudaMalloc(&m_data, m_size*sizeof(T)));
 }
@@ -341,13 +341,7 @@ DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(size_t n) :  m_size(n), m_data(nullptr), 
 template<typename T, typename lsFunctor>
 DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE &other) : DEVICE_BASE(other.m_size)
 {
-    assert_cuda( cudaMemcpy(m_data, other.m_data, m_size, cudaMemcpyDeviceToDevice));
-}
-
-template<typename T, typename lsFunctor>
-DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : DEVICE_BASE(other.m_size)
-{
-    assert_cuda( cudaMemcpy(m_data, other.m_data, m_size, cudaMemcpyHostToDevice));
+    assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(T), cudaMemcpyDeviceToDevice));
 }
 
 template<typename T, typename lsFunctor>
@@ -358,15 +352,32 @@ DEVICE_BASE<T, lsFunctor>::~DEVICE_BASE()
 }
 
 template<typename T, typename lsFunctor>
+DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : DEVICE_BASE(other.m_size)
+{
+    assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(T), cudaMemcpyHostToDevice));
+}
+
+template<typename T, typename lsFunctor>
 DEVICE_BASE<T, lsFunctor>::operator host_type() const
 {
     host_type host(m_size);
-    logDEBUG("PARTICLES") << m_size;
-    logDEBUG("PARTICLES") << host.m_size;
-    logDEBUG("PARTICLES") << host.m_data;
-    logDEBUG("PARTICLES") << m_data;
-    assert_cuda( cudaMemcpy(host.m_data,m_data,m_size,cudaMemcpyDeviceToHost));
+    assert_cuda( cudaMemcpy(host.m_data,m_data,m_size*sizeof(T),cudaMemcpyDeviceToHost));
     return host;
+}
+
+template<typename T, typename lsFunctor>
+DEVICE_BASE<T,lsFunctor> &DEVICE_BASE<T, lsFunctor>::operator=(const DEVICE_BASE::host_type& host)
+{
+    if(size() != host.size())
+    {
+        DEVICE_BASE<T,lsFunctor> base(host);
+        swap(*this,base);
+    }
+    else
+    {
+        assert_cuda( cudaMemcpy(m_data, host.m_data, m_size*sizeof(T), cudaMemcpyHostToDevice));
+    }
+    return *this;
 }
 
 template<typename T, typename lsFunctor>
@@ -376,6 +387,7 @@ DEVICE_BASE<T, lsFunctor> DEVICE_BASE<T, lsFunctor>::createDeviceCopy() const
     b.m_data=m_data;
     b.m_size = m_size;
     b.m_isDeviceCopy=true;
+    b.m_graphicsResource=nullptr;
     return b;
 };
 
@@ -432,10 +444,9 @@ void DEVICE_BASE<T, lsFunctor>::unmapGraphicsResource()
 template<typename T, typename lsFunctor>
 void DEVICE_BASE<T, lsFunctor>::unregisterGraphicsResource()
 {
-    cudaGraphicsUnregisterResource(m_graphicsResource);
+    assert_cuda(cudaGraphicsUnregisterResource(m_graphicsResource));
     m_data=nullptr;
     m_graphicsResource = nullptr;
 }
-
 
 #endif //MPUTILS_GLOBALPARTICLES_H
