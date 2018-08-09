@@ -189,14 +189,15 @@ public:
     //construction and destruction
     CUDAHOSTDEV DEVICE_BASE() : m_size(0), m_data(nullptr), m_isDeviceCopy(false), m_graphicsResource(nullptr) {}
     explicit DEVICE_BASE(size_t n);
-    ~DEVICE_BASE();
+    CUDAHOSTDEV ~DEVICE_BASE();
 
     // copy swap idom where copy construction is only allowed on th host
     // to copy on the device use device copy
     DEVICE_BASE(const DEVICE_BASE & other);
     CUDAHOSTDEV DEVICE_BASE( DEVICE_BASE&& other) noexcept : DEVICE_BASE() {swap(*this,other);}
-    CUDAHOSTDEV DEVICE_BASE& operator=(DEVICE_BASE other) {swap(*this,other); return *this;}
-    CUDAHOSTDEV friend void swap(DEVICE_BASE & first, DEVICE_BASE & second)
+    CUDAHOSTDEV DEVICE_BASE& operator=(DEVICE_BASE&& other) noexcept {swap(*this,other); return *this;}
+    DEVICE_BASE& operator=(DEVICE_BASE other) noexcept {swap(*this,other); return *this;}
+    CUDAHOSTDEV friend void swap(DEVICE_BASE & first, DEVICE_BASE & second) noexcept
     {
         using thrust::swap;
         swap(first.m_data,second.m_data);
@@ -291,7 +292,7 @@ Particles<Ts...> Particles<Args...>::deviceCopyHelper(std::tuple<Ts...>&&) const
 template<typename... Args>
 auto Particles<Args...>::createDeviceCopy() const
 {
-#if defined(__CUDA_ARCH__)
+#if 1 // defined(__CUDA_ARCH__)
     return Particles<Args...>(*this,true);
 #else
     return deviceCopyHelper(mpu::remove_t<copy_condition,Args...>());
@@ -340,6 +341,8 @@ void HOST_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> 
 #endif
 }
 
+int i;
+
 //-------------------------------------------------------------------
 // function definitions for DEVICE_BASE class
 template<typename T, typename lsFunctor>
@@ -357,8 +360,17 @@ DEVICE_BASE<T, lsFunctor>::DEVICE_BASE(const DEVICE_BASE &other) : DEVICE_BASE(o
 template<typename T, typename lsFunctor>
 DEVICE_BASE<T, lsFunctor>::~DEVICE_BASE()
 {
+#if defined(__CUDA_ARCH__)
+    #if !defined(NDEBUG)
+        if(m_isDeviceCopy || m_graphicsResource)
+        {
+            printf("Destroying base that is not a device copy on the device, this is likely to be a bug!");
+        }
+    #endif
+#else
     if(!m_isDeviceCopy && !m_graphicsResource) assert_cuda(cudaFree(m_data));
     if(m_graphicsResource) unregisterGraphicsResource();
+#endif
 }
 
 template<typename T, typename lsFunctor>
