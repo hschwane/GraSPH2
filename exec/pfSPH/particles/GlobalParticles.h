@@ -39,6 +39,12 @@
  *
  * Do NOT mix host and device bases.
  *
+ * openGL interop
+ * Use the register function to register an openGL VBO to a specific device base. Then use the map and unmap functions
+ * to map the VBOs into cuda address space and make them usable. In kernel calls. Make sure the openGL buffer has the
+ * correct size. Assignment from a host to a mapped device base will copy the data to the VBO, assignment from another
+ * device will however unmap the the VBO and allocate new cuda memory.
+ *
  * Supported particle attributes are:
  * HOST_POSM
  * HOST_VEL
