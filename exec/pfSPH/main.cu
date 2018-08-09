@@ -22,7 +22,6 @@
 #include <crt/math_functions.hpp>
 
 
-
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<15;
 
@@ -59,7 +58,7 @@ __global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t 
 
     const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    Particle<POS,MASS,VEL,ACC> pi = particles.loadParticle<POS,VEL,MASS>(idx);
+    Particle<POS,MASS,VEL,ACC> pi = particles.loadParticle<POS,MASS,VEL>(idx);
 
     for (int tile = 0; tile < numTiles; tile++)
     {
@@ -81,10 +80,10 @@ __global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t 
         }
         __syncthreads();
     }
-    pi.acc -= pi.vel * 0.1;
+
+    pi.acc -= pi.vel * 0.01;
     particles.storeParticle(idx,Particle<ACC>(pi));
 }
-
 
 __global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t dt, bool not_first_step)
 {
@@ -113,7 +112,6 @@ __global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles,
 
 int main()
 {
-
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
     logINFO("pfSPH") << "Welcome to planetformSPH!";
@@ -125,70 +123,38 @@ int main()
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate some particles
-//    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
-
-//    DEV_POSM dp(5);
-    Particles<DEV_POSM> pb(5);
+    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
 
     // register position and velocity buffer with cuda
-//#if defined(FRONTEND_OPENGL)
-//    static_cast<DEV_POSM>(pb).registerGLGraphicsResource(fnd::getPositionBuffer(pb.size()));
-//    static_cast<DEV_VEL>(pb).registerGLGraphicsResource(fnd::getVelocityBuffer(pb.size()));
-//    pb.mapGraphicsResource();
-//#endif
-
-    pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(5));
+#if defined(FRONTEND_OPENGL)
+    pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
+    pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
     pb.mapGraphicsResource();
+#endif
 
-    Particle<POS,MASS,VEL> p;
-    Particles<HOST_POSM > hp(5);
-    p.pos = {0.5,0.5,0};
-    p.vel = {1,0,0};
-    hp.storeParticle(2,p);
-
-    p.pos = {-0.5,0.5,0};
-    p.vel = {1,0,0};
-    hp.storeParticle(1,p);
-
-    p.pos = {0.5,-0.5,0};
-    p.vel = {1,0,0};
-    hp.storeParticle(0,p);
-
-    p.pos = {-0.5,-0.5,0};
-    p.vel = {1,0,0};
-    hp.storeParticle(3,p);
-
-    pb = hp;
-    hp = pb;
-
-    p = hp.loadParticle(2);
-    std::cout << p.pos.x << " " << p.pos.y << " " << p.pos.z <<std::endl;
-
-    pb.unmapGraphicsResource();
-
-//    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceCopy()));
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
-//    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.01f, PARTICLES/ BLOCK_SIZE);
-//    assert_cuda(cudaGetLastError());
-//    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.005f,false);
-//    assert_cuda(cudaGetLastError());
+    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0001f, PARTICLES/ BLOCK_SIZE);
+    assert_cuda(cudaGetLastError());
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.001f,false);
+    assert_cuda(cudaGetLastError());
 
-//    pb.unmapGraphicsResource(); // used for frontend stuff
+    pb.unmapGraphicsResource(); // used for frontend stuff
     mpu::DeltaTimer dt;
     while(fnd::handleFrontend(dt.getDeltaTime()))
     {
         if(simShouldRun)
         {
-//            pb.mapGraphicsResource(); // used for frontend stuff
+            pb.mapGraphicsResource(); // used for frontend stuff
 
-//            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.00001f, PARTICLES/ BLOCK_SIZE);
-//            assert_cuda(cudaGetLastError());
-//            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f,true);
-//            assert_cuda(cudaGetLastError());
+            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0001f, PARTICLES/ BLOCK_SIZE);
+            assert_cuda(cudaGetLastError());
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.001f,true);
+            assert_cuda(cudaGetLastError());
 
-//            pb.unmapGraphicsResource(); // used for frontend stuff
+            pb.unmapGraphicsResource(); // used for frontend stuff
         }
     }
 
