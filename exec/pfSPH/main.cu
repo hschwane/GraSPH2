@@ -20,36 +20,31 @@
 #include "frontends/frontendInterface.h"
 #include <Cuda/cudaUtils.h>
 #include <crt/math_functions.hpp>
-
+#include "particles/algorithms.h"
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<15;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles)
+__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx>=particles.size())
+    initializeEach(pb, [size=pb.size()](int i)
     {
-        printf("wrong dispatch parameters for particle count!");
-        return;
-    }
+        thrust::random::default_random_engine rng;
+        rng.discard(i);
+        thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
 
-    thrust::random::default_random_engine rng;
-    rng.discard(idx);
-    thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
+        Particle<POS,MASS,VEL> p;
 
-    Particle<POS,MASS,VEL,ACC> p;
+        p.pos.x = dist(rng);
+        p.pos.y = dist(rng);
+        p.pos.z = 0.0f;
+        p.mass = 1.0f/size;
 
-    p.pos.x = dist(rng);
-    p.pos.y = dist(rng);
-    p.pos.z = 0.0f;
-    p.mass = 1.0f/particles.size();
-
-    p.vel = cross(p.pos,{0.0f,0.0f, 0.75f});
-
-    particles.storeParticle(idx,p);
+        p.vel = cross(p.pos,{0.0f,0.0f, 0.75f});
+        return p;
+    });
 }
 
 __global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t eps2, const int numTiles)
@@ -87,27 +82,22 @@ __global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t 
 
 __global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t dt, bool not_first_step)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx>=particles.size())
+    using pT=Particle<POS,VEL,ACC>;
+    doForEach(particles, nvstd::function<pT(pT)>([&](Particle<POS,VEL,ACC> pi)
     {
-        printf("wrong dispatch parameters for particle count!");
-        return;
-    }
+        //   calculate velocity a_t
+        pi.vel = pi.vel + pi.acc * (dt * 0.5f);
 
-    auto pi = particles.loadParticle<POS,MASS,VEL,ACC>(idx);
+        // we could now change delta t here
 
-    //   calculate velocity a_t
-    pi.vel  = pi.vel + pi.acc * (dt*0.5f);
+        // calculate velocity a_t+1/2
+        pi.vel = pi.vel + pi.acc * (dt * 0.5f) * not_first_step;
 
-    // we could now change delta t here
+        // calculate position r_t+1
+        pi.pos = pi.pos + pi.vel * dt;
 
-    // calculate velocity a_t+1/2
-    pi.vel = pi.vel + pi.acc * (dt*0.5f) * not_first_step;
-
-    // calculate position r_t+1
-    pi.pos = pi.pos + pi.vel * dt;
-
-    particles.storeParticle(idx,pi);
+        return pi;
+    }));
 }
 
 int main()
@@ -132,7 +122,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceCopy()));
+    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
