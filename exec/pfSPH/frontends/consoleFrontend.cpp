@@ -45,9 +45,11 @@ void setPauseHandler(std::function<void(bool)> f)
 {
 }
 
-bool handleFrontend(double dt)
+bool handleFrontend()
 {
     using namespace cmdFrontend;
+    static mpu::DeltaTimer dtime;
+    double dt = dtime.getDeltaTime();
 
     totalTime += dt;
     timeSincePrint += dt;

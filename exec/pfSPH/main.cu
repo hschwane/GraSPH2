@@ -110,8 +110,7 @@ int main()
     assert_cuda(cudaGetLastError());
 
     pb.unmapGraphicsResource(); // used for frontend stuff
-    mpu::DeltaTimer dt;
-    while(fnd::handleFrontend(dt.getDeltaTime()))
+    while(fnd::handleFrontend())
     {
         if(simShouldRun)
         {

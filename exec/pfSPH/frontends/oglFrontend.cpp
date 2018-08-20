@@ -192,7 +192,7 @@ void setPauseHandler(std::function<void(bool)> f)
     pauseHandler = f;
 }
 
-bool handleFrontend(double dt)
+bool handleFrontend()
 {
     using namespace oglFronted;
 
