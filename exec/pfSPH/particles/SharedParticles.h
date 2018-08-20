@@ -13,9 +13,10 @@
 
 // includes
 //--------------------
-#include <mpUtils.h>
 #include "ext_base_cast.h"
 #include "Particle.h"
+#include <mpUtils.h>
+#include <Cuda/cudaUtils.h>
 //--------------------
 
 //-------------------------------------------------------------------

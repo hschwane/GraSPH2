@@ -27,63 +27,43 @@ constexpr int PARTICLES = 1<<15;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb)
+__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles)
 {
-    initializeEach(pb, [size=pb.size()](int i)
+    INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL),
     {
         thrust::random::default_random_engine rng;
         rng.discard(i);
         thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
 
-        Particle<POS,MASS,VEL> p;
+        pi.pos.x = dist(rng);
+        pi.pos.y = dist(rng);
+        pi.pos.z = 0.0f;
+        pi.mass = 1.0f/particles.size();
 
-        p.pos.x = dist(rng);
-        p.pos.y = dist(rng);
-        p.pos.z = 0.0f;
-        p.mass = 1.0f/size;
-
-        p.vel = cross(p.pos,{0.0f,0.0f, 0.75f});
-        return p;
+        pi.vel = cross(pi.pos,{0.0f,0.0f, 0.75f});
     });
 }
 
 __global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t eps2, const int numTiles)
 {
-    SharedParticles<BLOCK_SIZE,SHARED_POSM> shared;
-
-    const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    Particle<POS,MASS,VEL,ACC> pi = particles.loadParticle<POS,MASS,VEL>(idx);
-
-    for (int tile = 0; tile < numTiles; tile++)
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, SHARED_POSM, MPU_COMMA_LIST(POS,MASS,VEL,ACC),
+                        MPU_COMMA_LIST(POS,MASS,VEL), MPU_COMMA_LIST(ACC), MPU_COMMA_LIST(POS, MASS),
     {
-        const auto p = particles.loadParticle<POS,MASS>(tile*blockDim.x+threadIdx.x);
-        shared.storeParticle(threadIdx.x,p);
+        f3_t r = pi.pos - pj.pos;
+        f1_t distSqr = dot(r, r) + eps2;
 
-        __syncthreads();
-
-        for(int j = 0; j<blockDim.x;j++)
-        {
-            auto pj = shared.loadParticle<POS,MASS>(j);
-            f3_t r = pi.pos-pj.pos;
-            f1_t distSqr = dot(r,r) + eps2;
-
-            f1_t invDist = rsqrt(distSqr);
-            f1_t invDistCube =  invDist * invDist * invDist;
-            pi.acc -= r * pj.mass * invDistCube;
-
-        }
-        __syncthreads();
-    }
-
-    pi.acc -= pi.vel * 0.01;
-    particles.storeParticle(idx,Particle<ACC>(pi));
+        f1_t invDist = rsqrt(distSqr);
+        f1_t invDistCube = invDist * invDist * invDist;
+        pi.acc -= r * pj.mass * invDistCube;
+    },
+    {
+         pi.acc -= pi.vel * 0.01;
+    })
 }
 
 __global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t dt, bool not_first_step)
 {
-    using pT=Particle<POS,VEL,ACC>;
-    doForEach(particles, nvstd::function<pT(pT)>([&](Particle<POS,VEL,ACC> pi)
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL),
     {
         //   calculate velocity a_t
         pi.vel = pi.vel + pi.acc * (dt * 0.5f);
@@ -95,9 +75,7 @@ __global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles,
 
         // calculate position r_t+1
         pi.pos = pi.pos + pi.vel * dt;
-
-        return pi;
-    }));
+    })
 }
 
 int main()
