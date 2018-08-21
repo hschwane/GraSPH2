@@ -45,6 +45,7 @@ MAKE_PARTICLE_BASE(POS,pos,f3_t);
 MAKE_PARTICLE_BASE(MASS,mass,f1_t);
 MAKE_PARTICLE_BASE(VEL,vel,f3_t);
 MAKE_PARTICLE_BASE(ACC,acc,f3_t);
+MAKE_PARTICLE_BASE(RHO,rho,f1_t);
 
 //-------------------------------------------------------------------
 // 3D position as f4_t
@@ -131,5 +132,22 @@ template <size_t n>
 using SHARED_ACC = SHARED_BASE<n,f4_t, acc_impl>;
 using HOST_ACC = HOST_BASE<f4_t, acc_impl>;
 using DEV_ACC = DEVICE_BASE<f4_t, acc_impl>;
+
+//-------------------------------------------------------------------
+// hydrodynamic density rho
+struct density_impl
+{
+    CUDAHOSTDEV static auto load(const f1_t & v) { return Particle<RHO>(v); }
+    template <typename T> CUDAHOSTDEV static void store(f1_t & v, const T& p);
+    static constexpr f1_t defaultValue = 0;
+};
+
+template<typename T> CUDAHOSTDEV void density_impl::store(f1_t &v, const T &p) {}
+template<> CUDAHOSTDEV void density_impl::store<RHO>(f1_t & v, const RHO& p) {v=p.rho;}
+
+template <size_t n>
+using SHARED_RHO = SHARED_BASE<n,f1_t, density_impl>;
+using HOST_RHO = HOST_BASE<f1_t, density_impl>;
+using DEV_RHO = DEVICE_BASE<f1_t, density_impl>;
 
 #endif //MPUTILS_PARTICLES_H
