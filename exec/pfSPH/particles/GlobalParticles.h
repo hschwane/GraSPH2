@@ -15,8 +15,9 @@
 //--------------------
 #include <thrust/swap.h>
 #include <tuple>
-#include <mpUtils.h>
 #include <cuda_gl_interop.h>
+#include <mpUtils.h>
+#include <Cuda/cudaUtils.h>
 #include "ext_base_cast.h"
 #include "Particle.h"
 //--------------------
@@ -77,6 +78,7 @@ public:
     CUDAHOSTDEV Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
     template<typename... particleArgs>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
+    void initialize(); //!< set all particle attributes to there default values
 
     // graphics interop
     template <class base>
@@ -153,6 +155,7 @@ public:
     CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members Note: while this is a host device function, calling it on the device will have no effect
     template<typename ... Args>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
+    CUDAHOSTDEV void initialize(size_t i); //!< set all values to the default value
 
     void mapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
     void unmapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
@@ -231,6 +234,7 @@ public:
     CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members  Note: while this is a host device function, calling it on the host will have no effect
     template<typename ... Args>
     CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
+    CUDAHOSTDEV void initialize(size_t i); //!< set all values to the default value
 
     // status checks
     CUDAHOSTDEV size_t size() { return m_size;} //!< returns the number of particles
@@ -249,6 +253,21 @@ public:
     T* m_data; //!< the actual data
     cudaGraphicsResource* m_graphicsResource; //!< a cuda graphics resource that can be used as memory
 };
+
+//-------------------------------------------------------------------
+// helper functions
+
+namespace detail {
+    template<typename ... Args>
+    __global__ void _initializeParticles(Particles<Args...> particles)
+    {
+        for(const auto &i : mpu::gridStrideRange(particles.size()))
+        {
+            int t[] = {0, ((void)static_cast<Args*>(&particles)->initialize(i),1)...};
+            (void)t[0]; // silence compiler warning abut t being unused
+        }
+    }
+}
 
 //-------------------------------------------------------------------
 // function definitions for Particles class
@@ -326,6 +345,18 @@ void Particles<Args...>::registerGLGraphicsResource(uint32_t resourceID, cudaGra
     static_cast<base*>(this)->registerGLGraphicsResource(resourceID,flag);
 }
 
+template<typename... Args>
+void Particles<Args...>::initialize()
+{
+    for(int i = 0; i < size(); ++i)
+    {
+        int t[] = {0, ((void)Args::initialize(i),1)...};
+        (void)t[0]; // silence compiler warning abut t being unused
+    }
+
+    detail::_initializeParticles<<<(size()+255)/256, 256>>>(createDeviceCopy());
+}
+
 //-------------------------------------------------------------------
 // function definitions for HOST_BASE class
 template<typename T, typename lsFunctor>
@@ -347,7 +378,13 @@ void HOST_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> 
 #endif
 }
 
-int i;
+template<typename T, typename lsFunctor>
+void HOST_BASE<T, lsFunctor>::initialize(size_t i)
+{
+#if !defined(__CUDA_ARCH__)
+    m_data[i] = lsFunctor::defaultValue;
+#endif
+}
 
 //-------------------------------------------------------------------
 // function definitions for DEVICE_BASE class
@@ -475,6 +512,14 @@ void DEVICE_BASE<T, lsFunctor>::unregisterGraphicsResource()
     assert_cuda(cudaGraphicsUnregisterResource(m_graphicsResource));
     m_data=nullptr;
     m_graphicsResource = nullptr;
+}
+
+template<typename T, typename lsFunctor>
+void DEVICE_BASE<T, lsFunctor>::initialize(size_t i)
+{
+#if defined(__CUDA_ARCH__)
+    m_data[i] = lsFunctor::defaultValue;
+#endif
 }
 
 #endif //MPUTILS_GLOBALPARTICLES_H

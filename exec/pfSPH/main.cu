@@ -92,6 +92,7 @@ int main()
 
     // generate some particles
     Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
+    pb.initialize();
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)

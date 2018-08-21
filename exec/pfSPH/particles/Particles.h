@@ -52,6 +52,7 @@ struct pos_impl
 {
     CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<POS>(f3_t{v.x,v.y,v.z}); }
     template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
+    static constexpr f4_t defaultValue = {0,0,0,0};
 };
 
 template<typename T> CUDAHOSTDEV void pos_impl::store(f4_t &v, const T &p) {}
@@ -68,6 +69,7 @@ struct mass_impl
 {
     CUDAHOSTDEV static auto load(const float & v) { return Particle<MASS>(v); }
     template <typename T> CUDAHOSTDEV static void store(float & v, const T& p);
+    static constexpr f1_t defaultValue = {0};
 };
 
 template<typename T> CUDAHOSTDEV void mass_impl::store(float &v, const T &p) {}
@@ -84,6 +86,7 @@ struct posm_impl
 {
     CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<POS,MASS>(f3_t{v.x,v.y,v.z},v.w); }
     template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
+    static constexpr f4_t defaultValue = {0,0,0,0};
 };
 
 template<typename T> CUDAHOSTDEV void posm_impl::store(f4_t &v, const T &p) {}
@@ -101,6 +104,7 @@ struct vel_impl
 {
     CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<VEL>(f3_t{v.x,v.y,v.z}); }
     template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
+    static constexpr f4_t defaultValue = {0,0,0,0};
 };
 
 template<typename T> CUDAHOSTDEV void vel_impl::store(f4_t &v, const T &p) {}
@@ -116,8 +120,8 @@ using DEV_VEL = DEVICE_BASE<f4_t, vel_impl>;
 struct acc_impl
 {
     CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<ACC>(f3_t{v.x,v.y,v.z}); }
-
     template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
+    static constexpr f4_t defaultValue = {0,0,0,0};
 };
 
 template<typename T> CUDAHOSTDEV void acc_impl::store(f4_t &v, const T &p) {}
