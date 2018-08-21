@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include "../../external/cuda/helper_math.h"
 #include "../Log/Log.h"
+#include "../Range.h"
 //--------------------
 
 // make clion understand some cuda specific stuff
@@ -127,6 +128,31 @@ public:
         assert_cuda(cudaFree(ptr));
     }
 };
+
+/**
+ * @brief generates a Range to be used in a for each loop inside a kernel to decouple the grid size from the data size
+ *          indices will run in the range [0,problemSize)
+ * @param problemSize the size of the data to process
+ * @return a mpu::Range object to be used inside a for each loop
+ */
+inline __device__ Range<int> gridStrideRange(int problemSize)
+{
+    return Range<int>(blockIdx.x * blockDim.x + threadIdx.x, problemSize, gridDim.x * blockDim.x);
+}
+
+
+/**
+ * @brief generates a Range to be used in a for each loop inside a kernel to decouple the grid size from the data size
+ *          indices will run in the range [firstElement,problemSize)
+ * @param firstElement the first element of the dataset to process
+ * @param problemSize the size of the data to process
+ * @return a mpu::Range object to be used inside a for each loop
+ */
+inline __device__ Range<int> gridStrideRange(int firstElement, int problemSize)
+{
+    firstElement += blockIdx.x * blockDim.x + threadIdx.x;
+    return Range<int>(firstElement, problemSize, gridDim.x * blockDim.x);
+}
 
 }
 

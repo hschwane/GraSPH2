@@ -16,6 +16,10 @@
 #include "timeUtils.h"
 #include "type_traitUtils.h"
 #include "templateUtils.h"
+#include "Range.h"
+#if !defined(MPU_NO_PREPROCESSOR_UTILS)
+    #include "preprocessorUtils.h"
+#endif
 
 // include configuration util
 #include "Cfg/CfgFile.h"

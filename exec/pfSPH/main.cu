@@ -16,150 +16,115 @@
 #include <cuda_gl_interop.h>
 #include <thrust/random.h>
 
-#include "Particles.h"
+#include "particles/Particles.h"
 #include "frontends/frontendInterface.h"
 #include <Cuda/cudaUtils.h>
 #include <crt/math_functions.hpp>
+#include "particles/algorithms.h"
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<15;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-__global__ void generate2DNBSystem(Particles particles)
+__global__ void generate2DNBSystem(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx>=particles.size())
+    INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL),
     {
-        printf("wrong dispatch parameters for particle count!");
-        return;
-    }
+        thrust::random::default_random_engine rng;
+        rng.discard(i);
+        thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
 
-    thrust::random::default_random_engine rng;
-    rng.discard(idx);
-    thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
+        pi.pos.x = dist(rng);
+        pi.pos.y = dist(rng);
+        pi.pos.z = 0.0f;
+        pi.mass = 1.0f/particles.size();
 
-    Particle<POSM,VEL,ACC> p;
-
-    p.pos.x = dist(rng);
-    p.pos.y = dist(rng);
-    p.pos.z = 0.0f;
-    p.mass = 1.0f/particles.size();
-
-    p.vel = cross(p.pos,{0.0f,0.0f, 0.75f});
-
-    particles.storeParticle(p,idx);
+        pi.vel = cross(pi.pos,{0.0f,0.0f, 0.75f});
+    });
 }
 
-__global__ void nbodyForces(Particles particles, f1_t eps2, const int numTiles)
+__global__ void nbodyForces(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t eps2, const int numTiles)
 {
-    SharedParticles<BLOCK_SIZE,SHARED_POSM> shared;
-
-    const unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    const auto pi = particles.loadParticle<POSM,VEL>(idx);
-    Particle<ACC> piacc;
-
-    for (int tile = 0; tile < numTiles; tile++)
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, SHARED_POSM, MPU_COMMA_LIST(POS,MASS,VEL,ACC),
+                        MPU_COMMA_LIST(POS,MASS,VEL), MPU_COMMA_LIST(ACC), MPU_COMMA_LIST(POS, MASS),
     {
-        shared.copyFromGlobal(threadIdx.x, tile*blockDim.x+threadIdx.x, particles);
-        __syncthreads();
+        f3_t r = pi.pos - pj.pos;
+        f1_t distSqr = dot(r, r) + eps2;
 
-        for(int j = 0; j<blockDim.x;j++)
-        {
-            auto pj = shared.loadParticle<POSM>(j);
-            f3_t r = pi.pos-pj.pos;
-            f1_t distSqr = dot(r,r) + eps2;
-
-            f1_t invDist = rsqrt(distSqr);
-            f1_t invDistCube =  invDist * invDist * invDist;
-            piacc.acc -= r * pj.mass * invDistCube;
-
-        }
-        __syncthreads();
-    }
-    piacc.acc -= pi.vel * 0.1;
-    particles.storeParticle(piacc,idx);
+        f1_t invDist = rsqrt(distSqr);
+        f1_t invDistCube = invDist * invDist * invDist;
+        pi.acc -= r * pj.mass * invDistCube;
+    },
+    {
+         pi.acc -= pi.vel * 0.01;
+    })
 }
 
-
-__global__ void integrateLeapfrog(Particles particles, f1_t dt, bool not_first_step)
+__global__ void integrateLeapfrog(Particles<DEV_POSM,DEV_VEL,DEV_ACC> particles, f1_t dt, bool not_first_step)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx>=particles.size())
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL),
     {
-        printf("wrong dispatch parameters for particle count!");
-        return;
-    }
+        //   calculate velocity a_t
+        pi.vel = pi.vel + pi.acc * (dt * 0.5f);
 
-    auto pi = particles.loadParticle<POSM,VEL,ACC>(idx);
+        // we could now change delta t here
 
-    //   calculate velocity a_t
-    pi.vel  = pi.vel + pi.acc * (dt*0.5f);
+        // calculate velocity a_t+1/2
+        pi.vel = pi.vel + pi.acc * (dt * 0.5f) * not_first_step;
 
-    // we could now change delta t here
-
-    f1_t next_dt = dt;
-
-    // calculate velocity a_t+1/2
-    pi.vel = pi.vel + pi.acc * (dt*0.5f) * not_first_step;
-
-    // calculate position r_t+1
-    pi.pos = pi.pos + pi.vel * dt;
-
-    particles.storeParticle(pi,idx);
+        // calculate position r_t+1
+        pi.pos = pi.pos + pi.vel * dt;
+    })
 }
 
 int main()
 {
-
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
     logINFO("pfSPH") << "Welcome to planetformSPH!";
     assert_cuda(cudaSetDevice(0));
 
-    // handle frontend
+    // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = true;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
-    // generate 100 particles
-    Particles pb(PARTICLES);
+    // generate some particles
+    Particles<DEV_POSM,DEV_VEL,DEV_ACC> pb(PARTICLES);
+    pb.initialize();
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
-    pb.registerGLPositionBuffer(fnd::getPositionBuffer(pb.size()));
-    pb.registerGLVelocityBuffer(fnd::getVelocityBuffer(pb.size()));
-    pb.mapRegisteredBuffers();
+    pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
+    pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
+    pb.mapGraphicsResource();
 #endif
 
-    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone());
+    generate2DNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
-    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone(),0.01f, PARTICLES/ BLOCK_SIZE);
+    nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0001f, PARTICLES/ BLOCK_SIZE);
     assert_cuda(cudaGetLastError());
-    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceClone()),0.005f,false);
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.001f,false);
     assert_cuda(cudaGetLastError());
 
-    pb.unmapRegisteredBuffes(); // used for frontend stuff
-    mpu::DeltaTimer dt;
-    while(fnd::handleFrontend(dt.getDeltaTime()))
+    pb.unmapGraphicsResource(); // used for frontend stuff
+    while(fnd::handleFrontend())
     {
         if(simShouldRun)
         {
-            pb.mapRegisteredBuffers(); // used for frontend stuff
+            pb.mapGraphicsResource(); // used for frontend stuff
 
-            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceClone(),0.00001f, PARTICLES/ BLOCK_SIZE);
+            nbodyForces<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0001f, PARTICLES/ BLOCK_SIZE);
             assert_cuda(cudaGetLastError());
-            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(std::move(pb.createDeviceClone()),0.0025f,true);
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.001f,true);
             assert_cuda(cudaGetLastError());
 
-            pb.unmapRegisteredBuffes(); // used for frontend stuff
-            assert_cuda(cudaDeviceSynchronize());
+            pb.unmapGraphicsResource(); // used for frontend stuff
         }
     }
 
-    pb.unregisterBuffers(); // probably not needed since it is done in destructor
     return 0;
 }
