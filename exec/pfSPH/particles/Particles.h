@@ -20,23 +20,8 @@
 #include "SharedParticles.h"
 #include "GlobalParticles.h"
 #include <mpUtils.h>
+#include "../types.h"
 //--------------------
-
-//-------------------------------------------------------------------
-// define the data types used for the simulation
-#define SINGLE_PRECISION
-
-#if defined(DOUBLE_PRECISION)
-    using f1_t=double;
-    using f2_t=double2;
-    using f3_t=double3;
-    using f4_t=double4;
-#else
-    using f1_t=float;
-    using f2_t=float2;
-    using f3_t=float3;
-    using f4_t=float4;
-#endif
 
 //-------------------------------------------------------------------
 // create bases for particles and particle buffers
