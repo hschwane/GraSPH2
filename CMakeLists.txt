@@ -102,6 +102,8 @@ endif()
 
 # openGL and window managing
 if (USE_OPENGL)
+    set(OpenGL_GL_PREFERENCE "GLVND")
+
     find_package(OpenGL REQUIRED)
     find_package(GLEW REQUIRED)
     find_package(GLFW3 REQUIRED)
@@ -141,7 +143,6 @@ if (USE_OPENGL)
     else()
         message("Additional X11 libraries were NOT added. If you get crazy linker errors try to enable ADD_ADDITIONAL_X11_LIBS.")
     endif()
-
 endif ()
 
 # openMP
