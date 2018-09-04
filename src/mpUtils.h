@@ -28,7 +28,6 @@
 #include "Log/ConsoleSink.h"
 #include "Log/FileSink.h"
 #include "Log/Log.h"
-
 #ifdef __linux__
     #include "Log/SyslogSink.h"
 #endif
@@ -42,6 +41,7 @@
 // include cuda utils
 #if defined(__CUDACC__) || defined(__JETBRAINS_IDE__)
     #include "Cuda/cudaUtils.h"
+    #include "Cuda/matrix.h"
 #endif
 
 

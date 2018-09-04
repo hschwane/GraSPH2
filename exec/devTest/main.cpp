@@ -13,8 +13,9 @@
  */
 
 #include <mpUtils.h>
+#include <Graphics/Graphics.h>
 #include <chrono>
-#include "cudaTest.h"
+#include <Cuda/matrix.h>
 
 using namespace mpu;
 using namespace std;
@@ -22,18 +23,11 @@ using namespace std::chrono;
 
 int main()
 {
-    CpuStopwatch timer;
 
-//        Log myLog(LogPolicy::CONSOLE, LogLvl::ALL);
+    Mat<float,3,3> m(5);
+    Mat<float,3,3> m2(5);
 
-        Log myLog( LogLvl::ALL, ConsoleSink());
+    auto m3 = m * m2;
 
-        myLog(LogLvl::INFO, MPU_FILEPOS , "TEST") << "Hi, a log";
-
-        logINFO("TEST") << "Testing Cuda.";
-        testCuda();
-
-    logINFO("TEST") << "It took me " << timer.getSeconds() << " seconds" << endl;
-    myLog.close();
     return 0;
 }

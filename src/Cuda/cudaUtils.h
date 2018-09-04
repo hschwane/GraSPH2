@@ -95,22 +95,6 @@ inline void _cudaAssert(cudaError_t code, std::string &&filepos)
     }
 }
 
-
-// some converting functions
-template<typename d1, typename d2>
-CUDAHOSTDEV
-d1 toDim2(const d2& rhs)
-{
-    return {rhs.x, rhs.y};
-};
-
-template<typename d1, typename d2>
-CUDAHOSTDEV
-d1 toDim3(const d2& rhs)
-{
-    return {rhs.x, rhs.y, rhs.z};
-};
-
 class Managed
 {
 public:
