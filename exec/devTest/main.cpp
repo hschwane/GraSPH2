@@ -15,7 +15,7 @@
 #include <mpUtils.h>
 #include <Graphics/Graphics.h>
 #include <chrono>
-#include <Cuda/matrix.h>
+#include <Cuda/Matrix.h>
 
 using namespace mpu;
 using namespace std;

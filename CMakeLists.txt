@@ -82,7 +82,8 @@ list(APPEND SOURCE_FILES
         "src/Log/ConsoleSink.cpp"
         "src/Log/SyslogSink.cpp"
         "src/Log/Log.cpp"
-        "src/Cfg/CfgFile.cpp")
+        "src/Cfg/CfgFile.cpp"
+        "external/stb_image_impl.cpp")
 
 # mutithreading
 find_package(Threads REQUIRED) # the systems thread lib

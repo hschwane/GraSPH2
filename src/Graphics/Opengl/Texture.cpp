@@ -14,8 +14,7 @@
 // includes
 //--------------------
 #include "Texture.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include <../external/stb_image.h>
+#include "../../../external/stb_image.h"
 #include <assert.h>
 #include <Log/Log.h>
 

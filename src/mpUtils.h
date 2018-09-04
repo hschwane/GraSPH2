@@ -38,4 +38,10 @@
 #include "Timer/Stopwatch.h"
 #include "Timer/Timer.h"
 
+// image processing
+#include "../external/stb_image.h"
+
+// matrix type might be useful without cuda
+#include "Cuda/Matrix.h"
+
 #endif //MPUTILS_MPUTILS_H
