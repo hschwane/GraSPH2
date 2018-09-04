@@ -12,14 +12,13 @@
  *
  */
 
-#include <mpUtils.h>
-#include <cuda_gl_interop.h>
 #include <thrust/random.h>
+#include <mpUtils.h>
+#include <mpCuda.h>
+#include <cuda_gl_interop.h>
 
-#include "particles/Particles.h"
 #include "frontends/frontendInterface.h"
-#include <Cuda/cudaUtils.h>
-#include <crt/math_functions.hpp>
+#include "particles/Particles.h"
 #include "particles/algorithms.h"
 
 constexpr int BLOCK_SIZE = 256;

@@ -13,7 +13,7 @@
  */
 
 #include <mpUtils.h>
-#include <Graphics/Graphics.h>
+#include <mpGraphics.h>
 #include <chrono>
 #include <Cuda/Matrix.h>
 

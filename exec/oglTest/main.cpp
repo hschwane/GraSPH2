@@ -1,7 +1,7 @@
 #include <Log/Log.h>
 #include <Log/ConsoleSink.h>
 #include <Timer/DeltaTimer.h>
-#include <Graphics/Graphics.h>
+#include <mpGraphics.h>
 #include "Graphics/Geometry/Cube.h"
 
 constexpr int HEIGHT = 800;

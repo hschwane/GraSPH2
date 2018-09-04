@@ -13,7 +13,7 @@
 //--------------------
 #include "frontendInterface.h"
 #include <mpUtils.h>
-#include <Graphics/Graphics.h>
+#include <mpGraphics.h>
 //--------------------
 
 // hide all local stuff in this namespace
