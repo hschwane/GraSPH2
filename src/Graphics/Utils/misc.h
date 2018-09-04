@@ -1,22 +1,20 @@
 /*
  * mpUtils
- * Graphics.h
+ * misc.h
  *
  * @author: Hendrik Schwanekamp
  * @mail:   hendrik.schwanekamp@gmx.net
  *
- * Copyright (c) 2017 Hendrik Schwanekamp
+ * Copyright (c) 2018 Hendrik Schwanekamp
  *
  */
-#ifndef MPUTILS_GRAPHICS_H
-#define MPUTILS_GRAPHICS_H
+#ifndef MPUTILS_MISC_H
+#define MPUTILS_MISC_H
 
 // includes
 //--------------------
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/ext.hpp>
 #include "Log/Log.h"
 //--------------------
 
@@ -67,18 +65,4 @@ GLuint offset_of(TMember T::* field) noexcept
 
 }}
 
-// include everything useful from the graphics part of the framework
-//____________________
-#include "Window.h"
-#include "Utils/Transform.h"
-#include "Utils/ModelViewProjection.h"
-#include "Opengl/Buffer.h"
-#include "Opengl/VertexArray.h"
-#include "Opengl/Shader.h"
-#include "Opengl/Texture.h"
-#include "Opengl/Framebuffer.h"
-#include "Rendering/Camera.h"
-#include "Rendering/screenFillingTri.h"
-//--------------------
-
-#endif //MPUTILS_GRAPHICS_H
+#endif //MPUTILS_MISC_H

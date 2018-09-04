@@ -21,10 +21,10 @@
     #include "preprocessorUtils.h"
 #endif
 
-// include configuration util
+// configuration util
 #include "Cfg/CfgFile.h"
 
-// include the logger
+// the logger
 #include "Log/ConsoleSink.h"
 #include "Log/FileSink.h"
 #include "Log/Log.h"
@@ -32,17 +32,10 @@
     #include "Log/SyslogSink.h"
 #endif
 
-// include timer
+// timer
 #include "Timer/AsyncTimer.h"
 #include "Timer/DeltaTimer.h"
 #include "Timer/Stopwatch.h"
 #include "Timer/Timer.h"
-
-// include cuda utils
-#if defined(__CUDACC__) || defined(__JETBRAINS_IDE__)
-    #include "Cuda/cudaUtils.h"
-    #include "Cuda/matrix.h"
-#endif
-
 
 #endif //MPUTILS_MPUTILS_H
