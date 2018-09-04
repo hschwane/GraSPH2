@@ -52,11 +52,11 @@ class Mat
 public:
     // default constructors
     Mat() = default;
-    Mat(Mat &other) = default;
+    Mat(const Mat &other) = default;
     Mat(Mat &&other) = default;
     ~Mat() = default;
 
-    CUDAHOSTDEV explicit Mat(T v); //!< constructor fills the diagonal with v
+    CUDAHOSTDEV explicit Mat(const T& v); //!< constructor fills the diagonal with v
 
 #ifdef USE_GLM
     // conversion to glm
@@ -85,8 +85,8 @@ public:
 
     CUDAHOSTDEV Mat &operator*=(const T &v); //!< scalar multiply
     CUDAHOSTDEV Mat &operator/=(const T &v); //!< scalar divide
-    CUDAHOSTDEV Mat operator*(const T &v); //!< scalar multiply
-    CUDAHOSTDEV Mat operator/(const T &v); //!< scalar divide
+    CUDAHOSTDEV Mat operator*(const T &v) const; //!< scalar multiply
+    CUDAHOSTDEV Mat operator/(const T &v) const; //!< scalar divide
 
     CUDAHOSTDEV Mat &operator*=(const Mat &rhs); //!< matrix multiplication
     template<size_t rhsRows, size_t rhsCols>
@@ -134,6 +134,12 @@ namespace detail {
 }
 
 /**
+ * @brief scalar multiplication is order independent
+ */
+template<typename T, size_t rows, size_t cols>
+CUDAHOSTDEV Mat<T, rows, cols> operator*(const T& lhs, const Mat<T,rows,cols>& rhs);
+
+/**
  * @brief multiply a 2D vector with a 2x2 matrix
  */
 template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int> = 0>
@@ -155,7 +161,7 @@ CUDAHOSTDEV vT operator*(Mat<T, 4, 4> lhs, vT &rhs);
 //-------------------------------------------------------------------
 
 template<typename T, size_t rows, size_t cols>
-CUDAHOSTDEV Mat<T, rows, cols>::Mat(T v)
+CUDAHOSTDEV Mat<T, rows, cols>::Mat(const T& v)
 {
     for(int i = 0; i < rows; i++)
         for(int j = 0; j < cols; j++)
@@ -269,7 +275,7 @@ CUDAHOSTDEV Mat<T, rows, cols> &Mat<T, rows, cols>::operator/=(const T &v)
 }
 
 template<typename T, size_t rows, size_t cols>
-CUDAHOSTDEV Mat<T, rows, cols> Mat<T, rows, cols>::operator*(const T &v)
+CUDAHOSTDEV Mat<T, rows, cols> Mat<T, rows, cols>::operator*(const T &v) const
 {
     Mat<T, rows, cols> temp(*this);
     temp *= v;
@@ -277,7 +283,7 @@ CUDAHOSTDEV Mat<T, rows, cols> Mat<T, rows, cols>::operator*(const T &v)
 }
 
 template<typename T, size_t rows, size_t cols>
-CUDAHOSTDEV Mat<T, rows, cols> Mat<T, rows, cols>::operator/(const T &v)
+CUDAHOSTDEV Mat<T, rows, cols> Mat<T, rows, cols>::operator/(const T &v) const
 {
     Mat<T, rows, cols> temp(*this);
     temp /= v;
@@ -490,6 +496,12 @@ CUDAHOSTDEV Mat<T, 4, 4> invert(Mat<T, 4, 4> &m)
         inv(i) = inv(i) * det;
 
     return inv;
+}
+
+template<typename T, size_t rows, size_t cols>
+CUDAHOSTDEV Mat<T, rows, cols> operator*(const T &lhs, const Mat<T, rows, cols>& rhs)
+{
+    return rhs*lhs;
 }
 
 template<typename T, typename vT, int>

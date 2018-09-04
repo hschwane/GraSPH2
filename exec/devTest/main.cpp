@@ -25,9 +25,9 @@ int main()
 {
 
     Mat<float,3,3> m(5);
-    Mat<float,3,3> m2(5);
+    Mat<float,3,3> m2(m);
 
-    auto m3 = m * m2;
+    auto m3 = 2.0f * m * m2;
 
     return 0;
 }
