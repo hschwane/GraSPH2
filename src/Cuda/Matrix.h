@@ -52,10 +52,8 @@ class Mat
 public:
     // default constructors
     Mat() = default;
-    Mat(const Mat &other) = default;
-    Mat(Mat &&other) = default;
-    ~Mat() = default;
 
+    // additional construction
     CUDAHOSTDEV explicit Mat(const T& v); //!< constructor fills the diagonal with v
 
 #ifdef USE_GLM
