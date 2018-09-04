@@ -136,19 +136,19 @@ namespace detail {
 /**
  * @brief multiply a 2D vector with a 2x2 matrix
  */
-template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>::value, int> = 0>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int> = 0>
 CUDAHOSTDEV vT operator*(Mat<T, 2, 2> lhs, vT &rhs);
 
 /**
  * @brief multiply a 3D vector with a 3x3 matrix
  */
-template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>::value, int> = 0>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int> = 0>
 CUDAHOSTDEV vT operator*(Mat<T, 3, 3> lhs, vT &rhs);
 
 /**
  * @brief multiply a 4D vector with a 4x4 matrix
  */
-template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>::value, int> = 0>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int> = 0>
 CUDAHOSTDEV vT operator*(Mat<T, 4, 4> lhs, vT &rhs);
 
 // define all the template functions of the matrix class
