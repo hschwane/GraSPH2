@@ -30,7 +30,10 @@ MAKE_PARTICLE_BASE(POS,pos,f3_t);
 MAKE_PARTICLE_BASE(MASS,mass,f1_t);
 MAKE_PARTICLE_BASE(VEL,vel,f3_t);
 MAKE_PARTICLE_BASE(ACC,acc,f3_t);
-MAKE_PARTICLE_BASE(RHO,rho,f1_t);
+MAKE_PARTICLE_BASE(DENSITY,density,f1_t);
+MAKE_PARTICLE_BASE(DENSITY_DT,density_dt,f1_t);
+MAKE_PARTICLE_BASE(DSTRESS,dstress,m3_t);
+MAKE_PARTICLE_BASE(DSTRESS_DT,dstress_dt,m3_t);
 
 //-------------------------------------------------------------------
 // 3D position as f4_t
@@ -122,17 +125,69 @@ using DEV_ACC = DEVICE_BASE<f4_t, acc_impl>;
 // hydrodynamic density rho
 struct density_impl
 {
-    CUDAHOSTDEV static auto load(const f1_t & v) { return Particle<RHO>(v); }
+    CUDAHOSTDEV static auto load(const f1_t & v) { return Particle<DENSITY>(v); }
     template <typename T> CUDAHOSTDEV static void store(f1_t & v, const T& p);
     static constexpr f1_t defaultValue = 0;
 };
 
 template<typename T> CUDAHOSTDEV void density_impl::store(f1_t &v, const T &p) {}
-template<> CUDAHOSTDEV void density_impl::store<RHO>(f1_t & v, const RHO& p) {v=p.rho;}
+template<> CUDAHOSTDEV void density_impl::store<DENSITY>(f1_t & v, const DENSITY& p) {v=p.density;}
 
 template <size_t n>
-using SHARED_RHO = SHARED_BASE<n,f1_t, density_impl>;
-using HOST_RHO = HOST_BASE<f1_t, density_impl>;
-using DEV_RHO = DEVICE_BASE<f1_t, density_impl>;
+using SHARED_DENSITY = SHARED_BASE<n,f1_t, density_impl>;
+using HOST_DENSITY = HOST_BASE<f1_t, density_impl>;
+using DEV_DENSITY = DEVICE_BASE<f1_t, density_impl>;
+
+//-------------------------------------------------------------------
+// time derivative of hydrodynamic density rho
+struct density_dt_impl
+{
+    CUDAHOSTDEV static auto load(const f1_t & v) { return Particle<DENSITY_DT>(v); }
+    template <typename T> CUDAHOSTDEV static void store(f1_t & v, const T& p);
+    static constexpr f1_t defaultValue = 0;
+};
+
+template<typename T> CUDAHOSTDEV void density_dt_impl::store(f1_t &v, const T &p) {}
+template<> CUDAHOSTDEV void density_dt_impl::store<DENSITY_DT>(f1_t & v, const DENSITY_DT& p) {v=p.density_dt;}
+
+template <size_t n>
+using SHARED_DENSITY_DT = SHARED_BASE<n,f1_t, density_dt_impl>;
+using HOST_DENSITY_DT = HOST_BASE<f1_t, density_dt_impl>;
+using DEV_DENSITY_DT = DEVICE_BASE<f1_t, density_dt_impl>;
+
+//-------------------------------------------------------------------
+// deviatoric stress tensor S
+struct deviatoric_stress_impl
+{
+    CUDAHOSTDEV static auto load(const m3_t & v) { return Particle<DSTRESS>(v); }
+    template <typename T> CUDAHOSTDEV static void store(m3_t & v, const T& p);
+    static constexpr f1_t defaultValue = 0;
+};
+
+template<typename T> CUDAHOSTDEV void deviatoric_stress_impl::store(m3_t &v, const T &p) {}
+template<> CUDAHOSTDEV void deviatoric_stress_impl::store<DSTRESS>(m3_t & v, const DSTRESS& p) {v=p.dstress;}
+
+template <size_t n>
+using SHARED_DSTRESS = SHARED_BASE<n,m3_t, deviatoric_stress_impl>;
+using HOST_DSTRESS = HOST_BASE<m3_t, deviatoric_stress_impl>;
+using DEV_DSTRESS = DEVICE_BASE<m3_t, deviatoric_stress_impl>;
+
+
+//-------------------------------------------------------------------
+// time derivative of deviatoric stress tensor S
+struct deviatoric_stress_dt_impl
+{
+    CUDAHOSTDEV static auto load(const m3_t & v) { return Particle<DSTRESS_DT>(v); }
+    template <typename T> CUDAHOSTDEV static void store(m3_t & v, const T& p);
+    static constexpr f1_t defaultValue = 0;
+};
+
+template<typename T> CUDAHOSTDEV void deviatoric_stress_dt_impl::store(m3_t &v, const T &p) {}
+template<> CUDAHOSTDEV void deviatoric_stress_dt_impl::store<DSTRESS_DT>(m3_t & v, const DSTRESS_DT& p) {v=p.dstress_dt;}
+
+template <size_t n>
+using SHARED_DSTRESS_DT = SHARED_BASE<n,m3_t, deviatoric_stress_dt_impl>;
+using HOST_DSTRESS_DT = HOST_BASE<m3_t, deviatoric_stress_dt_impl>;
+using DEV_DSTRESS_DT = DEVICE_BASE<m3_t, deviatoric_stress_dt_impl>;
 
 #endif //MPUTILS_PARTICLES_H
