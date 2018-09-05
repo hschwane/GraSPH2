@@ -14,7 +14,7 @@
 // includes
 //--------------------
 #include "../types.h"
-#include <cmath>
+#include <math.h>
 //--------------------
 
 // this file contains device/host functions that also need to compile when using gcc
@@ -127,7 +127,7 @@ CUDAHOSTDEV f1_t dWspline(f1_t r, f1_t h)
  * @param h the smoothing length
  * @return the prefactor of the poly6 kernel
  */
-CUDAHOSTDEV f1_t Wpoly6Factor(f1_t h)
+CUDAHOSTDEV inline f1_t Wpoly6Factor(f1_t h)
 {
     return (315.0 / (64.0* M_PI * pow(h,9.0)));
 }
@@ -138,7 +138,7 @@ CUDAHOSTDEV f1_t Wpoly6Factor(f1_t h)
  * @param h the smoothing length
  * @return the value of the poly6 kernel
  */
-CUDAHOSTDEV f1_t Wpoly6(f1_t r2, f1_t h)
+CUDAHOSTDEV inline f1_t Wpoly6(f1_t r2, f1_t h)
 {
     const f1_t h2 = h*h;
     const f1_t hmr = h2-r2;
@@ -152,7 +152,7 @@ CUDAHOSTDEV f1_t Wpoly6(f1_t r2, f1_t h)
  * @param factor the precomputed prefactor
  * @return the value of the poly6 kernel
  */
-CUDAHOSTDEV f1_t Wpoly6(f1_t r2, f1_t h2, f1_t factor)
+CUDAHOSTDEV inline f1_t Wpoly6(f1_t r2, f1_t h2, f1_t factor)
 {
     const f1_t hmr = h2-r2;
     return (r2 < h2) ? factor *hmr*hmr*hmr :0.0;
@@ -166,7 +166,7 @@ CUDAHOSTDEV f1_t Wpoly6(f1_t r2, f1_t h2, f1_t factor)
  * @param h the smoothing length
  * @return the prefactor of the poly6 kernel
  */
-CUDAHOSTDEV f1_t dWpoly6Factor(f1_t h)
+CUDAHOSTDEV inline f1_t dWpoly6Factor(f1_t h)
 {
     return (-945.0 / (32.0* M_PI * pow(h,9.0)));
 }
@@ -177,7 +177,7 @@ CUDAHOSTDEV f1_t dWpoly6Factor(f1_t h)
  * @param h the smoothing length
  * @return the value of the poly6 derivative
  */
-CUDAHOSTDEV f1_t dWpoly6(f1_t r2, f1_t h)
+CUDAHOSTDEV inline f1_t dWpoly6(f1_t r2, f1_t h)
 {
     const f1_t h2 = h*h;
     const f1_t hmr = h2-r2;
@@ -191,7 +191,7 @@ CUDAHOSTDEV f1_t dWpoly6(f1_t r2, f1_t h)
  * @param factor the precomputed prefactor
  * @return the value of the poly6 derivative
  */
-CUDAHOSTDEV f1_t dWpoly6(f1_t r2, f1_t h2, f1_t factor)
+CUDAHOSTDEV inline f1_t dWpoly6(f1_t r2, f1_t h2, f1_t factor)
 {
     const f1_t hmr = h2-r2;
     return (r2 < h2) ? factor *hmr*hmr  :0.0;
@@ -205,7 +205,7 @@ CUDAHOSTDEV f1_t dWpoly6(f1_t r2, f1_t h2, f1_t factor)
  * @param h the smoothing length
  * @return the prefactor of the poly6 kernel
  */
-CUDAHOSTDEV f1_t dWspikyFactor(f1_t h)
+CUDAHOSTDEV inline f1_t dWspikyFactor(f1_t h)
 {
     return (-45.0 / (M_PI * pow(h,6.0)));
 }
@@ -216,7 +216,7 @@ CUDAHOSTDEV f1_t dWspikyFactor(f1_t h)
  * @param h the smoothing length
  * @return the value of the poly6 derivative
  */
-CUDAHOSTDEV f1_t dWspiky(f1_t r, f1_t h)
+CUDAHOSTDEV inline f1_t dWspiky(f1_t r, f1_t h)
 {
     float hmr = h-r;
     return (r < h) ? dWspikyFactor(h) * hmr*hmr :0.0;
@@ -229,7 +229,7 @@ CUDAHOSTDEV f1_t dWspiky(f1_t r, f1_t h)
  * @param factor the precomputed prefactor
  * @return the value of the poly6 derivative
  */
-CUDAHOSTDEV f1_t dWspiky(f1_t r, f1_t h, f1_t factor)
+CUDAHOSTDEV inline f1_t dWspiky(f1_t r, f1_t h, f1_t factor)
 {
     float hmr = h-r;
     return (r < h) ? factor * hmr*hmr :0.0;
