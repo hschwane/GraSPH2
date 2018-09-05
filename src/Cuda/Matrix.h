@@ -15,6 +15,7 @@
 //--------------------
 #include <iostream>
 #include <type_traits>
+#include <sstream>
 #include "../type_traitUtils.h"
 #ifdef USE_GLM
     #include <glm/glm.hpp>
@@ -55,6 +56,10 @@ public:
 
     // additional construction
     CUDAHOSTDEV explicit Mat(const T& v); //!< constructor fills the diagonal with v
+
+    template <typename... cArgs, std::enable_if_t< (sizeof...(cArgs) > 1) && (sizeof...(cArgs) == rows*cols), int> = 0>
+    CUDAHOSTDEV explicit Mat(const cArgs&... v) : m_data{static_cast<T>(v)...} {} //!< constructs matrix with a value for each element
+
 
 #ifdef USE_GLM
     // conversion to glm
@@ -154,6 +159,12 @@ CUDAHOSTDEV vT operator*(Mat<T, 3, 3> lhs, vT &rhs);
  */
 template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int> = 0>
 CUDAHOSTDEV vT operator*(Mat<T, 4, 4> lhs, vT &rhs);
+
+/**
+ * @brief convert a matrix to string for debugging
+ */
+template<typename T, size_t rows, size_t cols>
+std::string toString(Mat<T,rows,cols>& mat);
 
 // define all the template functions of the matrix class
 //-------------------------------------------------------------------
@@ -336,6 +347,7 @@ CUDAHOSTDEV Mat<T, cols, rows> transpose(Mat<T, rows, cols> &m)
     for(int i = 0; i < rows; i++)
         for(int j = 0; j < cols; j++)
             result[j][i] = m[i][j];
+    return result;
 }
 
 template<typename T, size_t rows, size_t cols>
@@ -524,6 +536,22 @@ CUDAHOSTDEV vT operator*(Mat<T, 4, 4> lhs, vT &rhs)
               lhs(4) * rhs.x + lhs(5) * rhs.y + lhs(6) * rhs.z + lhs(7) * rhs.z,
               lhs(8) * rhs.x + lhs(9) * rhs.y + lhs(10) * rhs.z + lhs(11) * rhs.z,
               lhs(12) * rhs.x + lhs(13) * rhs.y + lhs(14) * rhs.z + lhs(15) * rhs.z};
+}
+
+template<typename T, size_t rows, size_t cols>
+std::string toString(Mat<T,rows,cols>& mat)
+{
+    std::ostringstream ss;
+    for(int i = 0; i < rows; ++i)
+    {
+        ss << "| " << mat[i][0];
+        for(int j = 1; j < cols; ++j)
+        {
+            ss << ",  " << mat[i][j];
+        }
+        ss << " |\n";
+    }
+    return ss.str();
 }
 
 }
