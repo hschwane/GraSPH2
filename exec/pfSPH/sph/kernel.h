@@ -93,7 +93,7 @@ template<Dim dimension>
 CUDAHOSTDEV f1_t Wspline(f1_t r, f1_t h)
 {
     f1_t q = r/h;
-    return detail::splinePrefactor<dimension>()
+    return detail::splinePrefactor<dimension>(h)
             * (q<1.0) ? ((q<0.5) ? (6*q*q*q - 6*q*q +1)
                                  : 2*(1-q)*(1-q)*(1-q))
                                  : f1_t(0.0);
@@ -113,7 +113,7 @@ template<Dim dimension>
 CUDAHOSTDEV f1_t dWspline(f1_t r, f1_t h)
 {
     f1_t q = r/h;
-    return detail::dsplinePrefactor<dimension>()
+    return detail::dsplinePrefactor<dimension>(h)
            * (q<1.0) ? ((q<0.5) ? (3*q*q - 2*q +1)
                                 : -1*(1-q)*(1-q))
                                 : f1_t(0.0);
