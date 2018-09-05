@@ -502,14 +502,14 @@ CUDAHOSTDEV Mat<T, rows, cols> operator*(const T &lhs, const Mat<T, rows, cols>&
     return rhs*lhs;
 }
 
-template<typename T, typename vT, int>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int>>
 CUDAHOSTDEV vT operator*(Mat<T, 2, 2> lhs, vT &rhs)
 {
     return vT{lhs(0) * rhs.x + lhs(1) * rhs.y,
               lhs(2) * rhs.x + lhs(3) * rhs.y};
 }
 
-template<typename T, typename vT, int>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int>>
 CUDAHOSTDEV vT operator*(Mat<T, 3, 3> lhs, vT &rhs)
 {
     return vT{lhs(0) * rhs.x + lhs(1) * rhs.y + lhs(2) * rhs.z,
@@ -517,7 +517,7 @@ CUDAHOSTDEV vT operator*(Mat<T, 3, 3> lhs, vT &rhs)
               lhs(6) * rhs.x + lhs(7) * rhs.y + lhs(8) * rhs.z};
 }
 
-template<typename T, typename vT, int>
+template<typename T, typename vT, std::enable_if_t<!std::is_same<T,vT>::value && mpu::is_detected<detail::hasx_t,vT>(), int>>
 CUDAHOSTDEV vT operator*(Mat<T, 4, 4> lhs, vT &rhs)
 {
     return vT{lhs(0) * rhs.x + lhs(1) * rhs.y + lhs(2) * rhs.z + lhs(3) * rhs.z,
