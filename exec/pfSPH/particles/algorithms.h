@@ -89,16 +89,18 @@
  * @param BASES_OF_I_TO_LOAD choose bases according to the attributes of particle i that should be loaded from memory
  * @param BASES_OF_I_TO_STORE choose bases according to the attributes of particle i that should be stored in memory
  * @param BASES_OF_J choose bases according to the attributes of particle j needed for the interaction
+ * @param SINGLE_CODEA code to be executed before all interactions just after pi is loaded from global memory
  * @param PAIR_CODE code to be executed for each pair of particles, the particles are named pi and pj
- * @param SINGLE_CODE code to be executed after all interactions before pi is saved to global memory
+ * @param SINGLE_CODEB code to be executed after all interactions before pi is saved to global memory
  */
-#define DO_FOR_EACH_PAIR_SM( TILE_SIZE, PARTICLES, SHARED_BASES, BASES_OF_I, BASES_OF_I_TO_LOAD, BASES_OF_I_TO_STORE, BASES_OF_J, PAIR_CODE, SINGLE_CODE) \
+#define DO_FOR_EACH_PAIR_SM( TILE_SIZE, PARTICLES, SHARED_BASES, BASES_OF_I, BASES_OF_I_TO_LOAD, BASES_OF_I_TO_STORE, BASES_OF_J, SINGLE_CODEA, PAIR_CODE, SINGLE_CODEB) \
 {\
     SharedParticles<TILE_SIZE, SHARED_BASES> shared;\
     const int remain = PARTICLES .size() % TILE_SIZE; \
     for(const auto &i : mpu::gridStrideRange( PARTICLES .size())) \
     { \
         Particle< BASES_OF_I > pi = PARTICLES .loadParticle< BASES_OF_I_TO_LOAD >(i); \
+        SINGLE_CODEA \
         \
         const int thisTileSize = (i < PARTICLES .size() - remain) ? TILE_SIZE : remain; \
         const int numTiles = (PARTICLES .size() + thisTileSize - 1) / thisTileSize; \
@@ -115,7 +117,7 @@
             } \
             __syncthreads();\
         } \
-        SINGLE_CODE \
+        SINGLE_CODEB \
         PARTICLES .storeParticle(i, static_cast<Particle<BASES_OF_I_TO_STORE>>(pi)); \
     } \
 }
