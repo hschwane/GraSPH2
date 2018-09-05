@@ -55,10 +55,10 @@ public:
     Mat() = default;
 
     // additional construction
-    CUDAHOSTDEV explicit Mat(const T& v); //!< constructor fills the diagonal with v
+    CUDAHOSTDEV explicit Mat(const T v); //!< constructor fills the diagonal with v
 
     template <typename... cArgs, std::enable_if_t< (sizeof...(cArgs) > 1) && (sizeof...(cArgs) == rows*cols), int> = 0>
-    CUDAHOSTDEV explicit Mat(const cArgs&... v) : m_data{static_cast<T>(v)...} {} //!< constructs matrix with a value for each element
+    CUDAHOSTDEV explicit Mat(const cArgs... v) : m_data{static_cast<T>(v)...} {} //!< constructs matrix with a value for each element
 
 
 #ifdef USE_GLM
@@ -170,7 +170,7 @@ std::string toString(Mat<T,rows,cols>& mat);
 //-------------------------------------------------------------------
 
 template<typename T, size_t rows, size_t cols>
-CUDAHOSTDEV Mat<T, rows, cols>::Mat(const T& v)
+CUDAHOSTDEV Mat<T, rows, cols>::Mat(const T v)
 {
     for(int i = 0; i < rows; i++)
         for(int j = 0; j < cols; j++)
