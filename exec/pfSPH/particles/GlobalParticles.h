@@ -382,7 +382,7 @@ template<typename T, typename lsFunctor>
 void HOST_BASE<T, lsFunctor>::initialize(size_t i)
 {
 #if !defined(__CUDA_ARCH__)
-    m_data[i] = lsFunctor::defaultValue;
+    m_data[i] = T{lsFunctor::defaultValue};
 #endif
 }
 
@@ -518,7 +518,7 @@ template<typename T, typename lsFunctor>
 void DEVICE_BASE<T, lsFunctor>::initialize(size_t i)
 {
 #if defined(__CUDA_ARCH__)
-    m_data[i] = lsFunctor::defaultValue;
+    m_data[i] = T{lsFunctor::defaultValue};
 #endif
 }
 
