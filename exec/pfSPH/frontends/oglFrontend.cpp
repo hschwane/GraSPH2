@@ -202,6 +202,11 @@ bool handleFrontend()
     shader.use();
     glDrawArrays(GL_POINTS, 0, particleCount);
 
+    if(window().getKey(GLFW_KEY_1))
+        pauseHandler(false);
+    if(window().getKey(GLFW_KEY_2))
+        pauseHandler(true);
+
     return window().update();
 }
 
