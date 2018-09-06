@@ -25,13 +25,13 @@
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.01;
+constexpr f1_t H = 0.022;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 2;
-constexpr f1_t BULK = 8;
-constexpr f1_t dBULKdP = 8;
-constexpr f1_t shear = 0.22;
+constexpr f1_t rho0 = 0.5;
+constexpr f1_t BULK = 1;
+constexpr f1_t dBULKdP = 1;
+constexpr f1_t shear = 0.0;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -49,7 +49,7 @@ __global__ void generate2DRings(DeviceParticlesType particles)
 
     const float xOffA = -0.6;
     const float xOffB = 0.6;
-    const float speed = 1;
+    const float speed = .75;
 
 
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
@@ -82,6 +82,42 @@ __global__ void generate2DRings(DeviceParticlesType particles)
     });
 }
 
+__global__ void generateSquares(DeviceParticlesType particles)
+{
+    INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
+    {
+        float spacing = H/2;
+        int squareSize = particles.size()/2;
+        int sideres = sqrt(float(squareSize));
+        float side = (sideres-1) * spacing;
+
+        const float a = side*side;
+        const float squareMass = rho0 * a;
+        const float particleMass = squareMass/squareSize;
+
+        const float speed = .75;
+        const float seperation = 1;
+
+        if(i < squareSize)
+        {
+            pi.pos.x = -side / 2 + (i%sideres) *spacing;
+            pi.pos.y = -side / 2 + (i/sideres) *spacing;
+            pi.pos.x -= seperation/2;
+            pi.vel.x = speed;
+        }
+        else
+        {
+            pi.pos.x = -side / 2 + ((i-squareSize)%sideres) *spacing;
+            pi.pos.y = -side / 2 + ((i-squareSize)/sideres) *spacing;
+            pi.pos.x += seperation/2;
+            pi.vel.x = -speed;
+        }
+
+        pi.mass = particleMass;
+        pi.density = rho0;
+    })
+}
+
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
@@ -90,14 +126,13 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS),
 
     int numPartners=0;
-    f1_t sigOverRho_i; // stress over density square used for acceleration
+    m3_t sigOverRho_i; // stress over density square used for acceleration
     m3_t edot(0); // strain rate tensor (edot)
     m3_t rdot(0); // rotation rate tensor
     f1_t vdiv{0}; // velocity divergence
     {
-//        m3_t stress_i = m3_t(-eos::murnaghan( pi.density, rho0, BULK, dBULKdP)) + pi.dstress;
-//        sigOverRho_i = stress_i / (pi.density*pi.density);
-        sigOverRho_i = -eos::murnaghan( pi.density, rho0, BULK, dBULKdP) / (pi.density*pi.density);
+        m3_t stress_i = m3_t(-eos::murnaghan( pi.density, rho0, BULK, dBULKdP)) + pi.dstress;
+        sigOverRho_i = stress_i / (pi.density*pi.density);
     }
     ,
     {
@@ -124,9 +159,8 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             pi.acc -= pj.mass * II * gradw;
 
             // pressure and acceleration
-//            m3_t stress_j = m3_t(-eos::murnaghan( pj.density, rho0, BULK, dBULKdP)) + pj.dstress;
-//            m3_t sigOverRho_j = stress_j / (pj.density*pj.density);
-            f1_t sigOverRho_j = -eos::murnaghan( pj.density, rho0, BULK, dBULKdP) / (pj.density*pj.density);
+            m3_t stress_j = m3_t(-eos::murnaghan( pj.density, rho0, BULK, dBULKdP)) + pj.dstress;
+            m3_t sigOverRho_j = stress_j / (pj.density*pj.density);
             pi.acc += pj.mass * (sigOverRho_i + sigOverRho_j) * gradw;
 
             // strain rate tensor (edot) and rotation rate tensor (rdot)
@@ -143,6 +177,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         }
     },
     {
+//        printf("%i\n",numPartners);
         // density time derivative
         pi.density_dt = pi.density * vdiv;
 
@@ -236,7 +271,7 @@ int main()
 
     // set up frontend
     fnd::initializeFrontend();
-    bool simShouldRun = true;
+    bool simShouldRun = false;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate some particles
@@ -250,7 +285,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
@@ -263,7 +298,7 @@ int main()
 
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0001f);
+            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f);
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
