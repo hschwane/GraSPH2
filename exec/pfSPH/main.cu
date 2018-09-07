@@ -25,7 +25,7 @@
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.022;
+constexpr f1_t H = 0.033;
 
 constexpr f1_t alpha = 1;
 constexpr f1_t rho0 = 0.5;
@@ -40,42 +40,63 @@ using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_DENSITY,DEV_D
 
 __global__ void generate2DRings(DeviceParticlesType particles)
 {
-    const float R = 0.5;
-    const float r = 0.4;
+
+    const float R = 0.4;
+    const float r = 0.25;
+    const float seperationX = 1;
+    const float seperationY = 0.5;
+    const float speed = 1;
+
+
+    const float ringSize = particles.size()/2;
     const float a = M_PI * (R*R-r*r);
     const float ringMass = rho0 * a;
-    const int ringSize = particles.size()/2;
     const float particleMass = ringMass/ringSize;
 
-    const float xOffA = -0.6;
-    const float xOffB = 0.6;
-    const float speed = .25;
+    // find the starting index
+    int startingIndex = (r*r) * ringSize;
+    int lastIteration=0;
+    while(abs(startingIndex-lastIteration)>5)
+    {
+        lastIteration = startingIndex;
+        startingIndex = ((r/R)*(r/R)) * (ringSize+startingIndex);
+    }
 
+    // calculate the particle distance
+    f2_t posA;
+    f2_t posB;
+    float l = R * sqrt(10/(ringSize+startingIndex));
+    float theta = 2 * sqrt(M_PIf32*10);
+    posA.x = l * cos(theta);
+    posA.y = l * sin(theta);
+    l = R * sqrt(11/(ringSize+startingIndex));
+    theta = 2 * sqrt(M_PIf32*11);
+    posB.x = l * cos(theta);
+    posB.y = l * sin(theta);
+    printf("particle seperation: %f\n ",length(posA-posB));
 
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
-        thrust::random::default_random_engine rng;
-        rng.discard(i);
-        thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
-
-        while(length(pi.pos) > R || length(pi.pos) < r)
+        float index;
+        if(i<ringSize)
         {
-            pi.pos.x = dist(rng);
-            rng.discard(particles.size());
-            pi.pos.y = dist(rng);
-            rng.discard(particles.size());
-        }
-
-        if(i < ringSize)
-        {
-            pi.pos.x += xOffA;
-            pi.vel.x = speed;
+             index = i + startingIndex;
+             pi.pos.x = seperationX/2;
+             pi.pos.y = seperationY/2;
+             pi.vel.x = -speed/2;
         }
         else
         {
-            pi.pos.x += xOffB;
-            pi.vel.x = -speed;
+            index = i-ringSize + startingIndex;
+            pi.pos.x = -seperationX/2;
+            pi.pos.y = -seperationY/2;
+            pi.vel.x = speed/2;
         }
+
+        l = R * sqrt(index/(ringSize+startingIndex));
+        theta = 2 * sqrt(M_PIf32*index);
+        pi.pos.x += l * cos(theta);
+        pi.pos.y += l * sin(theta);
 
         pi.mass = particleMass;
         pi.density = rho0;
@@ -86,7 +107,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
 {
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
-        float spacing = H/2;
+        float spacing = H/3;
         int squareSize = particles.size()/2;
         int sideres = sqrt(float(squareSize));
         float side = (sideres-1) * spacing;
@@ -103,7 +124,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
             pi.pos.x = -side / 2 + (i%sideres) *spacing;
             pi.pos.y = -side / 2 + (i/sideres) *spacing;
             pi.pos.x -= seperation/2;
-            pi.pos.y -= seperation/4;
+            pi.pos.y -= seperation/10;
             pi.vel.x = speed;
         }
         else
@@ -111,7 +132,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
             pi.pos.x = -side / 2 + ((i-squareSize)%sideres) *spacing;
             pi.pos.y = -side / 2 + ((i-squareSize)/sideres) *spacing;
             pi.pos.x += seperation/2;
-            pi.pos.y += seperation/4;
+            pi.pos.y += seperation/10;
             pi.vel.x = -speed;
         }
 
@@ -202,7 +223,6 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             rdot[2][1] += tmp*(vij.z*gradw.y - vij.y*gradw.z);
             rdot[2][2] += tmp*(vij.z*gradw.z - vij.z*gradw.z);
 
-
             // density time derivative
             vdiv += (pj.mass/pj.density) * dot(vij,gradw);
         }
@@ -273,7 +293,6 @@ __global__ void nbodyForces(DeviceParticlesType particles, f1_t eps2)
     {
         f3_t r = pi.pos - pj.pos;
         f1_t distSqr = dot(r, r) + eps2;
-
         f1_t invDist = rsqrt(distSqr);
         f1_t invDistCube = invDist * invDist * invDist;
         pi.acc -= r * pj.mass * invDistCube;
@@ -323,7 +342,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
@@ -336,7 +355,7 @@ int main()
 
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f);
+            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0002f);
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
