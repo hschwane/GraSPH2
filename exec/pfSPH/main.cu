@@ -25,13 +25,13 @@
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.033;
+constexpr f1_t H = 0.008574*3;
 
 constexpr f1_t alpha = 1;
 constexpr f1_t rho0 = 0.5;
 constexpr f1_t BULK = 10;
 constexpr f1_t dBULKdP = 1;
-constexpr f1_t shear = 6;
+constexpr f1_t shear = 2;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -44,9 +44,8 @@ __global__ void generate2DRings(DeviceParticlesType particles)
     const float R = 0.4;
     const float r = 0.25;
     const float seperationX = 1;
-    const float seperationY = 0.5;
+    const float seperationY = 0;
     const float speed = 1;
-
 
     const float ringSize = particles.size()/2;
     const float a = M_PI * (R*R-r*r);
@@ -108,6 +107,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
         float spacing = H/3;
+        printf("spacing: %f\n",spacing);
         int squareSize = particles.size()/2;
         int sideres = sqrt(float(squareSize));
         float side = (sideres-1) * spacing;
@@ -116,7 +116,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
         const float squareMass = rho0 * a;
         const float particleMass = squareMass/squareSize;
 
-        const float speed = .25;
+        const float speed = .6;
         const float seperation = 1;
 
         if(i < squareSize)
@@ -154,6 +154,8 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
     return II;
 }
 
+
+
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
@@ -169,9 +171,12 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
     {
         sigOverRho_i = pi.dstress;
         f1_t pres_i = eos::murnaghan( pi.density, rho0, BULK, dBULKdP);
-        sigOverRho_i[0][0] = (sigOverRho_i[0][0] - pres_i) / (pi.density*pi.density);
-        sigOverRho_i[1][1] = (sigOverRho_i[1][1] - pres_i) / (pi.density*pi.density);
-        sigOverRho_i[2][2] = (sigOverRho_i[2][2] - pres_i) / (pi.density*pi.density);
+        sigOverRho_i[0][0] = (sigOverRho_i[0][0] - pres_i);
+        sigOverRho_i[1][1] = (sigOverRho_i[1][1] - pres_i);
+        sigOverRho_i[2][2] = (sigOverRho_i[2][2] - pres_i);
+
+        for(size_t e=0;e<9;e++)
+            sigOverRho_i(e) = sigOverRho_i(e)/ (pi.density*pi.density);
     }
     ,
     {
@@ -182,8 +187,10 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         {
             numPartners++;
             // get the kernel gradient
-            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
+            const f1_t dw = kernel::dWspiky<Dim::two>(r,H);
             const f3_t gradw = (dw/r) * rij;
+
+            // artificial stress
 
             // artificial viscosity
             const f3_t vij = pi.vel-pj.vel;
@@ -192,14 +199,28 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             // pressure
             m3_t sigOverRho_j = pj.dstress;
             f1_t pres_j = eos::murnaghan( pj.density, rho0, BULK, dBULKdP);
-            sigOverRho_j[0][0] = (sigOverRho_j[0][0] - pres_j) / (pj.density*pj.density);
-            sigOverRho_j[1][1] = (sigOverRho_j[1][1] - pres_j) / (pj.density*pj.density);
-            sigOverRho_j[2][2] = (sigOverRho_j[2][2] - pres_j) / (pj.density*pj.density);
+            sigOverRho_j[0][0] = (sigOverRho_j[0][0] - pres_j);
+            sigOverRho_j[1][1] = (sigOverRho_j[1][1] - pres_j);
+            sigOverRho_j[2][2] = (sigOverRho_j[2][2] - pres_j);
+            for(size_t e=0;e<9;e++)
+                sigOverRho_j(e) = sigOverRho_j(e) / (pj.density*pj.density);
+
+            // artificial stress
+            f1_t f = kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(0.008574,H);
+            f = pow(f,8.0f);
+            m3_t arts;
+
+            for(size_t e=0;e<9;e++)
+                arts(e) = (-0.2f * sigOverRho_i(e)) + (-0.2f * sigOverRho_j(e));
+
+            m3_t stress;
+            for(size_t e=0;e<9;e++)
+                stress(e) = sigOverRho_i(e) + sigOverRho_j(e) ;//+ f * arts(e);
 
             // acceleration
-            pi.acc.x += pj.mass * ((sigOverRho_i[0][0]+sigOverRho_j[0][0])*gradw.x + (sigOverRho_i[0][1]+sigOverRho_j[0][1])*gradw.y + (sigOverRho_i[0][2]+sigOverRho_j[0][2])*gradw.z);
-            pi.acc.y += pj.mass * ((sigOverRho_i[1][0]+sigOverRho_j[1][0])*gradw.x + (sigOverRho_i[1][1]+sigOverRho_j[1][1])*gradw.y + (sigOverRho_i[1][2]+sigOverRho_j[1][2])*gradw.z);
-            pi.acc.z += pj.mass * ((sigOverRho_i[2][0]+sigOverRho_j[2][0])*gradw.x + (sigOverRho_i[2][1]+sigOverRho_j[2][1])*gradw.y + (sigOverRho_i[2][2]+sigOverRho_j[2][2])*gradw.z);
+            pi.acc.x += pj.mass * ((stress[0][0])*gradw.x + (stress[0][1])*gradw.y + (stress[0][2])*gradw.z);
+            pi.acc.y += pj.mass * ((stress[1][0])*gradw.x + (stress[1][1])*gradw.y + (stress[1][2])*gradw.z);
+            pi.acc.z += pj.mass * ((stress[2][0])*gradw.x + (stress[2][1])*gradw.y + (stress[2][2])*gradw.z);
 
             // strain rate tensor (edot) and rotation rate tensor (rdot)
             f1_t tmp= -0.5f * pj.mass/pi.density;
@@ -342,7 +363,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
@@ -355,7 +376,7 @@ int main()
 
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0002f);
+            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f);
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
