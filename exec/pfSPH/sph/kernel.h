@@ -98,13 +98,13 @@ CUDAHOSTDEV f1_t dspikyPrefactor(f1_t h) {}// {throw std::logic_error("illegal d
 template<>
 CUDAHOSTDEV f1_t dspikyPrefactor<Dim::two>(f1_t h)
 {
-    return (-30.0 / (M_PI * h*h*h));
+    return -30.0 / (M_PI * h*h*h*h*h);
 }
 
 template<>
 CUDAHOSTDEV f1_t dspikyPrefactor<Dim::three>(f1_t h)
 {
-    return -45.0 / (M_PI * h*h*h*h);
+    return -45.0 / (M_PI * h*h*h*h*h*h);
 }
 
 }
@@ -183,8 +183,7 @@ CUDAHOSTDEV f1_t dWspline(f1_t r, f1_t h)
  */
 CUDAHOSTDEV inline f1_t dWspiky(f1_t r, f1_t h, f1_t factor)
 {
-    float q = r/h;
-    return (q < 1) ? factor * (1.0-q) * (1.0-q) : 0.0;
+    return (r < h) ? factor * (h-r) * (h-r) : 0.0;
 }
 
 /**
