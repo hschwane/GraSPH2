@@ -25,7 +25,7 @@
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.033;
+constexpr f1_t H = 0.03;
 
 constexpr f1_t alpha =0.6;
 constexpr f1_t rho0 = 1;
@@ -33,6 +33,9 @@ constexpr f1_t BULK = 8;
 constexpr f1_t dBULKdP = 1;
 constexpr f1_t shear = 6;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
+
+constexpr f1_t mateps =0.4;
+constexpr f1_t matexp =4;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -99,7 +102,7 @@ __global__ void generate2DRings(DeviceParticlesType particles)
         pi.pos.y += l * sin(theta);
 
         pi.mass = particleMass;
-        pi.density = 0;
+        pi.density = rho0;
     });
 }
 
@@ -107,7 +110,7 @@ __global__ void generateSquares(DeviceParticlesType particles)
 {
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
-        float spacing = H/3;
+        float spacing = H/2.5f;
         int squareSize = particles.size()/2;
         int sideres = sqrt(float(squareSize));
         float side = (sideres-1) * spacing;
@@ -182,8 +185,12 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
 
     int numPartners=0;
     f1_t pOverRho_i; // pressure over density square used for acceleration
+    f1_t apres_i=0;
     {
-        pOverRho_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound) / (pi.density * pi.density);
+        f1_t pres_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound);
+        pOverRho_i =  pres_i / (pi.density * pi.density);
+
+        apres_i = (pres_i > 0) ? mateps * (pres_i)/(pi.density * pi.density) : 0;
     }
     ,
     {
@@ -194,7 +201,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         {
             numPartners++;
             // get the kernel gradient
-            const f1_t dw = kernel::dWspiky<Dim::two>(r,H);
+            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
             const f3_t gradw = (dw/r) * rij;
 
             // artificial viscosity
@@ -202,8 +209,18 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             f1_t II = artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound);
 
             // pressure
-            f1_t pOverRho_j = eos::liquid( pj.density, rho0, speedOfSound*speedOfSound) / (pj.density * pj.density);
-            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II) * gradw;
+            f1_t pres_j = eos::liquid( pj.density, rho0, speedOfSound*speedOfSound);
+            f1_t pOverRho_j = pres_j / (pj.density * pj.density);
+
+            // artificial pressure
+            f1_t apres_j = 0;
+            apres_j = (pres_j > 0)? mateps * (pres_j)/(pj.density * pj.density) : 0;
+
+            f1_t apres=apres_i+apres_j;
+            f1_t f= pow(kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(H/2.5f,H),matexp);
+
+            // acc
+            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II + f*apres) * gradw;
         }
     },
     {
