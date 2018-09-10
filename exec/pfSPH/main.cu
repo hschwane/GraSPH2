@@ -27,16 +27,16 @@ constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
 constexpr f1_t H = 0.033;
 
-constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 0.5;
-constexpr f1_t BULK = 10;
+constexpr f1_t alpha =1;
+constexpr f1_t rho0 = 1;
+constexpr f1_t BULK = 5;
 constexpr f1_t dBULKdP = 1;
 constexpr f1_t shear = 6;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_DENSITY>;
 
 __global__ void generate2DRings(DeviceParticlesType particles)
 {
@@ -44,7 +44,7 @@ __global__ void generate2DRings(DeviceParticlesType particles)
     const float R = 0.4;
     const float r = 0.25;
     const float seperationX = 1;
-    const float seperationY = 0.5;
+    const float seperationY = 0;
     const float speed = 1;
 
 
@@ -99,7 +99,7 @@ __global__ void generate2DRings(DeviceParticlesType particles)
         pi.pos.y += l * sin(theta);
 
         pi.mass = particleMass;
-        pi.density = rho0;
+        pi.density = 0;
     });
 }
 
@@ -154,24 +154,36 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
     return II;
 }
 
+__global__ void computeDensity(DeviceParticlesType particles)
+{
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM),
+                     MPU_COMMA_LIST(POS,MASS,DENSITY),
+                     MPU_COMMA_LIST(POS,MASS), MPU_COMMA_LIST(DENSITY),
+                     MPU_COMMA_LIST(POS,MASS),
+    {},
+    {
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        f1_t r = sqrt(r2);
+        if(r<=H)
+        {
+           pi.density += pj.mass * kernel::Wspline<Dim::two>(r,H);
+        }
+    },
+    {})
+}
+
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
-    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
-            MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
-            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS), MPU_COMMA_LIST(ACC,DENSITY_DT,DSTRESS_DT),
-            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS),
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY),
+            MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY),
+            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY), MPU_COMMA_LIST(ACC),
+            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
 
     int numPartners=0;
-    m3_t sigOverRho_i; // stress over density square used for acceleration
-    m3_t edot(0); // strain rate tensor (edot)
-    m3_t rdot(0); // rotation rate tensor
-    f1_t vdiv{0}; // velocity divergence
+    f1_t pOverRho_i; // pressure over density square used for acceleration
     {
-        sigOverRho_i = pi.dstress;
-        f1_t pres_i = eos::murnaghan( pi.density, rho0, BULK, dBULKdP);
-        sigOverRho_i[0][0] = (sigOverRho_i[0][0] - pres_i) / (pi.density*pi.density);
-        sigOverRho_i[1][1] = (sigOverRho_i[1][1] - pres_i) / (pi.density*pi.density);
-        sigOverRho_i[2][2] = (sigOverRho_i[2][2] - pres_i) / (pi.density*pi.density);
+        pOverRho_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound) / (pi.density * pi.density);
     }
     ,
     {
@@ -182,73 +194,51 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         {
             numPartners++;
             // get the kernel gradient
-            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
+            const f1_t dw = kernel::dWspiky<Dim::two>(r,H);
             const f3_t gradw = (dw/r) * rij;
 
             // artificial viscosity
             const f3_t vij = pi.vel-pj.vel;
-            pi.acc -= pj.mass * artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound) * gradw;
+            f1_t II = artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound);
 
             // pressure
-            m3_t sigOverRho_j = pj.dstress;
-            f1_t pres_j = eos::murnaghan( pj.density, rho0, BULK, dBULKdP);
-            sigOverRho_j[0][0] = (sigOverRho_j[0][0] - pres_j) / (pj.density*pj.density);
-            sigOverRho_j[1][1] = (sigOverRho_j[1][1] - pres_j) / (pj.density*pj.density);
-            sigOverRho_j[2][2] = (sigOverRho_j[2][2] - pres_j) / (pj.density*pj.density);
-
-            // acceleration
-            pi.acc.x += pj.mass * ((sigOverRho_i[0][0]+sigOverRho_j[0][0])*gradw.x + (sigOverRho_i[0][1]+sigOverRho_j[0][1])*gradw.y + (sigOverRho_i[0][2]+sigOverRho_j[0][2])*gradw.z);
-            pi.acc.y += pj.mass * ((sigOverRho_i[1][0]+sigOverRho_j[1][0])*gradw.x + (sigOverRho_i[1][1]+sigOverRho_j[1][1])*gradw.y + (sigOverRho_i[1][2]+sigOverRho_j[1][2])*gradw.z);
-            pi.acc.z += pj.mass * ((sigOverRho_i[2][0]+sigOverRho_j[2][0])*gradw.x + (sigOverRho_i[2][1]+sigOverRho_j[2][1])*gradw.y + (sigOverRho_i[2][2]+sigOverRho_j[2][2])*gradw.z);
-
-            // strain rate tensor (edot) and rotation rate tensor (rdot)
-            f1_t tmp= -0.5f * pj.mass/pi.density;
-            edot[0][0] += tmp*(vij.x*gradw.x + vij.x*gradw.x);
-            edot[0][1] += tmp*(vij.x*gradw.y + vij.y*gradw.x);
-            edot[0][2] += tmp*(vij.x*gradw.z + vij.z*gradw.x);
-            edot[1][0] += tmp*(vij.y*gradw.x + vij.x*gradw.y);
-            edot[1][1] += tmp*(vij.y*gradw.y + vij.y*gradw.y);
-            edot[1][2] += tmp*(vij.y*gradw.z + vij.z*gradw.y);
-            edot[2][0] += tmp*(vij.z*gradw.x + vij.x*gradw.z);
-            edot[2][1] += tmp*(vij.z*gradw.y + vij.y*gradw.z);
-            edot[2][2] += tmp*(vij.z*gradw.z + vij.z*gradw.z);
-
-            rdot[0][0] += tmp*(vij.x*gradw.x - vij.x*gradw.x);
-            rdot[0][1] += tmp*(vij.x*gradw.y - vij.y*gradw.x);
-            rdot[0][2] += tmp*(vij.x*gradw.z - vij.z*gradw.x);
-            rdot[1][0] += tmp*(vij.y*gradw.x - vij.x*gradw.y);
-            rdot[1][1] += tmp*(vij.y*gradw.y - vij.y*gradw.y);
-            rdot[1][2] += tmp*(vij.y*gradw.z - vij.z*gradw.y);
-            rdot[2][0] += tmp*(vij.z*gradw.x - vij.x*gradw.z);
-            rdot[2][1] += tmp*(vij.z*gradw.y - vij.y*gradw.z);
-            rdot[2][2] += tmp*(vij.z*gradw.z - vij.z*gradw.z);
-
-            // density time derivative
-            vdiv += (pj.mass/pj.density) * dot(vij,gradw);
+            f1_t pOverRho_j = eos::liquid( pj.density, rho0, speedOfSound*speedOfSound) / (pj.density * pj.density);
+            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II) * gradw;
         }
     },
     {
 //        printf("%i\n",numPartners);
-        // density time derivative
-        pi.density_dt = pi.density * vdiv;
-
-        // deviatoric stress time derivative
-        for(int d = 0; d < 3; ++d)
-            for(int e = 0; e < 3; ++e)
-            {
-                pi.dstress_dt[d][e] += 2*shear*edot[d][e];
-                for(int f=0; f<3;f++)
-                {
-                    if(d==e)
-                    {
-                        pi.dstress_dt[d][e] += 2*shear*edot[f][f] / 3.0f;
-                    }
-                    pi.dstress_dt[d][e] += pi.dstress[d][f]*rdot[e][f];
-                    pi.dstress_dt[d][e] += pi.dstress[e][f]*rdot[d][f];
-                }
-
-            }
+        pi.acc.y -=1;
     })
+}
+
+__global__ void window2DBound(DeviceParticlesType particles)
+{
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+                {
+                    if(pi.pos.x > 1)
+                    {
+                        pi.pos.x=1;
+                        pi.vel.x -= 1.5*pi.vel.x;
+                    }
+                    else if(pi.pos.x < -1)
+                    {
+                        pi.pos.x=-1;
+                        pi.vel.x -= 1.5*pi.vel.x;
+                    }
+                    if(pi.pos.y > 1)
+                    {
+                        pi.pos.y=1;
+                        pi.vel.y -= 1.5*pi.vel.y;
+                    }
+                    else if(pi.pos.y < -1)
+                    {
+                        pi.pos.y=-1;
+                        pi.vel.y -= 1.5*pi.vel.y;
+                    }
+                })
 }
 
 __global__ void integrate(DeviceParticlesType particles, f1_t dt)
@@ -266,6 +256,7 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
 
         // deviatoric stress
         pi.dstress += pi.dstress_dt * dt;
+
     })
 }
 
@@ -342,9 +333,18 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
+
+    computeDensity<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    assert_cuda(cudaGetLastError());
+    computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+    assert_cuda(cudaGetLastError());
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.003f, false);
+    assert_cuda(cudaGetLastError());
+    window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    assert_cuda(cudaGetLastError());
 
     pb.unmapGraphicsResource(); // used for frontend stuff
     while(fnd::handleFrontend())
@@ -353,9 +353,13 @@ int main()
         {
             pb.mapGraphicsResource(); // used for frontend stuff
 
+            computeDensity<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+            assert_cuda(cudaGetLastError());
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0002f);
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.003f,true);
+            assert_cuda(cudaGetLastError());
+            window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
