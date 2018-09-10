@@ -64,6 +64,9 @@ mpu::gph::Window &window()
 }
 
 std::function<void(bool)> pauseHandler; //!< function to be calles when the simulation needs to be paused
+glm::vec2 oldWindowPos(0); //!< the old position of the window
+glm::vec2 oldWindowVel(0);
+glm::vec2 oldWindowAcc(0);
 
 // opengl buffer
 size_t particleCount{0};
@@ -121,6 +124,7 @@ void initializeFrontend()
     using namespace oglFronted;
 
     window();
+    oldWindowPos = window().getPosition() * 1.0/(SIZE.x*0.5);
 
     mpu::gph::addShaderIncludePath(LIB_SHADER_PATH);
     mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
@@ -190,6 +194,29 @@ void setPauseHandler(std::function<void(bool)> f)
 {
     using namespace oglFronted;
     pauseHandler = f;
+}
+
+glm::vec2 getWindowAcc()
+{
+    static mpu::DeltaTimer timer;
+    static double dt;
+    dt += timer.getDeltaTime();
+
+    using namespace oglFronted;
+
+    if(dt > 0.05)
+    {
+        glm::vec2 newPos = window().getPosition() * 1.0 / (SIZE.x * 0.5);
+
+        glm::vec2 vel = 1.0 * (newPos - oldWindowPos) / dt;
+        glm::vec2 acc = 1.0 * (vel - oldWindowVel) / dt;
+
+        oldWindowPos = newPos;
+        oldWindowVel = vel;
+        oldWindowAcc = acc;
+        dt=0;
+    }
+    return oldWindowAcc;
 }
 
 bool handleFrontend()

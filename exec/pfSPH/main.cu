@@ -27,9 +27,9 @@ constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
 constexpr f1_t H = 0.033;
 
-constexpr f1_t alpha =1;
+constexpr f1_t alpha =0.6;
 constexpr f1_t rho0 = 1;
-constexpr f1_t BULK = 5;
+constexpr f1_t BULK = 8;
 constexpr f1_t dBULKdP = 1;
 constexpr f1_t shear = 6;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
@@ -173,7 +173,7 @@ __global__ void computeDensity(DeviceParticlesType particles)
     {})
 }
 
-__global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
+__global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound, f2_t extForces)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY),
             MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY),
@@ -208,7 +208,8 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
     },
     {
 //        printf("%i\n",numPartners);
-        pi.acc.y -=1;
+        pi.acc.x += extForces.x;
+        pi.acc.y += extForces.y;
     })
 }
 
@@ -310,6 +311,16 @@ __global__ void integrateLeapfrog(DeviceParticlesType particles, f1_t dt, bool n
     })
 }
 
+#if defined(FRONTEND_OPENGL)
+namespace fnd {
+extern glm::vec2 getWindowAcc();
+}
+#else
+namespace fnd {
+glm::vec2 fnd::getWindowAcc() {return glm::vec2(0)}
+}
+#endif
+
 int main()
 {
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
@@ -339,25 +350,31 @@ int main()
 
     computeDensity<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
-    computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+    computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED,f2_t{0,-1});
     assert_cuda(cudaGetLastError());
-    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.003f, false);
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f, false);
     assert_cuda(cudaGetLastError());
     window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
 
+    fnd::getWindowAcc();
+
     pb.unmapGraphicsResource(); // used for frontend stuff
     while(fnd::handleFrontend())
     {
+        glm::vec2 windowAcc = fnd::getWindowAcc();
+
         if(simShouldRun)
         {
             pb.mapGraphicsResource(); // used for frontend stuff
 
+            f2_t extAcc{ -0.4f*windowAcc.x,-0.4f*windowAcc.y-1};
+
             computeDensity<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
             assert_cuda(cudaGetLastError());
-            computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+            computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED, extAcc);
             assert_cuda(cudaGetLastError());
-            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.003f,true);
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0025f,true);
             assert_cuda(cudaGetLastError());
             window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
             assert_cuda(cudaGetLastError());
