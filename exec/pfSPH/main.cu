@@ -25,14 +25,18 @@
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.008574*3;
+constexpr f1_t H = 0.006405*3;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 0.5;
+constexpr f1_t rho0 = 1;
 constexpr f1_t BULK = 10;
 constexpr f1_t dBULKdP = 1;
-constexpr f1_t shear = 2;
+constexpr f1_t shear = 4;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
+
+constexpr f1_t mateps = 0.4;
+constexpr f1_t matexp = 4;
+constexpr f1_t normalsep = 0.006405;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -41,11 +45,11 @@ using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_DENSITY,DEV_D
 __global__ void generate2DRings(DeviceParticlesType particles)
 {
 
-    const float R = 0.4;
-    const float r = 0.25;
+    const float R = 0.38;
+    const float r = 0.3;
     const float seperationX = 1;
     const float seperationY = 0;
-    const float speed = 1;
+    const float speed = 0.5;
 
     const float ringSize = particles.size()/2;
     const float a = M_PI * (R*R-r*r);
@@ -155,7 +159,6 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
 }
 
 
-
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
@@ -165,18 +168,19 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
 
     int numPartners=0;
     m3_t sigOverRho_i; // stress over density square used for acceleration
+    m3_t sigma_i;
     m3_t edot(0); // strain rate tensor (edot)
     m3_t rdot(0); // rotation rate tensor
     f1_t vdiv{0}; // velocity divergence
     {
-        sigOverRho_i = pi.dstress;
+        sigma_i = pi.dstress;
         f1_t pres_i = eos::murnaghan( pi.density, rho0, BULK, dBULKdP);
-        sigOverRho_i[0][0] = (sigOverRho_i[0][0] - pres_i);
-        sigOverRho_i[1][1] = (sigOverRho_i[1][1] - pres_i);
-        sigOverRho_i[2][2] = (sigOverRho_i[2][2] - pres_i);
+        sigma_i[0][0] = (sigma_i[0][0] - pres_i);
+        sigma_i[1][1] = (sigma_i[1][1] - pres_i);
+        sigma_i[2][2] = (sigma_i[2][2] - pres_i);
 
         for(size_t e=0;e<9;e++)
-            sigOverRho_i(e) = sigOverRho_i(e)/ (pi.density*pi.density);
+            sigOverRho_i(e) = sigma_i(e)/ (pi.density*pi.density);
     }
     ,
     {
@@ -187,7 +191,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         {
             numPartners++;
             // get the kernel gradient
-            const f1_t dw = kernel::dWspiky<Dim::two>(r,H);
+            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
             const f3_t gradw = (dw/r) * rij;
 
             // artificial stress
@@ -197,25 +201,30 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             pi.acc -= pj.mass * artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound) * gradw;
 
             // pressure
-            m3_t sigOverRho_j = pj.dstress;
+            m3_t sigma_j = pj.dstress;
             f1_t pres_j = eos::murnaghan( pj.density, rho0, BULK, dBULKdP);
-            sigOverRho_j[0][0] = (sigOverRho_j[0][0] - pres_j);
-            sigOverRho_j[1][1] = (sigOverRho_j[1][1] - pres_j);
-            sigOverRho_j[2][2] = (sigOverRho_j[2][2] - pres_j);
+            sigma_j[0][0] = (sigma_j[0][0] - pres_j);
+            sigma_j[1][1] = (sigma_j[1][1] - pres_j);
+            sigma_j[2][2] = (sigma_j[2][2] - pres_j);
+            m3_t sigOverRho_j;
             for(size_t e=0;e<9;e++)
-                sigOverRho_j(e) = sigOverRho_j(e) / (pj.density*pj.density);
+                sigOverRho_j(e) = sigma_j(e) / (pj.density*pj.density);
 
             // artificial stress
-            f1_t f = kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(0.008574,H);
-            f = pow(f,8.0f);
+            f1_t f = kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>( normalsep,H);
+            f = pow(f,matexp);
             m3_t arts;
 
             for(size_t e=0;e<9;e++)
-                arts(e) = (-0.2f * sigOverRho_i(e)) + (-0.2f * sigOverRho_j(e));
+                arts(e) = ((sigOverRho_i(e)>0)?(-mateps * sigOverRho_i(e)):0.0f) + ((sigOverRho_j(e)>0)?(-mateps * sigOverRho_j(e)):0.0f);
 
             m3_t stress;
             for(size_t e=0;e<9;e++)
-                stress(e) = sigOverRho_i(e) + sigOverRho_j(e) ;//+ f * arts(e);
+                stress(e) = sigOverRho_i(e) + sigOverRho_j(e);
+
+            pi.acc.x += pj.mass * f* ((arts[0][0])*gradw.x + (arts[0][1])*gradw.y + (arts[0][2])*gradw.z);
+            pi.acc.y += pj.mass * f* ((arts[1][0])*gradw.x + (arts[1][1])*gradw.y + (arts[1][2])*gradw.z);
+            pi.acc.z += pj.mass * f* ((arts[2][0])*gradw.x + (arts[2][1])*gradw.y + (arts[2][2])*gradw.z);
 
             // acceleration
             pi.acc.x += pj.mass * ((stress[0][0])*gradw.x + (stress[0][1])*gradw.y + (stress[0][2])*gradw.z);
@@ -363,7 +372,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 

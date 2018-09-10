@@ -32,7 +32,7 @@ enum class Falloff
 // settings
 //--------------------
 glm::uvec2 SIZE = {800,800};
-constexpr char TITLE[] = "Planetform";
+constexpr char TITLE[] = "sph";
 
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
