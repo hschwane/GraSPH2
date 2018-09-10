@@ -17,7 +17,7 @@ out vec4 vel_color;
 
 void main()
 {
-	gl_Position = model_view_projection * input_position;
+	gl_Position = model_view_projection * vec4(vec3(input_position),1);
 
     float size = render_size;
 
@@ -28,11 +28,11 @@ void main()
 #endif
 
 #ifdef COLORCODE_VELOCITY
-    if(iszero(input_velocity.xyz))
+    if(iszero(vec4(input_velocity).xyz))
         vel_color = defaultColor;
     else
     {
-        vec3 nv = 0.5f*normalize(input_velocity.xyz)+vec3(0.5f);
+        vec3 nv = 0.5f*normalize(vec4(input_velocity).xyz)+vec3(0.5f);
         vel_color = vec4( nv, 1);
     }
 #else

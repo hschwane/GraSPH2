@@ -48,6 +48,8 @@ bool depthTest              = false;
 bool colorcodeVelocity      = true;
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 
+using vecType=glm::vec4;
+
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
 
@@ -158,10 +160,9 @@ uint32_t getPositionBuffer(size_t n)
     else
         particleCount = n;
 
-
     positionBuffer.recreate();
-    positionBuffer.allocate<glm::vec4>(n);
-    vao.addAttributeBufferArray(POS_BUFFER_BINDING,positionBuffer,0, sizeof(glm::vec4),3,0);
+    positionBuffer.allocate<vecType>(n);
+    vao.addAttributeBufferArray(POS_BUFFER_BINDING,positionBuffer,0, sizeof(vecType),4,0);
 
     return positionBuffer;
 }
@@ -180,8 +181,8 @@ uint32_t getVelocityBuffer(size_t n)
 
 
     velocityBuffer.recreate();
-    velocityBuffer.allocate<glm::vec4>(particleCount);
-    vao.addAttributeBufferArray(VEL_BUFFER_BINDING,velocityBuffer,0, sizeof(glm::vec4),3,0);
+    velocityBuffer.allocate<vecType>(particleCount);
+    vao.addAttributeBufferArray(VEL_BUFFER_BINDING,velocityBuffer,0, sizeof(vecType),4,0);
 
     return velocityBuffer;
 }
