@@ -165,6 +165,47 @@ __global__ void generateSquares(DeviceParticlesType particles)
     })
 }
 
+__global__ void generateRect(DeviceParticlesType particles)
+{
+    INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
+    {
+        int rows = 150;
+        float offsetY = -0.45;
+
+        float spacing = H/3;
+        printf("spacing: %f\n",spacing);
+
+        int coatCols = 2.0f/spacing;
+        int coatSize = coatCols * 3;
+
+        int size = particles.size() - coatSize;
+        int cols = size / rows;
+        float side1 = (cols-1) * spacing;
+        float side2 = (rows-1) * spacing;
+        const float a = side1*side2;
+        const float mass = rho0 * a;
+        const float particleMass = mass/size;
+
+        thrust::random::default_random_engine rng;
+        rng.discard(i);
+        thrust::random::uniform_real_distribution<float> dist(-0.1f*spacing,0.1f*spacing);
+
+        if(i < coatSize)
+        {
+            pi.pos.x = -1.0f + ((i) % coatCols) * spacing + dist(rng);
+            pi.pos.y = -0.99f + ((i) / coatCols) * spacing + dist(rng);
+        }
+        else
+        {
+            pi.pos.x = -side1 / 2 + ((i-coatSize) % cols) * spacing + dist(rng);
+            pi.pos.y = -side2 / 2 + ((i-coatSize) / cols) * spacing + dist(rng);
+            pi.pos.y += offsetY;
+        }
+        pi.mass = particleMass;
+        pi.density = rho0;
+    })
+}
+
 __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, const f3_t& vij,  const f3_t& rij, f1_t r, f1_t ci, f1_t cj)
 {
     const f1_t wij = dot(rij, vij) /r;
@@ -374,6 +415,9 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
             MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
             MPU_COMMA_LIST(POS,VEL,DENSITY,DSTRESS),
     {
+        // gravity
+        pi.acc.y -=1;
+
         // eqn of motion
         pi.pos += (pi.vel+0.0f*pi.xvel) * dt;
         pi.vel += pi.acc * dt;
@@ -464,7 +508,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generateRect<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
