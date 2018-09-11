@@ -30,6 +30,7 @@ MAKE_PARTICLE_BASE(POS,pos,f3_t);
 MAKE_PARTICLE_BASE(MASS,mass,f1_t);
 MAKE_PARTICLE_BASE(VEL,vel,f3_t);
 MAKE_PARTICLE_BASE(ACC,acc,f3_t);
+MAKE_PARTICLE_BASE(XVEL,xvel,f3_t);
 MAKE_PARTICLE_BASE(DENSITY,density,f1_t);
 MAKE_PARTICLE_BASE(DENSITY_DT,density_dt,f1_t);
 MAKE_PARTICLE_BASE(DSTRESS,dstress,m3_t);
@@ -120,6 +121,24 @@ template <size_t n>
 using SHARED_ACC = SHARED_BASE<n,f4_t, acc_impl>;
 using HOST_ACC = HOST_BASE<f4_t, acc_impl>;
 using DEV_ACC = DEVICE_BASE<f4_t, acc_impl>;
+
+//-------------------------------------------------------------------
+// 3D smoothed velocity for xsph as f4_t
+struct xvel_impl
+{
+    CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<XVEL>(f3_t{v.x,v.y,v.z}); }
+    template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
+    static constexpr f4_t defaultValue = {0,0,0,0};
+};
+
+template<typename T> CUDAHOSTDEV void xvel_impl::store(f4_t &v, const T &p) {}
+template<> CUDAHOSTDEV void xvel_impl::store<XVEL>(f4_t & v, const XVEL& p) {v=f4_t{p.xvel.x,p.xvel.y,p.xvel.z,0.0f};}
+
+template <size_t n>
+using SHARED_XVEL = SHARED_BASE<n,f4_t, xvel_impl>;
+using HOST_XVEL = HOST_BASE<f4_t, xvel_impl>;
+using DEV_XVEL = DEVICE_BASE<f4_t, xvel_impl>;
+
 
 //-------------------------------------------------------------------
 // hydrodynamic density rho

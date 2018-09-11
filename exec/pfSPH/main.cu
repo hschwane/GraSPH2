@@ -28,10 +28,10 @@ constexpr int PARTICLES = 1<<13;
 constexpr f1_t H = 0.006405*3;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 1;
-constexpr f1_t BULK = 10;
+constexpr f1_t rho0 = 0.5;
+constexpr f1_t BULK = 6;
 constexpr f1_t dBULKdP = 1;
-constexpr f1_t shear = 4;
+constexpr f1_t shear = 1.4;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 constexpr f1_t mateps = 0.4;
@@ -40,7 +40,7 @@ constexpr f1_t normalsep = 0.006405;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
 
 __global__ void generate2DRings(DeviceParticlesType particles)
 {
@@ -158,12 +158,11 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
     return II;
 }
 
-
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
-            MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
-            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS), MPU_COMMA_LIST(ACC,DENSITY_DT,DSTRESS_DT),
+            MPU_COMMA_LIST(POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS), MPU_COMMA_LIST(ACC,XVEL,DENSITY_DT,DSTRESS_DT),
             MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS),
 
     int numPartners=0;
@@ -255,6 +254,9 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
 
             // density time derivative
             vdiv += (pj.mass/pj.density) * dot(vij,gradw);
+
+            // xsph
+            pi.xvel += 2*pj.mass / (pi.density+pj.density) * (pj.vel-pi.vel) * kernel::Wspline<Dim::two>(r,H);
         }
     },
     {
@@ -283,16 +285,19 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
 
 __global__ void integrate(DeviceParticlesType particles, f1_t dt)
 {
-    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
-            MPU_COMMA_LIST(POS,VEL,ACC,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+            MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
             MPU_COMMA_LIST(POS,VEL,DENSITY,DSTRESS),
     {
         // eqn of motion
+        pi.pos += (pi.vel+0.5f*pi.xvel) * dt;
         pi.vel += pi.acc * dt;
-        pi.pos += pi.vel * dt;
 
         // density
         pi.density += pi.density_dt * dt;
+
+        if(pi.density < 0)
+            pi.density = 0;
 
         // deviatoric stress
         pi.dstress += pi.dstress_dt * dt;
