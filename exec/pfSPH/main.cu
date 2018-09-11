@@ -38,7 +38,8 @@ constexpr f1_t mateps = 0.4;
 constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = 0.006405;
 
-constexpr f1_t Y = 0.6;
+constexpr f1_t friction_angle = 20.0f * (M_PI/180.0f);
+constexpr f1_t cohesion = 0.1;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -177,7 +178,7 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
     return II;
 }
 
-__device__ void plasticity(m3_t& destress)
+__device__ void plasticity(m3_t& destress, f1_t pressure)
 {
     // second invariant of deviatoric stress
     f1_t J2 = 0;
@@ -185,6 +186,7 @@ __device__ void plasticity(m3_t& destress)
         J2 += destress(e) * destress(e);
     J2 *= 0.5f;
 
+    f1_t Y = tan(friction_angle) * pressure + cohesion;
     f1_t miese_f = min(  Y*Y /(3.0f*J2),1.0f);
 
     for(uint e = 0; e < 9; ++e)
@@ -335,7 +337,7 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
         // deviatoric stress
         pi.dstress += pi.dstress_dt * dt;
 
-        plasticity(pi.dstress);
+        plasticity(pi.dstress,eos::murnaghan(pi.density,rho0, BULK, dBULKdP));
     })
 }
 
