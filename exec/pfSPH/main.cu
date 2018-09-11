@@ -28,15 +28,17 @@ constexpr int PARTICLES = 1<<13;
 constexpr f1_t H = 0.006405*3;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 0.5;
-constexpr f1_t BULK = 6;
+constexpr f1_t rho0 = 1;
+constexpr f1_t BULK = 12;
 constexpr f1_t dBULKdP = 1;
-constexpr f1_t shear = 1.4;
+constexpr f1_t shear = 6;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 constexpr f1_t mateps = 0.4;
 constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = 0.006405;
+
+constexpr f1_t Y = 0.6;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -76,10 +78,15 @@ __global__ void generate2DRings(DeviceParticlesType particles)
     theta = 2 * sqrt(M_PIf32*11);
     posB.x = l * cos(theta);
     posB.y = l * sin(theta);
-    printf("particle seperation: %f\n ",length(posA-posB));
+    f1_t spacing = length(posA-posB);
+    printf("particle seperation: %f\n ", spacing);
 
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
+        thrust::random::default_random_engine rng;
+        rng.discard(i);
+        thrust::random::uniform_real_distribution<float> dist(-0.1f*spacing,0.1f*spacing);
+
         float index;
         if(i<ringSize)
         {
@@ -110,37 +117,49 @@ __global__ void generateSquares(DeviceParticlesType particles)
 {
     INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
     {
+        float ratio = 0.99f;
         float spacing = H/3;
         printf("spacing: %f\n",spacing);
-        int squareSize = particles.size()/2;
-        int sideres = sqrt(float(squareSize));
-        float side = (sideres-1) * spacing;
+        int squareSize1 = particles.size() * ratio;
+        int squareSize2 = particles.size() * (1.0f-ratio);
+        int sideres1 = sqrt(float(squareSize1));
+        int sideres2 = sqrt(float(squareSize2));
+        float side1 = (sideres1-1) * spacing;
+        float side2 = (sideres2-1) * spacing;
 
-        const float a = side*side;
-        const float squareMass = rho0 * a;
-        const float particleMass = squareMass/squareSize;
+        const float a1 = side1*side1;
+        const float a2 = side2*side2;
+        const float squareMass1 = rho0 * a1;
+        const float squareMass2 = rho0 * a2;
+        const float particleMass1 = squareMass1/squareSize1;
+        const float particleMass2 = squareMass2/squareSize2;
 
-        const float speed = .6;
-        const float seperation = 1;
+        const float speed = 5;
+        const float seperationX = 1;
+        const float seperationY = 0;
 
-        if(i < squareSize)
+        thrust::random::default_random_engine rng;
+        rng.discard(i);
+        thrust::random::uniform_real_distribution<float> dist(-0.1f*spacing,0.1f*spacing);
+
+        if(i < squareSize1)
         {
-            pi.pos.x = -side / 2 + (i%sideres) *spacing;
-            pi.pos.y = -side / 2 + (i/sideres) *spacing;
-            pi.pos.x -= seperation/2;
-            pi.pos.y -= seperation/10;
-            pi.vel.x = speed;
+            pi.pos.x = -side1 / 2 + (i%sideres1) *spacing + dist(rng);
+            pi.pos.y = -side1 / 2 + (i/sideres1) *spacing + dist(rng);
+            pi.pos.x -= seperationX/2;
+            pi.pos.y -= seperationY/2;
+            pi.vel.x = speed * (1-ratio);
+            pi.mass = particleMass1;
         }
         else
         {
-            pi.pos.x = -side / 2 + ((i-squareSize)%sideres) *spacing;
-            pi.pos.y = -side / 2 + ((i-squareSize)/sideres) *spacing;
-            pi.pos.x += seperation/2;
-            pi.pos.y += seperation/10;
-            pi.vel.x = -speed;
+            pi.pos.x = -side2 / 2 + ((i-squareSize1)%sideres2) *spacing + dist(rng);
+            pi.pos.y = -side2 / 2 + ((i-squareSize1)/sideres2) *spacing + dist(rng);
+            pi.pos.x += seperationX/2;
+            pi.pos.y += seperationY/2;
+            pi.vel.x = -speed * ratio;
+            pi.mass = particleMass2;
         }
-
-        pi.mass = particleMass;
         pi.density = rho0;
     })
 }
@@ -156,6 +175,20 @@ __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, 
         II = -0.5f * alpha * wij * vsig / rhoij;
     }
     return II;
+}
+
+__device__ void plasticity(m3_t& destress)
+{
+    // second invariant of deviatoric stress
+    f1_t J2 = 0;
+    for(uint e = 0; e < 9; ++e)
+        J2 += destress(e) * destress(e);
+    J2 *= 0.5f;
+
+    f1_t miese_f = min(  Y*Y /(3.0f*J2),1.0f);
+
+    for(uint e = 0; e < 9; ++e)
+        destress(e) = miese_f * destress(e);
 }
 
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
@@ -290,7 +323,7 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
             MPU_COMMA_LIST(POS,VEL,DENSITY,DSTRESS),
     {
         // eqn of motion
-        pi.pos += (pi.vel+0.5f*pi.xvel) * dt;
+        pi.pos += (pi.vel+0.0f*pi.xvel) * dt;
         pi.vel += pi.acc * dt;
 
         // density
@@ -301,6 +334,8 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
 
         // deviatoric stress
         pi.dstress += pi.dstress_dt * dt;
+
+        plasticity(pi.dstress);
     })
 }
 
@@ -377,7 +412,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DRings<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
