@@ -28,18 +28,18 @@ constexpr int PARTICLES = 1<<13;
 constexpr f1_t H = 0.006405*3;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 1;
-constexpr f1_t BULK = 12;
-constexpr f1_t dBULKdP = 1;
-constexpr f1_t shear = 6;
+constexpr f1_t rho0 = 0.5;
+constexpr f1_t BULK = 6;
+constexpr f1_t dBULKdP = 2;
+constexpr f1_t shear = 12;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
-constexpr f1_t mateps = 0.4;
+constexpr f1_t mateps = 0.2;
 constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = 0.006405;
 
-constexpr f1_t friction_angle = 20.0f * (M_PI/180.0f);
-constexpr f1_t cohesion = 0.1;
+constexpr f1_t friction_angle = 45.0f * (M_PI/180.0f);
+constexpr f1_t cohesion = 0.0;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -193,6 +193,25 @@ __device__ void plasticity(m3_t& destress, f1_t pressure)
         destress(e) = miese_f * destress(e);
 }
 
+__global__ void computeDensity(DeviceParticlesType particles)
+{
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM),
+                         MPU_COMMA_LIST(POS,MASS,DENSITY),
+                         MPU_COMMA_LIST(POS,MASS), MPU_COMMA_LIST(DENSITY),
+                         MPU_COMMA_LIST(POS,MASS),
+    {},
+    {
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        f1_t r = sqrt(r2);
+        if(r<=H)
+        {
+            pi.density += pj.mass * kernel::Wspline<Dim::two>(r,H);
+        }
+    },
+    {})
+}
+
 __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS),
@@ -318,6 +337,37 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
     })
 }
 
+__global__ void window2DBound(DeviceParticlesType particles)
+{
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+    {
+        if(pi.pos.x > 1)
+        {
+            pi.pos.x=1;
+            pi.vel.x -= 1.5*pi.vel.x;
+        }
+        else if(pi.pos.x < -1)
+        {
+            pi.pos.x=-1;
+            pi.vel.x -= 1.5*pi.vel.x;
+        }
+        if(pi.pos.y > 1)
+        {
+            pi.pos.y=1;
+            pi.vel.y -= 1.5*pi.vel.y;
+        }
+        else if(pi.pos.y < -1)
+        {
+            pi.pos.y=-1;
+            pi.vel.y = 0;
+            pi.vel.x = 0;
+
+        }
+    })
+}
+
 __global__ void integrate(DeviceParticlesType particles, f1_t dt)
 {
     DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
@@ -428,6 +478,8 @@ int main()
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
             integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f);
+            assert_cuda(cudaGetLastError());
+            window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
