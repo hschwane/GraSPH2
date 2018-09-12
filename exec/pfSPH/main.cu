@@ -16,6 +16,7 @@
 #include <mpUtils.h>
 #include <mpCuda.h>
 #include <cuda_gl_interop.h>
+#include <cmath>
 
 #include "frontends/frontendInterface.h"
 #include "particles/Particles.h"
@@ -24,22 +25,27 @@
 #include "sph/eos.h"
 
 constexpr int BLOCK_SIZE = 256;
-constexpr int PARTICLES = 1<<13;
-constexpr f1_t H = 0.006405*3;
+constexpr int PARTICLES = 1<<14;
+
+constexpr float pradius = 0.002;
+constexpr float a = pradius * pradius * M_PI;
+constexpr float mass = 1.0 / PARTICLES;
+
+constexpr f1_t H = pradius*2.5;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = 0.5;
-constexpr f1_t BULK = 6;
-constexpr f1_t dBULKdP = 2;
-constexpr f1_t shear = 12;
+constexpr f1_t rho0 = mass / a;
+constexpr f1_t BULK = 64;
+constexpr f1_t dBULKdP = 8;
+constexpr f1_t shear = 48;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
-constexpr f1_t mateps = 0.2;
+constexpr f1_t mateps = 0.0;
 constexpr f1_t matexp = 4;
-constexpr f1_t normalsep = 0.006405;
+constexpr f1_t normalsep = H*0.3;
 
-constexpr f1_t friction_angle = 45.0f * (M_PI/180.0f);
-constexpr f1_t cohesion = 0.0;
+constexpr f1_t friction_angle = 55.0f * (M_PI/180.0f);
+constexpr f1_t cohesion = 0.01;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -206,6 +212,31 @@ __global__ void generateRect(DeviceParticlesType particles)
     })
 }
 
+__global__ void generate2DHydroNBSystem(DeviceParticlesType particles)
+{
+    INIT_EACH(particles, MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
+              {
+                  thrust::random::default_random_engine rng;
+                  rng.discard(i*particles.size());
+                  thrust::random::uniform_real_distribution<float> dist(-1.0f,1.0f);
+
+                  do
+                  {
+                      pi.pos.x = dist(rng);
+                      rng.discard(particles.size());
+                      pi.pos.y = dist(rng);
+                      rng.discard(particles.size());
+                  }
+                  while(length(pi.pos) > 1);
+
+                  pi.mass = mass;
+                  pi.density = rho0;
+
+                  pi.vel.x = pi.pos.y * sqrtf(1);
+                  pi.vel.y = - pi.pos.x * sqrtf(1);
+              });
+}
+
 __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, const f3_t& vij,  const f3_t& rij, f1_t r, f1_t ci, f1_t cj)
 {
     const f1_t wij = dot(rij, vij) /r;
@@ -281,77 +312,90 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         const f3_t rij = pi.pos-pj.pos;
         const f1_t r2 = dot(rij,rij);
         f1_t r = sqrt(r2);
-        if(r>0 && r <= H)
+        if(r>0)
         {
-            numPartners++;
-            // get the kernel gradient
-            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
-            const f3_t gradw = (dw/r) * rij;
+            // gravity
+//            f3_t r = pi.pos - pj.pos;
+            f1_t distSqr = r2 + H*H;
+            f1_t invDist = rsqrt(distSqr);
+            f1_t invDistCube = invDist * invDist * invDist;
+            pi.acc -= rij * pj.mass * invDistCube;
 
-            // artificial stress
+            if(r <= H)
+            {
+                numPartners++;
+                // get the kernel gradient
+                const f1_t dw = kernel::dWspline<Dim::two>(r, H);
+                const f3_t gradw = (dw / r) * rij;
 
-            // artificial viscosity
-            const f3_t vij = pi.vel-pj.vel;
-            pi.acc -= pj.mass * artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound) * gradw;
+                // artificial stress
 
-            // pressure
-            m3_t sigma_j = pj.dstress;
-            f1_t pres_j = eos::murnaghan( pj.density, rho0, BULK, dBULKdP);
-            sigma_j[0][0] = (sigma_j[0][0] - pres_j);
-            sigma_j[1][1] = (sigma_j[1][1] - pres_j);
-            sigma_j[2][2] = (sigma_j[2][2] - pres_j);
-            m3_t sigOverRho_j;
-            for(size_t e=0;e<9;e++)
-                sigOverRho_j(e) = sigma_j(e) / (pj.density*pj.density);
+                // artificial viscosity
+                const f3_t vij = pi.vel - pj.vel;
+                pi.acc -= pj.mass *
+                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, speedOfSound, speedOfSound) *
+                          gradw;
 
-            // artificial stress
-            f1_t f = kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>( normalsep,H);
-            f = pow(f,matexp);
-            m3_t arts;
+                // pressure
+                m3_t sigma_j = pj.dstress;
+                f1_t pres_j = eos::murnaghan(pj.density, rho0, BULK, dBULKdP);
+                sigma_j[0][0] = (sigma_j[0][0] - pres_j);
+                sigma_j[1][1] = (sigma_j[1][1] - pres_j);
+                sigma_j[2][2] = (sigma_j[2][2] - pres_j);
+                m3_t sigOverRho_j;
+                for(size_t e = 0; e < 9; e++)
+                    sigOverRho_j(e) = sigma_j(e) / (pj.density * pj.density);
 
-            for(size_t e=0;e<9;e++)
-                arts(e) = ((sigOverRho_i(e)>0)?(-mateps * sigOverRho_i(e)):0.0f) + ((sigOverRho_j(e)>0)?(-mateps * sigOverRho_j(e)):0.0f);
+                // artificial stress
+                f1_t f = kernel::Wspline<Dim::two>(r, H) / kernel::Wspline<Dim::two>(normalsep, H);
+                f = pow(f, matexp);
+                m3_t arts;
 
-            m3_t stress;
-            for(size_t e=0;e<9;e++)
-                stress(e) = sigOverRho_i(e) + sigOverRho_j(e);
+                for(size_t e = 0; e < 9; e++)
+                    arts(e) = ((sigOverRho_i(e) > 0) ? (-mateps * sigOverRho_i(e)) : 0.0f) +
+                              ((sigOverRho_j(e) > 0) ? (-mateps * sigOverRho_j(e)) : 0.0f);
 
-            pi.acc.x += pj.mass * f* ((arts[0][0])*gradw.x + (arts[0][1])*gradw.y + (arts[0][2])*gradw.z);
-            pi.acc.y += pj.mass * f* ((arts[1][0])*gradw.x + (arts[1][1])*gradw.y + (arts[1][2])*gradw.z);
-            pi.acc.z += pj.mass * f* ((arts[2][0])*gradw.x + (arts[2][1])*gradw.y + (arts[2][2])*gradw.z);
+                m3_t stress;
+                for(size_t e = 0; e < 9; e++)
+                    stress(e) = sigOverRho_i(e) + sigOverRho_j(e);
 
-            // acceleration
-            pi.acc.x += pj.mass * ((stress[0][0])*gradw.x + (stress[0][1])*gradw.y + (stress[0][2])*gradw.z);
-            pi.acc.y += pj.mass * ((stress[1][0])*gradw.x + (stress[1][1])*gradw.y + (stress[1][2])*gradw.z);
-            pi.acc.z += pj.mass * ((stress[2][0])*gradw.x + (stress[2][1])*gradw.y + (stress[2][2])*gradw.z);
+                pi.acc.x += pj.mass * f * ((arts[0][0]) * gradw.x + (arts[0][1]) * gradw.y + (arts[0][2]) * gradw.z);
+                pi.acc.y += pj.mass * f * ((arts[1][0]) * gradw.x + (arts[1][1]) * gradw.y + (arts[1][2]) * gradw.z);
+                pi.acc.z += pj.mass * f * ((arts[2][0]) * gradw.x + (arts[2][1]) * gradw.y + (arts[2][2]) * gradw.z);
 
-            // strain rate tensor (edot) and rotation rate tensor (rdot)
-            f1_t tmp= -0.5f * pj.mass/pi.density;
-            edot[0][0] += tmp*(vij.x*gradw.x + vij.x*gradw.x);
-            edot[0][1] += tmp*(vij.x*gradw.y + vij.y*gradw.x);
-            edot[0][2] += tmp*(vij.x*gradw.z + vij.z*gradw.x);
-            edot[1][0] += tmp*(vij.y*gradw.x + vij.x*gradw.y);
-            edot[1][1] += tmp*(vij.y*gradw.y + vij.y*gradw.y);
-            edot[1][2] += tmp*(vij.y*gradw.z + vij.z*gradw.y);
-            edot[2][0] += tmp*(vij.z*gradw.x + vij.x*gradw.z);
-            edot[2][1] += tmp*(vij.z*gradw.y + vij.y*gradw.z);
-            edot[2][2] += tmp*(vij.z*gradw.z + vij.z*gradw.z);
+                // acceleration
+                pi.acc.x += pj.mass * ((stress[0][0]) * gradw.x + (stress[0][1]) * gradw.y + (stress[0][2]) * gradw.z);
+                pi.acc.y += pj.mass * ((stress[1][0]) * gradw.x + (stress[1][1]) * gradw.y + (stress[1][2]) * gradw.z);
+                pi.acc.z += pj.mass * ((stress[2][0]) * gradw.x + (stress[2][1]) * gradw.y + (stress[2][2]) * gradw.z);
 
-            rdot[0][0] += tmp*(vij.x*gradw.x - vij.x*gradw.x);
-            rdot[0][1] += tmp*(vij.x*gradw.y - vij.y*gradw.x);
-            rdot[0][2] += tmp*(vij.x*gradw.z - vij.z*gradw.x);
-            rdot[1][0] += tmp*(vij.y*gradw.x - vij.x*gradw.y);
-            rdot[1][1] += tmp*(vij.y*gradw.y - vij.y*gradw.y);
-            rdot[1][2] += tmp*(vij.y*gradw.z - vij.z*gradw.y);
-            rdot[2][0] += tmp*(vij.z*gradw.x - vij.x*gradw.z);
-            rdot[2][1] += tmp*(vij.z*gradw.y - vij.y*gradw.z);
-            rdot[2][2] += tmp*(vij.z*gradw.z - vij.z*gradw.z);
+                // strain rate tensor (edot) and rotation rate tensor (rdot)
+                f1_t tmp = -0.5f * pj.mass / pi.density;
+                edot[0][0] += tmp * (vij.x * gradw.x + vij.x * gradw.x);
+                edot[0][1] += tmp * (vij.x * gradw.y + vij.y * gradw.x);
+                edot[0][2] += tmp * (vij.x * gradw.z + vij.z * gradw.x);
+                edot[1][0] += tmp * (vij.y * gradw.x + vij.x * gradw.y);
+                edot[1][1] += tmp * (vij.y * gradw.y + vij.y * gradw.y);
+                edot[1][2] += tmp * (vij.y * gradw.z + vij.z * gradw.y);
+                edot[2][0] += tmp * (vij.z * gradw.x + vij.x * gradw.z);
+                edot[2][1] += tmp * (vij.z * gradw.y + vij.y * gradw.z);
+                edot[2][2] += tmp * (vij.z * gradw.z + vij.z * gradw.z);
 
-            // density time derivative
-            vdiv += (pj.mass/pj.density) * dot(vij,gradw);
+                rdot[0][0] += tmp * (vij.x * gradw.x - vij.x * gradw.x);
+                rdot[0][1] += tmp * (vij.x * gradw.y - vij.y * gradw.x);
+                rdot[0][2] += tmp * (vij.x * gradw.z - vij.z * gradw.x);
+                rdot[1][0] += tmp * (vij.y * gradw.x - vij.x * gradw.y);
+                rdot[1][1] += tmp * (vij.y * gradw.y - vij.y * gradw.y);
+                rdot[1][2] += tmp * (vij.y * gradw.z - vij.z * gradw.y);
+                rdot[2][0] += tmp * (vij.z * gradw.x - vij.x * gradw.z);
+                rdot[2][1] += tmp * (vij.z * gradw.y - vij.y * gradw.z);
+                rdot[2][2] += tmp * (vij.z * gradw.z - vij.z * gradw.z);
 
-            // xsph
-            pi.xvel += 2*pj.mass / (pi.density+pj.density) * (pj.vel-pi.vel) * kernel::Wspline<Dim::two>(r,H);
+                // density time derivative
+                vdiv += (pj.mass / pj.density) * dot(vij, gradw);
+
+                // xsph
+                pi.xvel += 2 * pj.mass / (pi.density + pj.density) * (pj.vel - pi.vel) * kernel::Wspline<Dim::two>(r, H);
+            }
         }
     },
     {
@@ -415,12 +459,9 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
             MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
             MPU_COMMA_LIST(POS,VEL,DENSITY,DSTRESS),
     {
-        // gravity
-        pi.acc.y -=1;
-
         // eqn of motion
-        pi.pos += (pi.vel+0.0f*pi.xvel) * dt;
         pi.vel += pi.acc * dt;
+        pi.pos += (pi.vel+0.6f*pi.xvel) * dt;
 
         // density
         pi.density += pi.density_dt * dt;
@@ -492,6 +533,13 @@ int main()
     logINFO("pfSPH") << "Welcome to planetformSPH!";
     assert_cuda(cudaSetDevice(0));
 
+    logINFO("sim") << "particle mass: " << mass;
+    logINFO("sim") << "particle radius: " << pradius;
+    logINFO("sim") << "material density: " << rho0;
+    logINFO("sim") << "total mass: " << mass * PARTICLES;
+    logINFO("sim") << "total radius: " << 1;
+    logINFO("sim") << "total surface density: " <<  mass * PARTICLES / (1*1*M_PI);
+
     // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = false;
@@ -508,7 +556,7 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generateRect<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    generate2DHydroNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
@@ -521,9 +569,7 @@ int main()
 
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f);
-            assert_cuda(cudaGetLastError());
-            window2DBound<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0002f);
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff

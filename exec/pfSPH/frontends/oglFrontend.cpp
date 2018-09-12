@@ -38,7 +38,7 @@ const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
 const bool enableVsync    = false;
 
-float particleRenderSize    = 0.005f;
+float particleRenderSize    = 0.0025f;
 float particleBrightness    = 1.0f;
 Falloff falloffStyle        = Falloff::NONE;
 bool perspectiveSize        = true;
