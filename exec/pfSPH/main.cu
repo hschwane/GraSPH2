@@ -27,17 +27,19 @@
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<14;
 
-constexpr float pradius = 0.002;
+constexpr float pradius = 0.1 / 25.398416831491186;
 constexpr float a = pradius * pradius * M_PI;
-constexpr float mass = 1.0 / PARTICLES;
+constexpr float v = 4.0/3.0 * pradius * pradius * pradius * M_PI;
 
+
+constexpr float mass = 1.0 / PARTICLES;
 constexpr f1_t H = pradius*2.5;
 
 constexpr f1_t alpha = 1;
-constexpr f1_t rho0 = mass / a;
+constexpr f1_t rho0 = mass / v;
 constexpr f1_t BULK = 64;
 constexpr f1_t dBULKdP = 8;
-constexpr f1_t shear = 48;
+constexpr f1_t shear = 32;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 constexpr f1_t mateps = 0.0;
@@ -45,7 +47,9 @@ constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = H*0.3;
 
 constexpr f1_t friction_angle = 55.0f * (M_PI/180.0f);
-constexpr f1_t cohesion = 0.01;
+constexpr f1_t cohesion = 0.25;
+
+constexpr Dim dimension=Dim::three;
 
 int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
@@ -226,14 +230,16 @@ __global__ void generate2DHydroNBSystem(DeviceParticlesType particles)
                       rng.discard(particles.size());
                       pi.pos.y = dist(rng);
                       rng.discard(particles.size());
+                      pi.pos.z = dist(rng);
+                      rng.discard(particles.size());
                   }
                   while(length(pi.pos) > 1);
 
                   pi.mass = mass;
                   pi.density = rho0;
 
-                  pi.vel.x = pi.pos.y * sqrtf(1);
-                  pi.vel.y = - pi.pos.x * sqrtf(1);
+                  pi.vel.x = pi.pos.y * rsqrtf(3);
+                  pi.vel.y = - pi.pos.x * rsqrtf(3);
               });
 }
 
@@ -278,7 +284,7 @@ __global__ void computeDensity(DeviceParticlesType particles)
         f1_t r = sqrt(r2);
         if(r<=H)
         {
-            pi.density += pj.mass * kernel::Wspline<Dim::two>(r,H);
+            pi.density += pj.mass * kernel::Wspline<dimension>(r,H);
         }
     },
     {})
@@ -325,7 +331,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             {
                 numPartners++;
                 // get the kernel gradient
-                const f1_t dw = kernel::dWspline<Dim::two>(r, H);
+                const f1_t dw = kernel::dWspline<dimension>(r, H);
                 const f3_t gradw = (dw / r) * rij;
 
                 // artificial stress
@@ -347,7 +353,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
                     sigOverRho_j(e) = sigma_j(e) / (pj.density * pj.density);
 
                 // artificial stress
-                f1_t f = kernel::Wspline<Dim::two>(r, H) / kernel::Wspline<Dim::two>(normalsep, H);
+                f1_t f = kernel::Wspline<dimension>(r, H) / kernel::Wspline<dimension>(normalsep, H);
                 f = pow(f, matexp);
                 m3_t arts;
 
@@ -394,7 +400,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
                 vdiv += (pj.mass / pj.density) * dot(vij, gradw);
 
                 // xsph
-                pi.xvel += 2 * pj.mass / (pi.density + pj.density) * (pj.vel - pi.vel) * kernel::Wspline<Dim::two>(r, H);
+                pi.xvel += 2 * pj.mass / (pi.density + pj.density) * (pj.vel - pi.vel) * kernel::Wspline<dimension>(r, H);
             }
         }
     },
@@ -538,7 +544,7 @@ int main()
     logINFO("sim") << "material density: " << rho0;
     logINFO("sim") << "total mass: " << mass * PARTICLES;
     logINFO("sim") << "total radius: " << 1;
-    logINFO("sim") << "total surface density: " <<  mass * PARTICLES / (1*1*M_PI);
+    logINFO("sim") << "total density: " <<  mass * PARTICLES / (4.0/3.0 *1*1*1*M_PI);
 
     // set up frontend
     fnd::initializeFrontend();
@@ -573,6 +579,10 @@ int main()
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
+        }
+        else
+        {
+            mpu::sleep_ms(1);
         }
     }
 

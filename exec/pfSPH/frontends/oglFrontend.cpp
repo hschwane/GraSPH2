@@ -38,14 +38,14 @@ const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
 const bool enableVsync    = false;
 
-float particleRenderSize    = 0.0025f;
+float particleRenderSize    = 0.004f;
 float particleBrightness    = 1.0f;
-Falloff falloffStyle        = Falloff::NONE;
+Falloff falloffStyle        = Falloff::LINEAR;
 bool perspectiveSize        = true;
 bool roundParticles         = true;
 bool additiveBlending       = false;
-bool depthTest              = false;
-bool colorcodeVelocity      = true;
+bool depthTest              = true;
+bool colorcodeVelocity      = false;
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 
 using vecType=glm::vec4;
@@ -73,6 +73,18 @@ mpu::gph::Buffer positionBuffer(nullptr);
 mpu::gph::Buffer velocityBuffer(nullptr);
 mpu::gph::VertexArray vao(nullptr);
 mpu::gph::ShaderProgram shader(nullptr);
+
+// camera
+mpu::gph::ModelViewProjection mvp;
+mpu::gph::Camera &camera()
+{
+    static mpu::gph::Camera _internalCamera(std::make_shared<mpu::gph::SimpleWASDController>(&window(),40,2));
+    return _internalCamera;
+}
+
+// timing
+double delta{0};
+
 //--------------------
 
 void recompileShader()
@@ -145,6 +157,10 @@ void initializeFrontend()
     shader.recreate();
     recompileShader();
 
+
+    camera().setMVP(&mvp);
+    camera().setClip(0.001,10);
+
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }
 
@@ -196,11 +212,17 @@ void setPauseHandler(std::function<void(bool)> f)
 bool handleFrontend()
 {
     using namespace oglFronted;
+    static mpu::DeltaTimer timer;
+    delta = timer.getDeltaTime();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    camera().update(delta);
+
     vao.bind();
     shader.use();
+    shader.uniformMat4("model_view_projection", mvp.getModelViewProjection());
+    shader.uniformMat4("projection", mvp.getProj());
     glDrawArrays(GL_POINTS, 0, particleCount);
 
     if(window().getKey(GLFW_KEY_1))
