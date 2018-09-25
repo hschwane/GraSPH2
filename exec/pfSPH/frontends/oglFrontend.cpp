@@ -45,7 +45,7 @@ bool perspectiveSize        = true;
 bool roundParticles         = true;
 bool additiveBlending       = false;
 bool depthTest              = true;
-bool colorcodeVelocity      = false;
+bool colorcodeVelocity      = true;
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 
 using vecType=glm::vec4;

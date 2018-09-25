@@ -32,14 +32,14 @@ constexpr float a = pradius * pradius * M_PI;
 constexpr float v = 4.0/3.0 * pradius * pradius * pradius * M_PI;
 
 
-constexpr float mass = 1.0 / PARTICLES;
+constexpr float mass = 0.5 / PARTICLES;
 constexpr f1_t H = pradius*2.5;
 
 constexpr f1_t alpha = 1;
 constexpr f1_t rho0 = mass / v;
 constexpr f1_t BULK = 64;
-constexpr f1_t dBULKdP = 8;
-constexpr f1_t shear = 32;
+constexpr f1_t dBULKdP = 16;
+constexpr f1_t shear = 92;
 const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
 constexpr f1_t mateps = 0.0;
@@ -47,7 +47,7 @@ constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = H*0.3;
 
 constexpr f1_t friction_angle = 55.0f * (M_PI/180.0f);
-constexpr f1_t cohesion = 0.25;
+constexpr f1_t cohesion = 0.8;
 
 constexpr Dim dimension=Dim::three;
 
@@ -517,8 +517,10 @@ __global__ void nbodyForces(DeviceParticlesType particles, f1_t eps2)
 
 __global__ void integrateLeapfrog(DeviceParticlesType particles, f1_t dt, bool not_first_step)
 {
-    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL,ACC), MPU_COMMA_LIST(POS,VEL),
-    {
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+                MPU_COMMA_LIST(POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+                MPU_COMMA_LIST(POS,VEL,DENSITY,DSTRESS),
+        {
         //   calculate velocity a_t
         pi.vel = pi.vel + pi.acc * (dt * 0.5f);
 
@@ -529,6 +531,14 @@ __global__ void integrateLeapfrog(DeviceParticlesType particles, f1_t dt, bool n
 
         // calculate position r_t+1
         pi.pos = pi.pos + pi.vel * dt;
+
+        pi.density = pi.density + pi.density_dt * dt;
+        if(pi.density < 0)
+            pi.density = 0;
+
+        // deviatoric stress
+        pi.dstress += pi.dstress_dt * dt;
+        plasticity(pi.dstress,eos::murnaghan(pi.density,rho0, BULK, dBULKdP));
     })
 }
 
@@ -566,6 +576,11 @@ int main()
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
+    computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+    assert_cuda(cudaGetLastError());
+    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,false);
+    assert_cuda(cudaGetLastError());
+
     pb.unmapGraphicsResource(); // used for frontend stuff
     while(fnd::handleFrontend())
     {
@@ -575,7 +590,7 @@ int main()
 
             computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
             assert_cuda(cudaGetLastError());
-            integrate<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0002f);
+            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,true);
             assert_cuda(cudaGetLastError());
 
             pb.unmapGraphicsResource(); // used for frontend stuff
