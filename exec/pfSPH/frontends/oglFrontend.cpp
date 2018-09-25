@@ -38,15 +38,15 @@ const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
 const bool enableVsync    = false;
 
-float particleRenderSize    = 0.005f;
+float particleRenderSize    = 0.01f;
 float particleBrightness    = 1.0f;
-Falloff falloffStyle        = Falloff::NONE;
+Falloff falloffStyle        = Falloff::LINEAR;
 bool perspectiveSize        = true;
 bool roundParticles         = true;
-bool additiveBlending       = false;
+bool additiveBlending       = true;
 bool depthTest              = false;
-bool colorcodeVelocity      = true;
-glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
+bool colorcodeVelocity      = false;
+glm::vec4 particleColor     = {0.1,0.6,0.9,1.0};
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";

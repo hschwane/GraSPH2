@@ -163,14 +163,17 @@ __global__ void computeDensity(DeviceParticlesType particles)
                      MPU_COMMA_LIST(POS,MASS,DENSITY),
                      MPU_COMMA_LIST(POS,MASS), MPU_COMMA_LIST(DENSITY),
                      MPU_COMMA_LIST(POS,MASS),
-    {},
+    float prefactor;
+    {
+        prefactor = kernel::detail::splinePrefactor<Dim::two>(H);
+    },
     {
         const f3_t rij = pi.pos-pj.pos;
         const f1_t r2 = dot(rij,rij);
         f1_t r = sqrt(r2);
         if(r<=H)
         {
-           pi.density += pj.mass * kernel::Wspline<Dim::two>(r,H);
+           pi.density += pj.mass * kernel::Wspline(r,H,prefactor);
         }
     },
     {})
@@ -184,13 +187,15 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
 
     int numPartners=0;
+    float prefactor;
     f1_t pOverRho_i; // pressure over density square used for acceleration
-    f1_t apres_i=0;
+//    f1_t apres_i=0;
     {
         f1_t pres_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound);
         pOverRho_i =  pres_i / (pi.density * pi.density);
+        prefactor = kernel::detail::dspikyPrefactor<Dim::two>(H);
 
-        apres_i = (pres_i > 0) ? mateps * (pres_i)/(pi.density * pi.density) : 0;
+//        apres_i = (pres_i > 0) ? mateps * (pres_i)/(pi.density * pi.density) : 0;
     }
     ,
     {
@@ -201,7 +206,7 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
         {
             numPartners++;
             // get the kernel gradient
-            const f1_t dw = kernel::dWspline<Dim::two>(r,H);
+            const f1_t dw = kernel::dWspiky(r,H,prefactor);
             const f3_t gradw = (dw/r) * rij;
 
             // artificial viscosity
@@ -213,14 +218,14 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             f1_t pOverRho_j = pres_j / (pj.density * pj.density);
 
             // artificial pressure
-            f1_t apres_j = 0;
-            apres_j = (pres_j > 0)? mateps * (pres_j)/(pj.density * pj.density) : 0;
-
-            f1_t apres=apres_i+apres_j;
-            f1_t f= pow(kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(H/2.5f,H),matexp);
+//            f1_t apres_j = 0;
+//            apres_j = (pres_j > 0)? mateps * (pres_j)/(pj.density * pj.density) : 0;
+//
+//            f1_t apres=apres_i+apres_j;
+//            f1_t f= pow(kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(H/2.5f,H),matexp);
 
             // acc
-            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II + f*apres) * gradw;
+            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II /* + f*apres*/) * gradw;
         }
     },
     {
