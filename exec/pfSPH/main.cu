@@ -144,6 +144,49 @@ __global__ void generateSquares(DeviceParticlesType particles)
     })
 }
 
+int generateFromImage(std::string filename, DeviceParticlesType& dpart)
+{
+    float particleMass = 0.0001125;
+
+    Particles<HOST_POSM> pb(PARTICLES);
+
+    int Xres,Yres,n;
+    unsigned char *data = stbi_load(filename.c_str(), &Xres, &Yres, &n, 3);
+    if(!data) throw std::runtime_error("unable to open file " + filename);
+    int particleCount=0;
+
+    float spacing = 2.0/Xres;
+    for(int y = 0; y < Yres; ++y)
+        for(int x = 0; x < Xres; ++x)
+        {
+            float3 c{float(data[3*Xres*y+3*x+0])/255,float(data[3*Xres*y+3*x+1])/255,float(data[3*Xres*y+3*x+2])/255};
+            if(length(c) > 0.8 && particleCount < pb.size())
+            {
+                Particle<POS,MASS> p;
+                p.mass = particleMass;
+                p.pos.x = -1 + x*spacing;
+                p.pos.y = 1 - y*spacing;
+                pb.storeParticle(particleCount,p);
+                particleCount++;
+            }
+        }
+
+    int used = particleCount;
+    while(particleCount<pb.size())
+    {
+        Particle<POS,MASS> p;
+        p.mass = 0;
+        p.pos.x = 3;
+        p.pos.y = 3;
+        pb.storeParticle(particleCount,p);
+        particleCount++;
+    }
+
+    stbi_image_free(data);
+    dpart=pb;
+    return used;
+}
+
 __device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, const f3_t& vij,  const f3_t& rij, f1_t r, f1_t ci, f1_t cj)
 {
     const f1_t wij = dot(rij, vij) /r;
@@ -366,9 +409,11 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
-    assert_cuda(cudaGetLastError());
-    assert_cuda(cudaDeviceSynchronize());
+//    generateSquares<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+//    assert_cuda(cudaGetLastError());
+//    assert_cuda(cudaDeviceSynchronize());
+    int used=generateFromImage("/home/hendrik/sphInit.png",pb);
+    logINFO("LOADER") << "Used " << used << " from " << PARTICLES << " particles to recreate image";
 
     computeDensity<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
