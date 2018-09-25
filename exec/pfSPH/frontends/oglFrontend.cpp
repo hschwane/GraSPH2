@@ -31,22 +31,22 @@ enum class Falloff
 
 // settings
 //--------------------
-glm::uvec2 SIZE = {800,800};
-constexpr char TITLE[] = "Planetform";
+glm::uvec2 SIZE = {1024,1024};
+constexpr char TITLE[] = "PSF retreet 2018";
 
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
 const bool enableVsync    = false;
 
-float particleRenderSize    = 0.01f;
+float particleRenderSize    = 0.007f;
 float particleBrightness    = 1.0f;
-Falloff falloffStyle        = Falloff::LINEAR;
+Falloff falloffStyle        = Falloff::SQUARED;
 bool perspectiveSize        = true;
 bool roundParticles         = true;
 bool additiveBlending       = true;
 bool depthTest              = false;
 bool colorcodeVelocity      = false;
-glm::vec4 particleColor     = {0.1,0.6,0.9,1.0};
+glm::vec4 particleColor     = {0.1,0.3,0.6,1.0};
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
