@@ -15,8 +15,8 @@
 //--------------------
 #include "ext_base_cast.h"
 #include "Particle.h"
-#include <mpUtils.h>
-#include <Cuda/cudaUtils.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 //--------------------
 
 //-------------------------------------------------------------------

@@ -12,8 +12,8 @@
 // includes
 //--------------------
 #include "frontendInterface.h"
-#include <mpUtils.h>
-#include <mpGraphics.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpGraphics.h>
 //--------------------
 
 // hide all local stuff in this namespace
@@ -136,7 +136,7 @@ void initializeFrontend()
 
     window();
 
-    mpu::gph::addShaderIncludePath(LIB_SHADER_PATH);
+    mpu::gph::addShaderIncludePath(MPU_LIB_SHADER_PATH);
     mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
 
     mpu::gph::enableVsync(enableVsync);

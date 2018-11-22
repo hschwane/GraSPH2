@@ -13,7 +13,8 @@
 
 // includes
 //--------------------
-#include <mpUtils.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 //--------------------
 
 // template function ext_base_cast which is used to cast a Particle to type that can be assigned to Base

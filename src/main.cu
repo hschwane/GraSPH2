@@ -13,8 +13,8 @@
  */
 
 #include <thrust/random.h>
-#include <mpUtils.h>
-#include <mpCuda.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 #include <cuda_gl_interop.h>
 #include <cmath>
 

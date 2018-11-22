@@ -16,8 +16,8 @@
 #include <thrust/swap.h>
 #include <tuple>
 #include <cuda_gl_interop.h>
-#include <mpUtils.h>
-#include <Cuda/cudaUtils.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 #include "ext_base_cast.h"
 #include "Particle.h"
 //--------------------

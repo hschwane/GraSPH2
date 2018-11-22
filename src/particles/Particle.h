@@ -13,7 +13,8 @@
 
 // includes
 //--------------------
-#include <mpUtils.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 #include "ext_base_cast.h"
 //--------------------
 

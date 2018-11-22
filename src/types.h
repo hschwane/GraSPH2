@@ -13,7 +13,8 @@
 
 // includes
 //--------------------
-#include <mpCuda.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 //--------------------
 
 #define SINGLE_PRECISION

@@ -19,7 +19,8 @@
 #include "Particle.h"
 #include "SharedParticles.h"
 #include "GlobalParticles.h"
-#include <mpUtils.h>
+#include <mpUtils/mpUtils.h>
+#include <mpUtils/mpCuda.h>
 #include "../types.h"
 //--------------------
 
