@@ -49,6 +49,9 @@ if( OPENGL_FRONTEND AND (NOT mpUtils_OPENGL_AVAILIBLE))
     message(SEND_ERROR "You want to use opengl frontend but openGL is not supported by your build of mpUtils")
 endif()
 
+if(NOT mpUtils_CUDA_AVAILIBLE)
+    message(SEND_ERROR "The mpUtils instalation was compiled without cuda support, however cuda support is needed.")
+endif()
 
 # -------------------------------------------------------------
 # create target
@@ -77,13 +80,15 @@ set(PFSPH_PROJECT_SHADER_PATH "${CMAKE_CURRENT_LIST_DIR}/shader")
 target_compile_definitions(GraSPH2 PRIVATE PROJECT_SHADER_PATH="${PFSPH_PROJECT_SHADER_PATH}/")
 
 # link libraries
-target_link_libraries(GraSPH2 mpUtils::mpUtils mpUtils::mpCudaSettings)
+target_link_libraries(GraSPH2 mpUtils::mpUtils)
 
+# set cuda code generation flags
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${mpUtils_CUDA_ARCH_FLAGS}")
 
 # -------------------------------------------------------------
 # set includes
 # -------------------------------------------------------------
-target_include_directories(mpUtils
+target_include_directories(GraSPH2
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
@@ -107,4 +112,3 @@ if(OPENGL_FRONTEND)
 endif()
 
 set_target_properties( GraSPH2 PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
