@@ -113,13 +113,21 @@ CUDAHOSTDEV f1_t dspikyPrefactor<Dim::three>(f1_t h)
 // B-Spline
 
 /**
+ * @brief calculates the dimension dependent prefactor of the spline functions
+ * @tparam dimension Dim::one, Dim::two, or Dim::three
+ * @param h the smoothing length
+ * @return the dimension dependent prefactor of the spline functions
+ */
+using detail::splinePrefactor;
+
+/**
  * @brief calculates the b-spline kernel function Monaghan & Lattanzio (1985)
- * @param factor dimension dependend precomputed prefactor (use detail::splinePrefactor)
+ * @param factor dimension dependend precomputed prefactor (use splinePrefactor)
  * @param r the distance from the sample point r
  * @param h the smoothing length
  * @return value of the spline kernel function
  */
-CUDAHOSTDEV f1_t Wspline(f1_t r, f1_t h, f1_t factor)
+CUDAHOSTDEV inline f1_t Wspline(f1_t r, f1_t h, f1_t factor)
 {
     f1_t q = r / h;
     return factor *( (q <= 1.0) ? ((q < 0.5) ? (6 * q * q * q - 6 * q * q + 1)
@@ -135,17 +143,25 @@ CUDAHOSTDEV f1_t Wspline(f1_t r, f1_t h, f1_t factor)
  * @return value of the spline kernel function
  */
 template<Dim dimension>
-CUDAHOSTDEV inline f1_t Wspline(f1_t r, f1_t h)
+CUDAHOSTDEV f1_t Wspline(f1_t r, f1_t h)
 {
-    return Wspline(r,h,detail::splinePrefactor<dimension>(h));
+    return Wspline(r,h,splinePrefactor<dimension>(h));
 }
 
 // -----------------------------------------------------------------------------------------------------
 // B-Spline derivative
 
 /**
+* @brief calculates the dimension dependent prefactor of the first derivatives spline functions
+* @tparam dimension Dim::one, Dim::two, or Dim::three
+* @param h the smoothing length
+* @return the dimension dependent prefactor of the spline functions
+*/
+using detail::dsplinePrefactor;
+
+/**
  * @brief calculates the first derivative of the b-spline kernel function Monaghan & Lattanzio (1985)
- * @param factor dimension dependend precomputed prefactor (use detail::dsplinePrefactor)
+ * @param factor dimension dependend precomputed prefactor (use dsplinePrefactor)
  * @param r the distance from the sample point r
  * @param h the smoothing length
  * @return value of the spline function derivative
@@ -175,10 +191,18 @@ CUDAHOSTDEV f1_t dWspline(f1_t r, f1_t h)
 // spiky derivative
 
 /**
+* @brief calculates the dimension dependent prefactor of the first derivatives spiky kernel
+* @tparam dimension Dim::one, Dim::two, or Dim::three
+* @param h the smoothing length
+* @return the dimension dependent prefactor of the spiky kernel
+*/
+using detail::dspikyPrefactor;
+
+/**
  * @brief calculate the first derivative of the spiky kernel function Desbrun 1996
  * @param r2 the square of the distance to the sample point
  * @param h the smoothing length
- * @param factor the precomputed prefactor (use detail::dspikyPrefactor)
+ * @param factor the precomputed prefactor (use dspikyPrefactor)
  * @return the value of the poly6 derivative
  */
 CUDAHOSTDEV inline f1_t dWspiky(f1_t r, f1_t h, f1_t factor)
@@ -195,7 +219,7 @@ CUDAHOSTDEV inline f1_t dWspiky(f1_t r, f1_t h, f1_t factor)
 template<Dim dimension>
 CUDAHOSTDEV f1_t dWspiky(f1_t r, f1_t h)
 {
-    return dWspiky(r,h,detail::dspikyPrefactor<dimension>(h));
+    return dWspiky(r,h,dspikyPrefactor<dimension>(h));
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -203,6 +227,7 @@ CUDAHOSTDEV f1_t dWspiky(f1_t r, f1_t h)
 
 /**
  * @brief calculate the prefactor of the poly6 kernel which can be saved for performance reasons
+ *          this is only availible for 3d right now
  * @param h the smoothing length
  * @return the prefactor of the poly6 kernel
  */
@@ -242,6 +267,7 @@ CUDAHOSTDEV inline f1_t Wpoly6(f1_t r2, f1_t h2, f1_t factor)
 
 /**
  * @brief calculate the prefactor of the derivative of the poly6 kernel which can be saved for performance reasons
+ * only availible for 3d right now
  * @param h the smoothing length
  * @return the prefactor of the poly6 kernel
  */
