@@ -23,6 +23,7 @@
 #include "particles/algorithms.h"
 #include "sph/kernel.h"
 #include "sph/eos.h"
+#include "sph/models.h"
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int PARTICLES = 1<<14;
@@ -243,34 +244,6 @@ __global__ void generate2DHydroNBSystem(DeviceParticlesType particles)
               });
 }
 
-__device__ f1_t artificialViscosity(f1_t alpha, f1_t density_i, f1_t density_j, const f3_t& vij,  const f3_t& rij, f1_t r, f1_t ci, f1_t cj)
-{
-    const f1_t wij = dot(rij, vij) /r;
-    f1_t II = 0;
-    if(wij < 0)
-    {
-        const f1_t vsig = f1_t(ci+cj - 3.0*wij);
-        const f1_t rhoij = (density_i + density_j)*f1_t(0.5);
-        II = -0.5f * alpha * wij * vsig / rhoij;
-    }
-    return II;
-}
-
-__device__ void plasticity(m3_t& destress, f1_t pressure)
-{
-    // second invariant of deviatoric stress
-    f1_t J2 = 0;
-    for(uint e = 0; e < 9; ++e)
-        J2 += destress(e) * destress(e);
-    J2 *= 0.5f;
-
-    f1_t Y = tan(friction_angle) * pressure + cohesion;
-    f1_t miese_f = min(  Y*Y /(3.0f*J2),1.0f);
-
-    for(uint e = 0; e < 9; ++e)
-        destress(e) = miese_f * destress(e);
-}
-
 __global__ void computeDensity(DeviceParticlesType particles)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM),
@@ -478,7 +451,7 @@ __global__ void integrate(DeviceParticlesType particles, f1_t dt)
         // deviatoric stress
         pi.dstress += pi.dstress_dt * dt;
 
-        plasticity(pi.dstress,eos::murnaghan(pi.density,rho0, BULK, dBULKdP));
+        plasticity(pi.dstress,mohrCoulombYieldStress(tan(friction_angle),eos::murnaghan(pi.density,rho0, BULK, dBULKdP),cohesion));
     })
 }
 
