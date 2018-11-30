@@ -17,6 +17,8 @@
 #include <mpUtils/mpCuda.h>
 #include <cuda_gl_interop.h>
 #include <cmath>
+#include <initialConditions/InitGenerator.h>
+#include <initialConditions/particleSources/UniformSphere.h>
 
 #include "frontends/frontendInterface.h"
 #include "particles/Particles.h"
@@ -25,15 +27,14 @@
 #include "sph/eos.h"
 #include "sph/models.h"
 
-constexpr int BLOCK_SIZE = 256;
-constexpr int PARTICLES = 1<<14;
+constexpr size_t BLOCK_SIZE = 256;
 
 constexpr float pradius = 0.1 / 25.398416831491186;
 constexpr float a = pradius * pradius * M_PI;
 constexpr float v = 4.0/3.0 * pradius * pradius * pradius * M_PI;
 
 
-constexpr float mass = 0.5 / PARTICLES;
+constexpr float mass = 0.5;
 constexpr f1_t H = pradius*2.5;
 
 constexpr f1_t alpha = 1;
@@ -52,9 +53,10 @@ constexpr f1_t cohesion = 0.8;
 
 constexpr Dim dimension=Dim::three;
 
-int NUM_BLOCKS = (PARTICLES + BLOCK_SIZE - 1) / BLOCK_SIZE;
+size_t NUM_BLOCKS(size_t particles) {return (particles + BLOCK_SIZE - 1) / BLOCK_SIZE;}
 
 using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using HostParticlesType = Particles<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
 
 __global__ void generate2DRings(DeviceParticlesType particles)
 {
@@ -522,12 +524,12 @@ int main()
     logINFO("pfSPH") << "Welcome to planetformSPH!";
     assert_cuda(cudaSetDevice(0));
 
-    logINFO("sim") << "particle mass: " << mass;
-    logINFO("sim") << "particle radius: " << pradius;
-    logINFO("sim") << "material density: " << rho0;
-    logINFO("sim") << "total mass: " << mass * PARTICLES;
-    logINFO("sim") << "total radius: " << 1;
-    logINFO("sim") << "total density: " <<  mass * PARTICLES / (4.0/3.0 *1*1*1*M_PI);
+//    logINFO("sim") << "particle mass: " << mass;
+//    logINFO("sim") << "particle radius: " << pradius;
+//    logINFO("sim") << "material density: " << rho0;
+//    logINFO("sim") << "total mass: " << mass * PARTICLES;
+//    logINFO("sim") << "total radius: " << 1;
+//    logINFO("sim") << "total density: " <<  mass * PARTICLES / (4.0/3.0 *1*1*1*M_PI);
 
     // set up frontend
     fnd::initializeFrontend();
@@ -535,8 +537,12 @@ int main()
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
     // generate some particles
-    DeviceParticlesType pb(PARTICLES);
-    pb.initialize();
+    InitGenerator<HostParticlesType> generator;
+//    generator.addParticles(ps::UniformSphere(1<<12,0.1,1,0.1));
+    generator.addParticles(ps::UniformSphere(1<<14,1.0,1,0.1));
+    auto hpb = generator.generate();
+
+    DeviceParticlesType pb(hpb.size());
 
     // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
@@ -545,13 +551,16 @@ int main()
     pb.mapGraphicsResource();
 #endif
 
-    generate2DHydroNBSystem<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy());
+    // upload particles
+//    pb = hpb;
+
+    generate2DHydroNBSystem<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy());
     assert_cuda(cudaGetLastError());
     assert_cuda(cudaDeviceSynchronize());
 
-    computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+    computeDerivatives<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
     assert_cuda(cudaGetLastError());
-    integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,false);
+    integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,false);
     assert_cuda(cudaGetLastError());
 
     pb.unmapGraphicsResource(); // used for frontend stuff
@@ -559,14 +568,14 @@ int main()
     {
         if(simShouldRun)
         {
-            pb.mapGraphicsResource(); // used for frontend stuff
-
-            computeDerivatives<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
-            assert_cuda(cudaGetLastError());
-            integrateLeapfrog<<<NUM_BLOCKS,BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,true);
-            assert_cuda(cudaGetLastError());
-
-            pb.unmapGraphicsResource(); // used for frontend stuff
+//            pb.mapGraphicsResource(); // used for frontend stuff
+//
+//            computeDerivatives<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
+//            assert_cuda(cudaGetLastError());
+//            integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),0.0003f,true);
+//            assert_cuda(cudaGetLastError());
+//
+//            pb.unmapGraphicsResource(); // used for frontend stuff
         }
         else
         {

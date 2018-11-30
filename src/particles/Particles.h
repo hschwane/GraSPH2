@@ -47,7 +47,7 @@ struct pos_impl
 };
 
 template<typename T> CUDAHOSTDEV void pos_impl::store(f4_t &v, const T &p) {}
-template<> CUDAHOSTDEV void pos_impl::store<POS>(f4_t & v, const POS& p) {v=f4_t{p.pos.x,p.pos.y,p.pos.z,0.0f};}
+template<> CUDAHOSTDEV inline void pos_impl::store<POS>(f4_t & v, const POS& p) {v=f4_t{p.pos.x,p.pos.y,p.pos.z,0.0f};}
 
 template <size_t n>
 using SHARED_POS = SHARED_BASE<n,f4_t, pos_impl>;
@@ -64,7 +64,7 @@ struct mass_impl
 };
 
 template<typename T> CUDAHOSTDEV void mass_impl::store(float &v, const T &p) {}
-template<> CUDAHOSTDEV void mass_impl::store<MASS>(float & v, const MASS& p) {v=p.mass;}
+template<> CUDAHOSTDEV inline void mass_impl::store<MASS>(float & v, const MASS& p) {v=p.mass;}
 
 template <size_t n>
 using SHARED_MASS = SHARED_BASE<n,float, mass_impl>;
@@ -81,8 +81,8 @@ struct posm_impl
 };
 
 template<typename T> CUDAHOSTDEV void posm_impl::store(f4_t &v, const T &p) {}
-template <> CUDAHOSTDEV void posm_impl::store<POS>(f4_t & v, const POS& p) {v.x=p.pos.x; v.y=p.pos.y; v.z=p.pos.z;}
-template <> CUDAHOSTDEV void posm_impl::store<MASS>(f4_t & v, const MASS& p) {v.w=p.mass;}
+template <> CUDAHOSTDEV inline void posm_impl::store<POS>(f4_t & v, const POS& p) {v.x=p.pos.x; v.y=p.pos.y; v.z=p.pos.z;}
+template <> CUDAHOSTDEV inline void posm_impl::store<MASS>(f4_t & v, const MASS& p) {v.w=p.mass;}
 
 template <size_t n>
 using SHARED_POSM = SHARED_BASE<n,f4_t, posm_impl>;
@@ -99,7 +99,7 @@ struct vel_impl
 };
 
 template<typename T> CUDAHOSTDEV void vel_impl::store(f4_t &v, const T &p) {}
-template<> CUDAHOSTDEV void vel_impl::store<VEL>(f4_t & v, const VEL& p) {v=f4_t{p.vel.x,p.vel.y,p.vel.z,0.0f};}
+template<> CUDAHOSTDEV void inline vel_impl::store<VEL>(f4_t & v, const VEL& p) {v=f4_t{p.vel.x,p.vel.y,p.vel.z,0.0f};}
 
 template <size_t n>
 using SHARED_VEL = SHARED_BASE<n,f4_t, vel_impl>;
@@ -116,7 +116,7 @@ struct acc_impl
 };
 
 template<typename T> CUDAHOSTDEV void acc_impl::store(f4_t &v, const T &p) {}
-template<> CUDAHOSTDEV void acc_impl::store<ACC>(f4_t & v, const ACC& p) {v=f4_t{p.acc.x,p.acc.y,p.acc.z,0.0f};}
+template<> CUDAHOSTDEV void inline acc_impl::store<ACC>(f4_t & v, const ACC& p) {v=f4_t{p.acc.x,p.acc.y,p.acc.z,0.0f};}
 
 template <size_t n>
 using SHARED_ACC = SHARED_BASE<n,f4_t, acc_impl>;
@@ -133,7 +133,7 @@ struct xvel_impl
 };
 
 template<typename T> CUDAHOSTDEV void xvel_impl::store(f4_t &v, const T &p) {}
-template<> CUDAHOSTDEV void xvel_impl::store<XVEL>(f4_t & v, const XVEL& p) {v=f4_t{p.xvel.x,p.xvel.y,p.xvel.z,0.0f};}
+template<> CUDAHOSTDEV void inline xvel_impl::store<XVEL>(f4_t & v, const XVEL& p) {v=f4_t{p.xvel.x,p.xvel.y,p.xvel.z,0.0f};}
 
 template <size_t n>
 using SHARED_XVEL = SHARED_BASE<n,f4_t, xvel_impl>;
@@ -151,7 +151,7 @@ struct density_impl
 };
 
 template<typename T> CUDAHOSTDEV void density_impl::store(f1_t &v, const T &p) {}
-template<> CUDAHOSTDEV void density_impl::store<DENSITY>(f1_t & v, const DENSITY& p) {v=p.density;}
+template<> CUDAHOSTDEV inline void density_impl::store<DENSITY>(f1_t & v, const DENSITY& p) {v=p.density;}
 
 template <size_t n>
 using SHARED_DENSITY = SHARED_BASE<n,f1_t, density_impl>;
@@ -168,7 +168,7 @@ struct density_dt_impl
 };
 
 template<typename T> CUDAHOSTDEV void density_dt_impl::store(f1_t &v, const T &p) {}
-template<> CUDAHOSTDEV void density_dt_impl::store<DENSITY_DT>(f1_t & v, const DENSITY_DT& p) {v=p.density_dt;}
+template<> CUDAHOSTDEV void inline density_dt_impl::store<DENSITY_DT>(f1_t & v, const DENSITY_DT& p) {v=p.density_dt;}
 
 template <size_t n>
 using SHARED_DENSITY_DT = SHARED_BASE<n,f1_t, density_dt_impl>;
@@ -185,7 +185,7 @@ struct deviatoric_stress_impl
 };
 
 template<typename T> CUDAHOSTDEV void deviatoric_stress_impl::store(m3_t &v, const T &p) {}
-template<> CUDAHOSTDEV void deviatoric_stress_impl::store<DSTRESS>(m3_t & v, const DSTRESS& p) {v=p.dstress;}
+template<> CUDAHOSTDEV void inline deviatoric_stress_impl::store<DSTRESS>(m3_t & v, const DSTRESS& p) {v=p.dstress;}
 
 template <size_t n>
 using SHARED_DSTRESS = SHARED_BASE<n,m3_t, deviatoric_stress_impl>;
@@ -203,7 +203,7 @@ struct deviatoric_stress_dt_impl
 };
 
 template<typename T> CUDAHOSTDEV void deviatoric_stress_dt_impl::store(m3_t &v, const T &p) {}
-template<> CUDAHOSTDEV void deviatoric_stress_dt_impl::store<DSTRESS_DT>(m3_t & v, const DSTRESS_DT& p) {v=p.dstress_dt;}
+template<> CUDAHOSTDEV inline void deviatoric_stress_dt_impl::store<DSTRESS_DT>(m3_t & v, const DSTRESS_DT& p) {v=p.dstress_dt;}
 
 template <size_t n>
 using SHARED_DSTRESS_DT = SHARED_BASE<n,m3_t, deviatoric_stress_dt_impl>;

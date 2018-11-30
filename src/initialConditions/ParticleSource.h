@@ -19,13 +19,18 @@
 //--------------------
 #include <types.h>
 #include <glm/glm.hpp>
-#include <particles/Particles.h>
 //--------------------
 
+// namespace
+//--------------------
+namespace ps {
+//--------------------
 
 namespace detail {
     //!< class to check if something is derived from any instantiation of ParticleSource
-    class ParticleSourceBaseFlag{};
+    class ParticleSourceBaseFlag
+    {
+    };
 }
 
 //-------------------------------------------------------------------
@@ -43,32 +48,40 @@ namespace detail {
  * Then override the generateParticle(size_t id) where you return the particle with the index id.
  *
  */
-template <typename particleType>
+template<typename particleType>
 class ParticleSource : public detail::ParticleSourceBaseFlag
 {
 public:
-    virtual ~ParticleSource()= default;
-    size_t getNumParticles() {return m_numberOfParticles;} //!< the number of particles provided by this source
+    virtual ~ParticleSource() = default;
+
+    size_t getNumParticles() { return m_numberOfParticles; } //!< the number of particles provided by this source
 
     // transformation
-    template <typename vecType>
-    ParticleSource& move(vecType position); //!< move the generated particles to a position
+    template<typename vecType>
+    ParticleSource &move(vecType position); //!< move the generated particles to a position
 
     //ParticleSource rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
 
     // initial values for other properties
     //ParticleSource addVelocity();
 
-    template <typename particleBufferType>
-    void operator()(particleBufferType & particles, size_t id, size_t pos); //!< function to generate a single id < getNumparticles(), pos is the position in the buffer where the particle is saved
+    template<typename particleBufferType>
+    void operator()(particleBufferType &particles, size_t id,
+                    size_t pos); //!< function to generate a single id < getNumparticles(), pos is the position in the buffer where the particle is saved
+protected:
+    size_t m_numberOfParticles{0}; //!< number of particles provided by this source
+    using ptType=particleType; //!< the type of particle created by this source (shorthand to be used in derived classes)
 
 private:
-    virtual particleType generateParticle(size_t id)=0; //!< function to be overridden ny derived classes to provide particles
+    virtual particleType
+    generateParticle(size_t id) = 0; //!< function to be overridden ny derived classes to provide particles
 
-    size_t m_numberOfParticles{0}; //!< number of particles provided by this source
-    std::vector<std::function<void(particleType&)>> m_operations; //!< a list of modifiers that are performed on the particles after generation e.g. add velocity
+    std::vector<std::function<void(
+            particleType &)>> m_operations; //!< a list of modifiers that are performed on the particles after generation e.g. add velocity
 };
 
+//!< bases that every particle should have, so modifiers can work
+#define PS_DEFAULT_PARTICLE_BASES POS,MASS,VEL
 
 // template function definitions of the ParticleSource class
 //-------------------------------------------------------------------
@@ -77,7 +90,8 @@ template<typename particleType>
 template<typename vecType>
 ParticleSource<particleType> &ParticleSource<particleType>::move(vecType position)
 {
-    m_operations.push_back([position](particleType &p){p.pos+=position;});
+    m_operations.push_back([position](particleType &p)
+                           { p.pos += position; });
     return *this;
 }
 
@@ -90,7 +104,9 @@ void ParticleSource<particleType>::operator()(particleBufferType &particles, siz
     {
         operation(p);
     }
-    particles.storeParticle(pos,p);
+    particles.storeParticle(pos, p);
+}
+
 }
 
 #endif //GRASPH2_PARTICLEGENERATOR_H
