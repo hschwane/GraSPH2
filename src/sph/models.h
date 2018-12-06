@@ -64,7 +64,7 @@ CUDAHOSTDEV f1_t artificialViscosity(f1_t alpha,
 CUDAHOSTDEV void plasticity(m3_t &destress, f1_t Y);
 
 /**
- * @brief calculates the yield stress using the moh-coulomb model
+ * @brief calculates the yield stress using the mohr-coulomb model
  * @param tanFrictionAngle tangent of the inner friction angle, maximal angle of attack for a force without material sliding away / failing
  * @param pressure the current pressure of particle i
  * @param cohesion cohesion of the material, higher values increases "stickyness"
