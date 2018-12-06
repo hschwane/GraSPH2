@@ -49,7 +49,7 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 #define ROTATING_UNIFORM_SPHERE
 constexpr f1_t tmass = 0.5; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles needs to be a power of two
-
+constexpr f3_t angVel=f3_t{0,0,2.0}; // angular velocity of the cloud omega
 
 // --------------------
 // Material settings

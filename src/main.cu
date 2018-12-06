@@ -230,7 +230,9 @@ int main()
 
     // generate some particles
     InitGenerator<HostParticlesType> generator;
-    generator.addParticles(ps::UniformSphere(particle_count,1.0,tmass,rho0));
+    ps::UniformSphere us(particle_count,1.0,tmass,rho0);
+    us.addAngularVelocity(angVel);
+    generator.addParticles(us);
     auto hpb = generator.generate();
 
     if( hpb.size()==0 || (hpb.size() & (hpb.size() - 1)) )

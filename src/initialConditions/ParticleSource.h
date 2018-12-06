@@ -63,7 +63,7 @@ public:
     //ParticleSource rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
 
     // initial values for other properties
-    //ParticleSource addVelocity();
+    ParticleSource &addAngularVelocity(f3_t omega); //!< add angular velocity around axis omega with strength length(omega)
 
     template<typename particleBufferType>
     void operator()(particleBufferType &particles, size_t id,
@@ -91,7 +91,19 @@ template<typename vecType>
 ParticleSource<particleType> &ParticleSource<particleType>::move(vecType position)
 {
     m_operations.push_back([position](particleType &p)
-                           { p.pos += position; });
+                           {
+                                p.pos += position;
+                           });
+    return *this;
+}
+
+template<typename particleType>
+ParticleSource<particleType> &ParticleSource<particleType>::addAngularVelocity(f3_t omega)
+{
+    m_operations.push_back([omega](particleType &p)
+                           {
+                                p.vel = cross(omega,p.pos);
+                           });
     return *this;
 }
 
