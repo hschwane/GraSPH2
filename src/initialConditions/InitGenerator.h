@@ -69,7 +69,7 @@ void InitGenerator<hostParticleType>::addParticles(ParticleSourceType particleSo
 template<typename hostParticleType>
 hostParticleType InitGenerator<hostParticleType>::generate()
 {
-    logINFO("InitalConditions") << "Getting " << m_totalNumOfParticles << " particles from particle sources.";
+    logINFO("InitialConditions") << "Getting " << m_totalNumOfParticles << " particles from particle sources.";
 
     // create a buffer to hold the particles
     hostParticleType hpb(m_totalNumOfParticles);

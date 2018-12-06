@@ -39,6 +39,7 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
+// NUMBER OF PARTICLES NEEDS TO BE A POWER OF TWO !!!
 #define READ_FROM_FILE
 #define FILENAME "~/inputData.tsv"
 #define SEPERATOR "\t"
@@ -47,6 +48,7 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // only use this with 3D simulations
 #define ROTATING_UNIFORM_SPHERE
 constexpr f1_t tmass = 0.5; // total mass of the sphere
+constexpr f1_t particle_count=1<<14; // number of particles needs to be a power of two
 
 
 // --------------------

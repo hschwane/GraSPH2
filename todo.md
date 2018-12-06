@@ -2,7 +2,6 @@
 
 ## high priority
 
-- make the demo simulation from the settings file work with the uniform sphere generator
 - add source to generate from file
 - add possibility to dump simulation to file
 - make all settings from the settings file actually work

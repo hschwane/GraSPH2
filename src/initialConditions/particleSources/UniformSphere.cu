@@ -31,7 +31,7 @@ UniformSphere::UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, 
     m_numberOfParticles = particleCount;
 }
 
-Particle<PS_DEFAULT_PARTICLE_BASES, DENSITY> UniformSphere::generateParticle(size_t id)
+UniformSphere::ptType UniformSphere::generateParticle(size_t id)
 {
     ptType p{};
 

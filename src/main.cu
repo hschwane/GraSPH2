@@ -219,6 +219,7 @@ int main()
 {
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
+    myLog.printHeader("GraSPH2");
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 
@@ -229,8 +230,16 @@ int main()
 
     // generate some particles
     InitGenerator<HostParticlesType> generator;
-    generator.addParticles(ps::UniformSphere(1<<14,1.0,1,0.1));
+    generator.addParticles(ps::UniformSphere(particle_count,1.0,tmass,rho0));
     auto hpb = generator.generate();
+
+    if( hpb.size()==0 || (hpb.size() & (hpb.size() - 1)) )
+    {
+        logFATAL_ERROR("InitialConditions") << "Particle count of " << hpb.size()
+                                            << " is not a power of two. Only power of two particle counts are currently supported!";
+        myLog.flush();
+        throw std::runtime_error("Particle count not supported!");
+    }
 
     DeviceParticlesType pb(hpb.size());
 
