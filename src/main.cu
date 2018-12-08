@@ -19,6 +19,7 @@
 #include <cmath>
 #include <initialConditions/InitGenerator.h>
 #include <initialConditions/particleSources/UniformSphere.h>
+#include <initialConditions/particleSources/TextFile.h>
 
 #include "frontends/frontendInterface.h"
 #include "particles/Particles.h"
@@ -228,13 +229,23 @@ int main()
     bool simShouldRun = false;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
-    // generate some particles
+    // generate some particles depending on options in the settings file
     InitGenerator<HostParticlesType> generator;
+
+#if defined(READ_FROM_FILE)
+
+    ps::TextFile tf(FILENAME,SEPERATOR);
+    generator.addParticles(tf);
+
+#elif defined(ROTATING_UNIFORM_SPHERE)
+
     ps::UniformSphere us(particle_count,1.0,tmass,rho0);
     us.addAngularVelocity(angVel);
     generator.addParticles(us);
-    auto hpb = generator.generate();
 
+#endif
+
+    auto hpb = generator.generate();
     if( hpb.size()==0 || (hpb.size() & (hpb.size() - 1)) )
     {
         logFATAL_ERROR("InitialConditions") << "Particle count of " << hpb.size()
@@ -243,9 +254,8 @@ int main()
         throw std::runtime_error("Particle count not supported!");
     }
 
+    // create cuda buffer
     DeviceParticlesType pb(hpb.size());
-
-    // register position and velocity buffer with cuda
 #if defined(FRONTEND_OPENGL)
     pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
     pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));

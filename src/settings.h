@@ -11,14 +11,16 @@
 #ifndef GRASPH2_SETTINGS_H
 #define GRASPH2_SETTINGS_H
 
-// includes
-//--------------------
-#include "types.h"
-#include "particles/Particles.h"
-//--------------------
-
 // -------------------
 // general
+
+// enable to use double precision floating point numbers (slow !!)
+//#define DOUBLE_PRECISION
+
+// -------------------
+#include "types.h"
+#include "particles/Particles.h"
+// -------------------
 
 // 2D or 3D simulation (for 2D simulation, make sure all particles have 0 values in z components of position and velocity))
 //constexpr Dim dimension=Dim::two;
@@ -39,16 +41,16 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
-// NUMBER OF PARTICLES NEEDS TO BE A POWER OF TWO !!!
+// NUMBER OF PARTICLES MUST BE A POWER OF TWO !!!
 #define READ_FROM_FILE
 #define FILENAME "~/inputData.tsv"
-#define SEPERATOR "\t"
+constexpr char SEPERATOR='\t';
 
 // generate a rotating sphere with uniform density
 // only use this with 3D simulations
-#define ROTATING_UNIFORM_SPHERE
+//#define ROTATING_UNIFORM_SPHERE
 constexpr f1_t tmass = 0.5; // total mass of the sphere
-constexpr f1_t particle_count=1<<14; // number of particles needs to be a power of two
+constexpr f1_t particle_count=1<<14; // number of particles must be a power of two
 constexpr f3_t angVel=f3_t{0,0,2.0}; // angular velocity of the cloud omega
 
 // --------------------
@@ -62,7 +64,7 @@ constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pr
 // parameters for solid bodys
 constexpr f1_t shear = 92; // the materials shear modulus
 
-// choose one of the plasticity models
+// choose one of the plasticity models, if you disable both the material is purely elastic
 
 // von miese plasticity using a yield stress Y
 //#define PLASTICITY_MIESE
@@ -112,6 +114,10 @@ using ParticleType = Particle<POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,D
 //-------------------------------------------------------------------------
 // DO NOT MODIFY BELOW HERE
 // check if options are valid...
+
+#if defined(READ_FROM_FILE) && defined(ROTATING_UNIFORM_SPHERE)
+    #error "Choose one input method, not both!"
+#endif
 
 #if defined(PLASTICITY_MIESE) && defined(PLASTICITY_MC)
     #error "Choose one plasticity model, not both!"

@@ -2,7 +2,6 @@
 
 ## high priority
 
-- add source to generate from file
 - add possibility to dump simulation to file
 - make all settings from the settings file actually work
 
