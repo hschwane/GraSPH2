@@ -61,7 +61,7 @@ void InitGenerator<hostParticleType>::addParticles(ParticleSourceType particleSo
     static_assert(std::is_base_of<ps::detail::ParticleSourceBaseFlag,ParticleSourceType>::value, "particleSource must be an object of a class derived from the ParticleSource class!");
 
     size_t numParticles = particleSource.getNumParticles();
-    m_genFuncs.push_back(particleSource);
+    m_genFuncs.emplace_back(particleSource);
     m_genParameters.emplace_back(m_totalNumOfParticles,m_totalNumOfParticles+numParticles);
     m_totalNumOfParticles += numParticles;
 }
