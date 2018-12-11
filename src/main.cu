@@ -27,6 +27,7 @@
 #include "sph/kernel.h"
 #include "sph/eos.h"
 #include "sph/models.h"
+#include "ResultStorageManager.h"
 #include "settings.h"
 
 /**
@@ -224,10 +225,14 @@ int main()
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 
+    // set up file saving engine
+//    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX);
+
     // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = false;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
+
 
     // generate some particles depending on options in the settings file
     InitGenerator<HostParticlesType> generator;
@@ -268,13 +273,15 @@ int main()
     // calculate sound speed
     const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
+    // start simulating
     computeDerivatives<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
     assert_cuda(cudaGetLastError());
     integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),timestep,false);
     assert_cuda(cudaGetLastError());
+    double simulatedTime=timestep;
 
     pb.unmapGraphicsResource(); // used for frontend stuff
-    while(fnd::handleFrontend())
+    while(fnd::handleFrontend(simulatedTime))
     {
         if(simShouldRun)
         {
@@ -285,11 +292,12 @@ int main()
             integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),timestep,true);
             assert_cuda(cudaGetLastError());
 
+            simulatedTime += timestep;
             pb.unmapGraphicsResource(); // used for frontend stuff
         }
         else
         {
-            mpu::sleep_ms(1);
+            mpu::sleep_ms(2);
         }
     }
 

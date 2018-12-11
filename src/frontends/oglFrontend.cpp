@@ -47,6 +47,7 @@ bool additiveBlending       = false;
 bool depthTest              = true;
 bool colorcodeVelocity      = false;
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
+double printIntervall       = 2.0;
 
 using vecType=glm::vec4;
 
@@ -84,6 +85,8 @@ mpu::gph::Camera &camera()
 
 // timing
 double delta{0};
+double time{0};
+int frames{0};
 
 //--------------------
 
@@ -209,11 +212,20 @@ void setPauseHandler(std::function<void(bool)> f)
     pauseHandler = f;
 }
 
-bool handleFrontend()
+bool handleFrontend(double t)
 {
     using namespace oglFronted;
     static mpu::DeltaTimer timer;
     delta = timer.getDeltaTime();
+
+    time+=delta;
+    frames++;
+    if(time > printIntervall)
+    {
+        logINFO("openGL Frontend") << "Simulated Time: " << t << " fps: " << frames / time << " ms/f: " << time/frames * 1000;
+        frames=0;
+        time=0;
+    }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

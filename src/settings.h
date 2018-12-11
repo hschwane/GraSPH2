@@ -29,6 +29,10 @@ constexpr Dim dimension=Dim::three;
 // the integration timestep for the constant timestep leapfrog integrator
 constexpr f1_t timestep=0.0003;
 
+// storing results in this folder
+#define STORE_RESULTS
+#define RESULT_FOLDER "/home/hendrik/test/"
+#define RESULT_PREFIX "grasp_"
 
 //--------------------
 // initial conditions
@@ -42,16 +46,16 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
 // NUMBER OF PARTICLES MUST BE A POWER OF TWO !!!
-#define READ_FROM_FILE
-#define FILENAME "~/inputData.tsv"
+//#define READ_FROM_FILE
+#define FILENAME "/some/path/inputData.tsv"
 constexpr char SEPERATOR='\t';
 
 // generate a rotating sphere with uniform density
 // only use this with 3D simulations
-//#define ROTATING_UNIFORM_SPHERE
+#define ROTATING_UNIFORM_SPHERE
 constexpr f1_t tmass = 0.5; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles must be a power of two
-constexpr f3_t angVel=f3_t{0,0,2.0}; // angular velocity of the cloud omega
+constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
 
 // --------------------
 // Material settings
