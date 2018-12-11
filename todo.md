@@ -1,4 +1,4 @@
-# todo before next major release
+# my todo list
 
 ## high priority
 
@@ -15,6 +15,7 @@
 - somehow make it possible to get the host type from a base buffer
 - think about the particle management carefully
 - think about particles during init carefully
+- enhance compile time using particle
 
 ### particle creation
 - make modifiers work
@@ -37,4 +38,10 @@
 
 ### simulation features
 - add functionality from the other branch
+- linear consistency fix
+- investigate angular momentum (not)conservation
+- add collisional merging simulation
 
+### output data handling
+- use pinned host memory here
+- remove the stream sync points

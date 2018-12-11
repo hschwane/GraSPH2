@@ -108,8 +108,6 @@ using HostParticlesType = Particles<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_D
 using ParticleType = Particle<POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
 
 
-
-
 // DO NOT MODIFY BELOW HERE
 //-------------------------------------------------------------------------
 // DO NOT MODIFY BELOW HERE

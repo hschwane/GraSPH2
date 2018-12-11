@@ -63,6 +63,7 @@ add_executable(GraSPH2)
 # add general source files
 target_sources(GraSPH2 PRIVATE
                 "src/main.cu"
+                "src/ResultStorageManager.cu"
                 "src/sph/eos.cu"
                 "src/sph/models.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
