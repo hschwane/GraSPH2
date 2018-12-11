@@ -50,8 +50,9 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // The Order of the parameter is assumed to be as follows:
 // POS_x | POS_y | POS_z | VEL_x | VEL_y | VEL_z | MASS | DENSITY
 //#define READ_FROM_FILE
-#define FILENAME "/some/path/inputData.tsv"
+#define FILENAME "/home/hendrik/inputData.tsv"
 constexpr char SEPERATOR='\t';
+constexpr double startTime = 0; // if you continue a old simulation you can set the start time to match displayed simulation times
 
 // generate a rotating sphere with uniform density
 // only use this with 3D simulations
@@ -64,7 +65,7 @@ constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
 // Material settings
 
 // parameters of the equation of state
-constexpr f1_t rho0 = tmass / (4.0/3.0 * pradius * pradius * pradius * M_PI); // the materials rest density
+constexpr f1_t rho0 = tmass /particle_count / (4.0/3.0 * pradius * pradius * pradius * M_PI); // the materials rest density
 constexpr f1_t BULK = 64; // the materials bulk modulus
 constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pressure
 

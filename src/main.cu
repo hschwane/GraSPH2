@@ -278,6 +278,9 @@ int main()
     integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),timestep,false);
     assert_cuda(cudaGetLastError());
     double simulatedTime=timestep;
+#if defined(READ_FROM_FILE)
+    simulatedTime += startTime;
+#endif
 
     pb.unmapGraphicsResource(); // used for frontend stuff
     while(fnd::handleFrontend(simulatedTime))
