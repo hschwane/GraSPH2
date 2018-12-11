@@ -92,7 +92,7 @@ void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
 {
     try
     {
-        std::unique_ptr<DeviceDiscPT> downloadCopy(particles);
+        std::unique_ptr<DeviceDiscPT> downloadCopy(new DeviceDiscPT(particles));
         assert_cuda(cudaGetLastError());
         assert_cuda(cudaStreamSynchronize(nullptr));
 
@@ -104,7 +104,7 @@ void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
     {
         logWARNING("ResultStorage") << "Could not duplicate simulation data on the device. Copying directly to main memory.";
 
-        std::unique_ptr<HostDiscPT> hostData(particles);
+        std::unique_ptr<HostDiscPT> hostData(new HostDiscPT(particles));
         assert_cuda(cudaGetLastError());
         assert_cuda(cudaStreamSynchronize(nullptr));
 

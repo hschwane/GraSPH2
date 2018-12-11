@@ -225,29 +225,21 @@ int main()
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 
-    // set up file saving engine
-//    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX);
-
     // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = false;
     fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
 
-
     // generate some particles depending on options in the settings file
     InitGenerator<HostParticlesType> generator;
 
 #if defined(READ_FROM_FILE)
-
     ps::TextFile tf(FILENAME,SEPERATOR);
     generator.addParticles(tf);
-
 #elif defined(ROTATING_UNIFORM_SPHERE)
-
     ps::UniformSphere us(particle_count,1.0,tmass,rho0);
     us.addAngularVelocity(angVel);
     generator.addParticles(us);
-
 #endif
 
     auto hpb = generator.generate();
@@ -273,6 +265,13 @@ int main()
     // calculate sound speed
     const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
+#ifdef STORE_RESULTS
+    // set up file saving engine
+    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX);
+    storage.printToFile(pb,0);
+    f1_t timeSinceStore=timestep;
+#endif
+
     // start simulating
     computeDerivatives<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),SOUNDSPEED);
     assert_cuda(cudaGetLastError());
@@ -293,6 +292,16 @@ int main()
             assert_cuda(cudaGetLastError());
 
             simulatedTime += timestep;
+
+#ifdef STORE_RESULTS
+            timeSinceStore += timestep;
+            if( timeSinceStore > store_intervall)
+            {
+                storage.printToFile(pb,simulatedTime);
+                timeSinceStore=0;
+            }
+#endif
+
             pb.unmapGraphicsResource(); // used for frontend stuff
         }
         else

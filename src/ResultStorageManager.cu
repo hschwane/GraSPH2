@@ -52,8 +52,8 @@ void ResultStorageManager::worker()
                 cudaEventCreate(&event);
                 cudaEventRecord(event, 0);
                 m_ongoingTransfers.emplace(std::move(deviceData.first), std::move(hostData), deviceData.second, event);
-            }
-            hdc_lck.unlock();
+            } else
+                hdc_lck.unlock();
 
             // handle finished memory transfers if any
             if(!m_ongoingTransfers.empty() && cudaEventQuery(m_ongoingTransfers.front().event) != cudaErrorNotReady)
@@ -63,6 +63,7 @@ void ResultStorageManager::worker()
 
                 ddc_lck.lock();
                 m_deviceDiskCopy.emplace(std::move(transfer.target),transfer.time);
+                ddc_lck.unlock();
             }
 
             // put data from cpu to memory
@@ -75,11 +76,21 @@ void ResultStorageManager::worker()
 
                 logINFO("ResultStorageManager") << "Results stored for t= " << hostData.second;
                 // writeToFile(hostData);
-            }
-            ddc_lck.unlock();
+            } else
+                ddc_lck.unlock();
 
             hdc_lck.lock();
             ddc_lck.lock();
         }
     }
+}
+
+ResultStorageManager::~ResultStorageManager()
+{
+    {
+        std::lock_guard<std::mutex> lck(m_workerMutex);
+        m_terminateWorker = true;
+        m_workSignal.notify_one();
+    }
+    m_workerThread.join();
 }

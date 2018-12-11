@@ -47,7 +47,7 @@ bool additiveBlending       = false;
 bool depthTest              = true;
 bool colorcodeVelocity      = false;
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
-double printIntervall       = 2.0;
+double printIntervall       = 4.0;
 
 using vecType=glm::vec4;
 

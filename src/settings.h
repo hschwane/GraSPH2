@@ -33,6 +33,7 @@ constexpr f1_t timestep=0.0003;
 #define STORE_RESULTS
 #define RESULT_FOLDER "/home/hendrik/test/"
 #define RESULT_PREFIX "grasp_"
+constexpr f1_t store_intervall=0.2;
 
 //--------------------
 // initial conditions
