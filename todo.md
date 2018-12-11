@@ -24,14 +24,17 @@
 - add 2d image source from the other branch
 
 ### frontend
+- runtime coloring switches on openGL
+- fix opengl frontend camera
 - better options for both frontends
 
 ### usability
 - write installation instructions
+- more runtime options vs compiletime options
 - add some real time control and feedback to the frontends
 
 ### simulation managemant
-- make the compute derivitives more organized
+- make the compute derivitives function more organized
 - add some kind of structure to the deriviative computation
 - find better solution for the stuff in the algorithms file
 
@@ -45,3 +48,11 @@
 - use pinned host memory here
 - remove the stream sync points
 - add limit of pending copy operations
+
+# finished
+for personal motivation, all finished todo entries are moved here instead of beeing deleted
+
+- add possibility to dump simulation to file
+- add source to generate from file
+- make the demo simulation from the settings file work with the uniform sphere generator
+- add some kind of setting file

@@ -5,7 +5,7 @@
  * @author: Hendrik Schwanekamp
  * @mail:   hendrik.schwanekamp@gmx.net
  *
- * Implements the ResultStorageManager class
+ * Implements the ResultStorageManager class, which saves simulation results into files.
  *
  * Copyright (c) 2018 Hendrik Schwanekamp
  *
@@ -21,11 +21,11 @@
 //-------------------------------------------------------------------
 
 ResultStorageManager::ResultStorageManager(std::string directory, std::string prefix, int maxJobs)
-    : m_directory(directory), m_prefix(prefix), m_terminateWorker(false), m_maxQueue(maxJobs), m_numberJobs(0)
+    : m_directory(directory), m_prefix(prefix), m_terminateWorker(false), m_maxQueue(maxJobs),
+    m_numberJobs(0), m_startTime(mpu::timestamp("%Y-%m-%d_%H:%M"))
+
 {
     assert_critical(m_maxQueue>1, "ResultStorageManager", "Can't work with Maximum job number below 1.")
-
-    m_startTime = mpu::timestamp("%Y-%m-%d_%H:%M");
     m_workerThread = std::thread(&ResultStorageManager::worker, this);
 }
 

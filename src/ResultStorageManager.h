@@ -5,7 +5,7 @@
  * @author: Hendrik Schwanekamp
  * @mail:   hendrik.schwanekamp@gmx.net
  *
- * Implements the ResultStorageManager class
+ * Implements the ResultStorageManager class, which saves simulation results into files.
  *
  * Copyright (c) 2018 Hendrik Schwanekamp
  *
@@ -47,9 +47,19 @@ struct OngoingTransfer
 //-------------------------------------------------------------------
 /**
  * class ResultStorageManager
- * Stores Simulation results in a file.
+ * Stores Simulation results in a file. The file is a tab seperated text file with one line for each particle.
+ * Position, mass, velocity and density are stored for each particle. An output file can be used directly as an
+ * input file for the "TextFile" particle source.
+ * Filenames consist of the start time of the simulation and the current simulation time of the snapshot that is
+ * being saved in the file. File i/o operation as well as copying from device to host are
+ * handled in asyncronus to the simulation.
  *
  * usage:
+ * Create an object of this class specifying an existing folder where simulation results are stored.
+ * You also pass a prefix for the filename of this simulation and a maximum number of storage jobs that can live in
+ * RAM at any given time.
+ * To save a snapshot call printToFile() with your particle buffer. The function will duplicate the data that is needed
+ * for storing and then return, while the actual file operations are handled in a different thread.
  *
  */
 class ResultStorageManager
@@ -59,34 +69,34 @@ public:
     ~ResultStorageManager();
 
     template<typename deviceParticleType>
-    void printToFile(deviceParticleType particles, f1_t time);
+    void printToFile(deviceParticleType particles, f1_t time); //!< add a simulation snapshot to the storage queue
 
 private:
 
-    std::string m_directory;
-    std::string m_prefix;
-    std::string m_startTime;
+    const std::string m_directory; //!< the directory where all the snapshots are saved
+    const std::string m_prefix; //!< prefix for files of the current simulation
+    const std::string m_startTime; //!< the timestamp of when the simulation was started
 
-    const int m_maxQueue;
+    const int m_maxQueue; //!< the maximum number of jobs waiting in the queue before the simulation is paused
 
-    using hdcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >;
-    using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >;
+    using hdcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >; //!< type of elements in first queue
+    using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >; //!< type of elements in third queue
 
-    std::queue<hdcQueueType> m_hostDeviceCopy;
-    std::queue<OngoingTransfer> m_ongoingTransfers;
-    std::queue<ddcQueueType> m_deviceDiskCopy;
+    std::queue<hdcQueueType> m_hostDeviceCopy; //!< device data that is waiting to be transfered to host memory
+    std::queue<OngoingTransfer> m_ongoingTransfers; //!< currently running memory transfers from device to host
+    std::queue<ddcQueueType> m_deviceDiskCopy; //!< host data waiting to be written to a file
 
-    std::mutex m_hdcMutex;
-    std::mutex m_ddcMutex;
-    std::mutex m_workerMutex;
-    std::condition_variable m_workSignal;
+    std::mutex m_hdcMutex; //!< murtex for first queue
+    std::mutex m_ddcMutex; //!< mutex for third queue
+    std::mutex m_workerMutex; //!< mutex for the conditional variable of the worker thread
+    std::condition_variable m_workSignal; //!< conditional variable to signal the worker thread when work is availible
 
-    bool m_terminateWorker;
-    std::atomic_int m_numberJobs;
-    std::thread m_workerThread;
-    void worker();
+    bool m_terminateWorker; //!< set to true to terminate the worker thread once all jobs are done
+    std::atomic_int m_numberJobs; //!< the number of jobs currently in all queues
+    std::thread m_workerThread; //!< handle to the worker thread
+    void worker(); //!< main function of the worker thread
 
-    void printTextFile(ddcQueueType data);
+    void printTextFile(ddcQueueType data); //!< function to actually print data to a file
 };
 
 
