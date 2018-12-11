@@ -14,10 +14,8 @@
 // includes
 //--------------------
 #include <mpUtils/mpCuda.h>
+#include "settings/precisionSettings.h"
 //--------------------
-
-#define SINGLE_PRECISION
-//#define DOUBLE_PRECISION
 
 /**
  * @brief enum class to specialize templates on different dimensions

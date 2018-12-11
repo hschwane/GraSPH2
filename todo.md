@@ -25,13 +25,12 @@
 
 ### frontend
 - runtime coloring switches on openGL
+- resize callback for openGL
 - fix opengl frontend camera
-- better options for both frontends
 
 ### usability
 - write installation instructions
 - more runtime options vs compiletime options
-- add some real time control and feedback to the frontends
 
 ### simulation managemant
 - make the compute derivitives function more organized
@@ -47,12 +46,17 @@
 ### output data handling
 - use pinned host memory here
 - remove the stream sync points
-- add limit of pending copy operations
 
 # finished
 for personal motivation, all finished todo entries are moved here instead of beeing deleted
 
-- add possibility to dump simulation to file
+- add functionality to the console frontend
+- add some more feedback to the frontends
+- add limit of pending copy operations for output data handling
+- add possibility to dump simulation results to file
 - add source to generate from file
 - make the demo simulation from the settings file work with the uniform sphere generator
 - add some kind of setting file
+- start cleaning the main.cu file
+- rewrite build system
+- reorder project files

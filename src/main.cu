@@ -28,7 +28,7 @@
 #include "sph/eos.h"
 #include "sph/models.h"
 #include "ResultStorageManager.h"
-#include "settings.h"
+#include "settings/settings.h"
 
 /**
  * @brief calculates the number of cuda blocks to be launched
@@ -272,7 +272,7 @@ int main()
     // calculate sound speed
     const f1_t SOUNDSPEED = sqrt(BULK / rho0);
 
-#ifdef STORE_RESULTS
+#if defined(STORE_RESULTS)
     // set up file saving engine
     ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
     storage.printToFile(pb,0);
@@ -303,7 +303,7 @@ int main()
 
             simulatedTime += timestep;
 
-#ifdef STORE_RESULTS
+#if defined(STORE_RESULTS)
             timeSinceStore += timestep;
             if( timeSinceStore >= store_intervall)
             {

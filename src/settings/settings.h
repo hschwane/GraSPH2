@@ -11,16 +11,15 @@
 #ifndef GRASPH2_SETTINGS_H
 #define GRASPH2_SETTINGS_H
 
-// -------------------
-// general
-
-// enable to use double precision floating point numbers (slow !!)
-//#define DOUBLE_PRECISION
-
+// includes
 // -------------------
 #include "types.h"
 #include "particles/Particles.h"
 // -------------------
+
+
+// -------------------
+// general
 
 // 2D or 3D simulation (for 2D simulation, make sure all particles have 0 values in z components of position and velocity))
 //constexpr Dim dimension=Dim::two;
@@ -36,6 +35,7 @@ constexpr f1_t timestep=0.0003;
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 
+
 //--------------------
 // initial conditions
 
@@ -47,7 +47,7 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
-// NUMBER OF PARTICLES MUST BE A POWER OF TWO !!!
+// NUMBER OF PARTICLES MUST BE A POWER OF TWO!
 // The Order of the parameter is assumed to be as follows:
 // POS_x | POS_y | POS_z | VEL_x | VEL_y | VEL_z | MASS | DENSITY
 //#define READ_FROM_FILE
@@ -61,6 +61,7 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 constexpr f1_t tmass = 0.5; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles must be a power of two
 constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
+
 
 // --------------------
 // Material settings
