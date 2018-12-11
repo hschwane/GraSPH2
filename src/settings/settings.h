@@ -17,6 +17,10 @@
 #include "particles/Particles.h"
 // -------------------
 
+// This file contains all important settings for the GraSPH2 simulation code.
+// Entries of the style "constexpr type name = value" can be just be set to the value you need.
+// Entries of the style "#define NAME" are on/off switches. Comment out a line to turn the feature off.
+// You will find some additional settings in the headlessSettings.h and precisionSettings.h files.
 
 // -------------------
 // general
@@ -30,11 +34,16 @@ constexpr f1_t timestep=0.0003;
 
 // storing results as file
 #define STORE_RESULTS
-#define RESULT_FOLDER "/home/hendrik/test/" // results will be stored in this folder
-#define RESULT_PREFIX "graSPH2_" // prefix for filename
+constexpr char RESULT_FOLDER[] = "/home/hendrik/test/"; // results will be stored in this folder
+constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 
+// enable / disable self gravity
+#define ENABLE_SELF_GRAVITY
+
+// enable / disable SPH simulation
+#define ENABLE_SPH
 
 //--------------------
 // initial conditions
@@ -95,14 +104,14 @@ constexpr f1_t alpha = 1; // strength of artificial viscosity
 
 // artificial stress to prevent particle clumps
 // not needed for most simulations
-#define ARTIFICIAL_STRESS
-constexpr f1_t mateps = 0.0;
+//#define ARTIFICIAL_STRESS
+constexpr f1_t mateps = 0.4;
 constexpr f1_t matexp = 4;
 constexpr f1_t normalsep = H*0.3;
 
 // enable XSPH, a technique to smooth the velocity field
 //#define XSPH
-constexpr f1_t xsph_factor = 1;
+constexpr f1_t xsph_factor = 0.5;
 
 
 //--------------------

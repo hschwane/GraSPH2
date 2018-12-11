@@ -2,8 +2,6 @@
 
 ## high priority
 
-- make all settings from the settings file actually work
-
 ## medium priority
 
 ### bugfixes
@@ -34,8 +32,9 @@
 
 ### simulation managemant
 - make the compute derivitives function more organized
-- add some kind of structure to the deriviative computation
 - find better solution for the stuff in the algorithms file
+- find better solution to switch options on and off
+- find better solution for 2D simulation
 
 ### simulation features
 - add functionality from the other branch
@@ -43,13 +42,21 @@
 - investigate angular momentum (not)conservation
 - add collisional merging simulation
 
+### performance
+- somehow automatically adjust particle attributes based on options
+- optimize the functions in models.h
+- add datastructures
+
 ### output data handling
 - use pinned host memory here
 - remove the stream sync points
 
-# finished
-for personal motivation, all finished todo entries are moved here instead of beeing deleted
 
+# finished
+for motivation, all finished todo entries are moved here instead of beeing deleted
+
+- add some kind of structure to the deriviative computation
+- make all settings from the settings file actually work
 - add functionality to the console frontend
 - add some more feedback to the frontends
 - add limit of pending copy operations for output data handling

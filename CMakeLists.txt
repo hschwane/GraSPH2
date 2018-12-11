@@ -65,7 +65,6 @@ target_sources(GraSPH2 PRIVATE
                 "src/main.cu"
                 "src/ResultStorageManager.cu"
                 "src/sph/eos.cu"
-                "src/sph/models.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
                 "src/initialConditions/particleSources/TextFile.cu"
                 "src/dummy.cpp"
