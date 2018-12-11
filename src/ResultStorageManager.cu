@@ -20,8 +20,9 @@
 // function definitions of the ResultStorageManager class
 //-------------------------------------------------------------------
 
-ResultStorageManager::ResultStorageManager(std::string directory, std::string prefix) : m_terminateWorker(false)
+ResultStorageManager::ResultStorageManager(std::string directory, std::string prefix) : m_directory(directory), m_prefix(prefix), m_terminateWorker(false)
 {
+    m_startTime = mpu::timestamp("%Y-%m-%d_%H:%M");
     m_workerThread = std::thread(&ResultStorageManager::worker, this);
 }
 
@@ -75,7 +76,7 @@ void ResultStorageManager::worker()
                 ddc_lck.unlock();
 
                 logINFO("ResultStorageManager") << "Results stored for t= " << hostData.second;
-                // writeToFile(hostData);
+                printTextFile(std::move(hostData));
             } else
                 ddc_lck.unlock();
 
@@ -93,4 +94,38 @@ ResultStorageManager::~ResultStorageManager()
         m_workSignal.notify_one();
     }
     m_workerThread.join();
+}
+
+void ResultStorageManager::printTextFile(ResultStorageManager::ddcQueueType data)
+{
+    std::string filename = m_directory + m_prefix + m_startTime + "_" + mpu::toString(data.second)+".tsv";
+    std::ofstream file(filename);
+
+    if(!file.is_open())
+    {
+        logERROR("ResultStorageManager") << "Could not open output file: " << filename << " Make sure the path actually exists.";
+        logFlush();
+        throw std::runtime_error("Could not open output file.");
+    }
+
+    for(int i = 0; i < data.first->size(); ++i)
+    {
+        auto p = data.first->loadParticle<DiscPbases>(i);
+
+        file << p.pos.x << "\t"
+             << p.pos.y << "\t"
+             << p.pos.z << "\t"
+             << p.vel.x << "\t"
+             << p.vel.y << "\t"
+             << p.vel.z << "\t"
+             << p.mass << "\t"
+             << p.density << "\n";
+    }
+
+    if(file.fail())
+    {
+        logERROR("ResultStorageManager") << "Error writing output file: " << filename;
+        logFlush();
+        throw std::runtime_error("Could not write to output file.");
+    }
 }

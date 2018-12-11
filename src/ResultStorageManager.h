@@ -25,7 +25,8 @@
 // particle parameters that are saved to disk
 using DeviceDiscPT = Particles<DEV_POSM,DEV_VEL,DEV_DENSITY>;
 using HostDiscPT = Particles<DEV_POSM,DEV_VEL,DEV_DENSITY>;
-using DiscPT = Particle<POS,MASS,VEL,DENSITY>;
+#define DiscPbases POS,MASS,VEL,DENSITY
+using DiscPT = Particle<DiscPbases>;
 
 /**
  * @brief store information about ongoing memory transfer
@@ -65,6 +66,7 @@ private:
     // the path where things will be written
     std::string m_directory;
     std::string m_prefix;
+    std::string m_startTime;
 
     using hdcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >;
     using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >;
@@ -81,6 +83,8 @@ private:
     bool m_terminateWorker;
     std::thread m_workerThread;
     void worker();
+
+    void printTextFile(ddcQueueType data);
 };
 
 

@@ -47,6 +47,8 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
 // NUMBER OF PARTICLES MUST BE A POWER OF TWO !!!
+// The Order of the parameter is assumed to be as follows:
+// POS_x | POS_y | POS_z | VEL_x | VEL_y | VEL_z | MASS | DENSITY
 //#define READ_FROM_FILE
 #define FILENAME "/some/path/inputData.tsv"
 constexpr char SEPERATOR='\t';
