@@ -24,7 +24,6 @@
 ### frontend
 - runtime coloring switches on openGL
 - resize callback for openGL
-- fix opengl frontend camera
 
 ### usability
 - write installation instructions
@@ -51,10 +50,16 @@
 - use pinned host memory here
 - remove the stream sync points
 
+### library / utils
+- add to string for cuda data types
+- fix opengl frontend camera
+- use logFlush for cuda assert
+
 
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
 
+--- v0.2.0 ---
 - add some kind of structure to the deriviative computation
 - make all settings from the settings file actually work
 - add functionality to the console frontend
