@@ -2,7 +2,6 @@
 
 ## high priority
 
-- add possibility to dump simulation to file
 - make all settings from the settings file actually work
 
 ## medium priority
@@ -45,3 +44,4 @@
 ### output data handling
 - use pinned host memory here
 - remove the stream sync points
+- add limit of pending copy operations

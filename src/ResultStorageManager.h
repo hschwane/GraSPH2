@@ -24,7 +24,7 @@
 
 // particle parameters that are saved to disk
 using DeviceDiscPT = Particles<DEV_POSM,DEV_VEL,DEV_DENSITY>;
-using HostDiscPT = Particles<DEV_POSM,DEV_VEL,DEV_DENSITY>;
+using HostDiscPT = Particles<HOST_POSM,HOST_VEL,HOST_DENSITY>;
 #define DiscPbases POS,MASS,VEL,DENSITY
 using DiscPT = Particle<DiscPbases>;
 
