@@ -228,7 +228,7 @@ int main()
     buildType = "Debug"
 #endif
 
-    myLog.printHeader("GraSPH2","","",buildType);
+    myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 

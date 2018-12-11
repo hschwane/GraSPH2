@@ -111,6 +111,9 @@ set_target_properties(GraSPH2 PROPERTIES
         CUDA_STANDARD_REQUIRED YES
         )
 
+target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION=\"${VERSION_SHORT}\"")
+target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION_SHA=\"${VERSION_SHA1}\"")
+
 # force c++17 if using opengl
 if(OPENGL_FRONTEND)
     set_target_properties(GraSPH2 PROPERTIES CXX_STANDARD 17)
