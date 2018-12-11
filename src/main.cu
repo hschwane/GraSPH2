@@ -221,7 +221,14 @@ int main()
 {
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
-    myLog.printHeader("GraSPH2");
+    std::string buildType;
+#if defined(NDEBUG)
+    buildType = "Release";
+#else
+    buildType = "Debug"
+#endif
+
+    myLog.printHeader("GraSPH2","","",buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 
@@ -267,7 +274,7 @@ int main()
 
 #ifdef STORE_RESULTS
     // set up file saving engine
-    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX);
+    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
     storage.printToFile(pb,0);
     f1_t timeSinceStore=timestep;
 #endif
@@ -298,10 +305,10 @@ int main()
 
 #ifdef STORE_RESULTS
             timeSinceStore += timestep;
-            if( timeSinceStore > store_intervall)
+            if( timeSinceStore >= store_intervall)
             {
                 storage.printToFile(pb,simulatedTime);
-                timeSinceStore=0;
+                timeSinceStore-=store_intervall;
             }
 #endif
 

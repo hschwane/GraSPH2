@@ -55,7 +55,7 @@ struct OngoingTransfer
 class ResultStorageManager
 {
 public:
-    ResultStorageManager(std::string directory, std::string prefix);
+    ResultStorageManager(std::string directory, std::string prefix, int maxJobs);
     ~ResultStorageManager();
 
     template<typename deviceParticleType>
@@ -63,10 +63,11 @@ public:
 
 private:
 
-    // the path where things will be written
     std::string m_directory;
     std::string m_prefix;
     std::string m_startTime;
+
+    const int m_maxQueue;
 
     using hdcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >;
     using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >;
@@ -81,6 +82,7 @@ private:
     std::condition_variable m_workSignal;
 
     bool m_terminateWorker;
+    std::atomic_int m_numberJobs;
     std::thread m_workerThread;
     void worker();
 
@@ -94,6 +96,20 @@ private:
 template<typename deviceParticleType>
 void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
 {
+    // wait for things to be written so memory frees up
+    if(m_numberJobs > m_maxQueue)
+    {
+        logWARNING("ResultStorageManager") << "Storage Queue full. Pausing simulation until data is written to file.";
+        while( m_numberJobs>1)
+        {
+
+            mpu::yield();
+            mpu::sleep_ms(10);
+        }
+    }
+    m_numberJobs++;
+
+    // try to buffer in gpu memory
     try
     {
         std::unique_ptr<DeviceDiscPT> downloadCopy(new DeviceDiscPT(particles));

@@ -29,11 +29,12 @@ constexpr Dim dimension=Dim::three;
 // the integration timestep for the constant timestep leapfrog integrator
 constexpr f1_t timestep=0.0003;
 
-// storing results in this folder
+// storing results as file
 #define STORE_RESULTS
-#define RESULT_FOLDER "/home/hendrik/test/"
-#define RESULT_PREFIX "grasp_"
-constexpr f1_t store_intervall=0.2;
+#define RESULT_FOLDER "/home/hendrik/test/" // results will be stored in this folder
+#define RESULT_PREFIX "graSPH2_" // prefix for filename
+constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
+constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 
 //--------------------
 // initial conditions
