@@ -18,7 +18,7 @@ endif()
 # -------------------------------------------------------------
 enable_language(CXX)
 enable_language(CUDA)
-find_package(mpUtils 0.9.2 REQUIRED)
+find_package(mpUtils 0.9.3 REQUIRED)
 
 
 # -------------------------------------------------------------
