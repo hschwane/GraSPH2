@@ -54,7 +54,7 @@
 - add to string for cuda data types
 - fix opengl frontend camera
 - use logFlush for cuda assert
-
+- fix cmake bug with multiple cuda gencode arguments
 
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
