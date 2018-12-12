@@ -58,7 +58,7 @@ endif()
 # -------------------------------------------------------------
 
 # create target
-add_executable(GraSPH2)
+add_executable(GraSPH2 "src/dummy.cpp")
 
 # add general source files
 target_sources(GraSPH2 PRIVATE
@@ -67,7 +67,6 @@ target_sources(GraSPH2 PRIVATE
                 "src/sph/eos.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
                 "src/initialConditions/particleSources/TextFile.cu"
-                "src/dummy.cpp"
             )
 
 # add frontend dependend source files
