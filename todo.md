@@ -22,10 +22,9 @@
 
 ### frontend
 - runtime coloring switches on openGL
-- resize callback for openGL
+- allow runtime changing particle size in openGL mode
 
 ### usability
-- write installation instructions
 - more runtime options vs compiletime options
 
 ### simulation managemant
@@ -63,8 +62,10 @@
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
 
-
+- resize callback for openGL
 - fix particle numbers that are not power of 2
+- write installation instructions
+
 --- v0.2.0 ---
 - add some kind of structure to the deriviative computation
 - make all settings from the settings file actually work

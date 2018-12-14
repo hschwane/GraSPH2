@@ -31,7 +31,7 @@ enum class Falloff
 
 // settings
 //--------------------
-glm::uvec2 SIZE = {800,800};
+glm::uvec2 SIZE = {800,800}; //!< initial and current size of the window
 constexpr char TITLE[] = "sph";
 
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
@@ -129,6 +129,14 @@ void recompileShader()
     shader.uniform4f("defaultColor",particleColor);
 }
 
+void window_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0,0,width,height);
+    camera().setAspect( float(width) / height);
+    SIZE={width,height};
+    shader.uniform2f("viewport_size", glm::vec2(SIZE));
+}
+
 }
 
 //-------------------------------------------------------------------
@@ -137,7 +145,7 @@ void initializeFrontend()
 {
     using namespace oglFronted;
 
-    window();
+    window().setSizeCallback(window_size_callback);
 
     mpu::gph::addShaderIncludePath(MPU_LIB_SHADER_PATH);
     mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
