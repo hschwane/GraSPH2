@@ -56,7 +56,6 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
-// NUMBER OF PARTICLES MUST BE A POWER OF TWO!
 // The Order of the parameter is assumed to be as follows:
 // POS_x | POS_y | POS_z | VEL_x | VEL_y | VEL_z | MASS | DENSITY
 //#define READ_FROM_FILE
@@ -68,7 +67,7 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 // only use this with 3D simulations
 #define ROTATING_UNIFORM_SPHERE
 constexpr f1_t tmass = 0.5; // total mass of the sphere
-constexpr f1_t particle_count=1<<14; // number of particles must be a power of two
+constexpr f1_t particle_count=1<<14; // number of particles
 constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
 
 

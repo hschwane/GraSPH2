@@ -54,6 +54,11 @@ __global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSo
             MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS), MPU_COMMA_LIST(ACC,XVEL,DENSITY_DT,DSTRESS_DT),
             MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS),
 
+//    DO_FOR_EACH_PAIR(particles,
+//            MPU_COMMA_LIST(POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT),
+//            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS), MPU_COMMA_LIST(ACC,XVEL,DENSITY_DT,DSTRESS_DT),
+//            MPU_COMMA_LIST(POS,MASS,VEL,DENSITY,DSTRESS),
+
     // code executed for each particle once before it starts interacting with neighbours
 
 #if defined(ENABLE_SPH)
@@ -241,13 +246,6 @@ int main()
 #endif
 
     auto hpb = generator.generate();
-    if( hpb.size()==0 || (hpb.size() & (hpb.size() - 1)) )
-    {
-        logFATAL_ERROR("InitialConditions") << "Particle count of " << hpb.size()
-                                            << " is not a power of two. Only power of two particle counts are currently supported!";
-        myLog.flush();
-        throw std::runtime_error("Particle count not supported!");
-    }
 
     // create cuda buffer
     DeviceParticlesType pb(hpb.size());
@@ -260,7 +258,7 @@ int main()
     // upload particles
     pb = hpb;
 
-    // calculate sound speed
+    // calculate sound speed and tangents of friction angle
     const f1_t SOUNDSPEED = sqrt(BULK / rho0);
     const f1_t tanfr = tan(friction_angle);
 
@@ -276,6 +274,7 @@ int main()
     assert_cuda(cudaGetLastError());
     integrateLeapfrog<<<NUM_BLOCKS(pb.size()),BLOCK_SIZE>>>(pb.createDeviceCopy(),timestep,false,tanfr);
     assert_cuda(cudaGetLastError());
+
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
     simulatedTime += startTime;

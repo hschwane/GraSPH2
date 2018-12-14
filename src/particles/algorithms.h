@@ -66,17 +66,18 @@
  * @param PAIR_CODE code to be executed for each pair of particles, the particles are named pi and pj
  * @param SINGLE_CODE code to be executed after all interactions before pi is saved to global memory
  */
-#define DO_FOR_EACH_PAIR( PARTICLES, BASES_OF_I, BASES_OF_I_TO_LOAD, BASES_OF_I_TO_STORE, BASES_OF_J, PAIR_CODE, SINGLE_CODE)\
+#define DO_FOR_EACH_PAIR( PARTICLES, BASES_OF_I, BASES_OF_I_TO_LOAD, BASES_OF_I_TO_STORE, BASES_OF_J, SINGLE_CODEA, PAIR_CODE, SINGLE_CODEB)\
 {\
     for(const auto &i : mpu::gridStrideRange( PARTICLES .size())) \
     { \
         Particle< BASES_OF_I > pi = PARTICLES .loadParticle< BASES_OF_I_TO_LOAD >(i); \
+        SINGLE_CODEA \
         for(const auto &j : mpu::Range<int>( PARTICLES .size())) \
         { \
             const auto pj = PARTICLES .loadParticle< BASES_OF_J >(j); \
             PAIR_CODE \
         } \
-        SINGLE_CODE \
+        SINGLE_CODEB \
         PARTICLES .storeParticle(i, static_cast<Particle< BASES_OF_I_TO_STORE >>(pi)); \
     } \
 }
@@ -107,11 +108,15 @@
         const int numTiles = (PARTICLES .size() + thisTileSize - 1) / thisTileSize; \
         for (int tile = 0; tile < numTiles; tile++) \
         { \
-            const auto p = PARTICLES .loadParticle< BASES_OF_J >(tile*TILE_SIZE+threadIdx.x); \
-            shared.storeParticle(threadIdx.x,p); \
+            int loadIndex = tile*TILE_SIZE+threadIdx.x; \
+            if( loadIndex < PARTICLES .size()) \
+            {\
+                const auto p = PARTICLES .loadParticle< BASES_OF_J >(tile*TILE_SIZE+threadIdx.x); \
+                shared.storeParticle(threadIdx.x,p); \
+            }\
             __syncthreads(); \
             \
-            for(int j = 0; j < thisTileSize; j++) \
+            for(int j = 0; j < thisTileSize && (j+remain < thisTileSize || tile < numTiles); j++) \
             { \
                 const auto pj = shared.template loadParticle< BASES_OF_J >(j);\
                 PAIR_CODE \

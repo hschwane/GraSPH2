@@ -5,7 +5,6 @@
 ## medium priority
 
 ### bugfixes
-- fix particle numbers that are not power of 2
 - fix initialisation of host particle buffer
 
 ### particle management
@@ -41,6 +40,11 @@
 - investigate angular momentum (not)conservation
 - add collisional merging simulation
 
+### integration
+- better structure to different integrators
+- mark deriviatives in the particle buffer
+- adaptive algorithms
+
 ### performance
 - somehow automatically adjust particle attributes based on options
 - optimize the functions in models.h
@@ -59,6 +63,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
 
+
+- fix particle numbers that are not power of 2
 --- v0.2.0 ---
 - add some kind of structure to the deriviative computation
 - make all settings from the settings file actually work
