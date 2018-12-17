@@ -60,6 +60,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- use different cuda stream for downloading data
 - fix opengl frontend camera in mpUtils
 - use logFlush for cuda assert in mpUtils
 - add output operator for cuda data types in mpUtils

@@ -13,6 +13,7 @@ if(EXISTS "${LOC_PATH}")
     message(FATAL_ERROR "You cannot build in a source directory (or any directory with a CMakeLists.txt file). Please make a build subdirectory. Feel free to remove CMakeCache.txt and CMakeFiles.")
 endif()
 
+
 # -------------------------------------------------------------
 # find dependencies
 # -------------------------------------------------------------
@@ -53,6 +54,7 @@ if(NOT mpUtils_CUDA_AVAILIBLE)
     message(SEND_ERROR "The mpUtils instalation was compiled without cuda support, however cuda support is needed.")
 endif()
 
+
 # -------------------------------------------------------------
 # create target
 # -------------------------------------------------------------
@@ -88,6 +90,7 @@ target_link_libraries(GraSPH2 mpUtils::mpUtils)
 # set cuda code generation flags
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${mpUtils_CUDA_ARCH_FLAGS}")
 
+
 # -------------------------------------------------------------
 # set includes
 # -------------------------------------------------------------
@@ -111,6 +114,8 @@ set_target_properties(GraSPH2 PROPERTIES
 
 target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION=\"${VERSION_SHORT}\"")
 target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION_SHA=\"${VERSION_SHA1}\"")
+
+target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread>)
 
 # force c++17 if using opengl
 if(OPENGL_FRONTEND)
