@@ -56,7 +56,6 @@ Falloff falloffStyle        = Falloff::LINEAR;
 bool perspectiveSize        = true;
 bool roundParticles         = true;
 bool additiveBlending       = false;
-bool depthTest              = true;
 ColorMode colorMode      = ColorMode::CONSTANT;
 float upperBound = 1;   // upper bound of density / velocity transfer function
 float lowerBound = 0.001;   // lower bound of density / velocity transfer function
@@ -106,8 +105,11 @@ int frames{0};
 
 // input
 bool wasCpressed=false;
+bool wasZpressed=false;
 bool needInfoPrintingUpper=false;
 bool needInfoPrintingLower=false;
+bool needInfoPrintingSize=false;
+bool needInfoPrintingBrightness=false;
 
 //--------------------
 
@@ -159,6 +161,21 @@ void window_size_callback(GLFWwindow* window, int width, int height)
     shader.uniform2f("viewport_size", glm::vec2(SIZE));
 }
 
+void setBlending(bool additive)
+{
+    if(additive)
+    {
+        glBlendFunc(GL_ONE, GL_ONE);
+        glEnable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+    }
+    else
+    {
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+    }
+}
+
 }
 
 //-------------------------------------------------------------------
@@ -175,15 +192,7 @@ void initializeFrontend()
     mpu::gph::enableVsync(enableVsync);
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
     glEnable(GL_PROGRAM_POINT_SIZE);
-    if(additiveBlending)
-    {
-        glBlendFunc(GL_ONE, GL_ONE);
-        glEnable(GL_BLEND);
-    }
-    if(depthTest)
-    {
-        glEnable(GL_DEPTH_TEST);
-    }
+    setBlending(additiveBlending);
 
     vao.recreate();
 
@@ -323,16 +332,15 @@ bool handleFrontend(double t)
         needInfoPrintingUpper = false;
     }
 
-
     if(window().getKey(GLFW_KEY_B))
     {
-        lowerBound += (lowerBound+0.1)*0.5f*delta;
+        lowerBound += (lowerBound+std::numeric_limits<float>::min())*0.5f*delta;
         shader.uniform1f("lowerBound",lowerBound);
         needInfoPrintingLower = true;
 
     } else if(window().getKey(GLFW_KEY_Z))
     {
-        lowerBound -= (lowerBound+0.1) * 0.5f*delta;
+        lowerBound -= (lowerBound+std::numeric_limits<float>::min()) * 0.5f*delta;
         lowerBound = (lowerBound < 0) ? 0 : lowerBound;
         shader.uniform1f("lowerBound",lowerBound);
         needInfoPrintingLower = true;
@@ -343,6 +351,55 @@ bool handleFrontend(double t)
         needInfoPrintingLower = false;
     }
 
+    // handle changes of particle size
+    if(window().getKey(GLFW_KEY_R))
+    {
+        particleRenderSize += (particleRenderSize+std::numeric_limits<float>::min())*0.5f*delta;
+        shader.uniform1f("render_size",particleRenderSize);
+        needInfoPrintingSize=true;
+
+    } else if(window().getKey(GLFW_KEY_F))
+    {
+        particleRenderSize -= (particleRenderSize+std::numeric_limits<float>::min()) * 0.5f*delta;
+        particleRenderSize = (particleRenderSize < 0) ? 0 : particleRenderSize;
+        shader.uniform1f("render_size",particleRenderSize);
+        needInfoPrintingSize=true;
+    }
+    else if(needInfoPrintingSize)
+    {
+        logINFO("openGL Frontend") << "Rendered Particle Size: " << particleRenderSize;
+        needInfoPrintingSize = false;
+    }
+
+    // handle changes of particle brightness
+    if(window().getKey(GLFW_KEY_T))
+    {
+        particleBrightness += (particleBrightness+std::numeric_limits<float>::min())*0.5f*delta;
+        shader.uniform1f("brightness",particleBrightness);
+        needInfoPrintingBrightness=true;
+
+    } else if(window().getKey(GLFW_KEY_G))
+    {
+        particleBrightness -= (particleBrightness+std::numeric_limits<float>::min()) * 0.5f*delta;
+        particleBrightness = (particleBrightness < 0) ? 0 : particleBrightness;
+        shader.uniform1f("brightness",particleBrightness);
+        needInfoPrintingBrightness=true;
+    }
+    else if(needInfoPrintingBrightness)
+    {
+        logINFO("openGL Frontend") << "Rendered Particle Brightness: " << particleBrightness;
+        needInfoPrintingBrightness = false;
+    }
+
+    bool key_y=window().getKey(GLFW_KEY_Y);
+    if( key_y && !wasZpressed)
+    {
+        additiveBlending = !additiveBlending;
+        setBlending(additiveBlending);
+        wasZpressed=true;
+    }
+    else if(!key_y && wasZpressed)
+        wasZpressed = false;
 
 
     return window().update();

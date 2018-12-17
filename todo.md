@@ -2,10 +2,11 @@
 
 ## high priority
 
-## medium priority
-
 ### bugfixes
+- fix cmake bug with multiple cuda gencode arguments
 - fix initialisation of host particle buffer
+
+## medium priority
 
 ### particle management
 - somehow make it possible to get the host type from a base buffer
@@ -19,9 +20,7 @@
 - add sources
 - add constructors for uniform sphere
 - add 2d image source from the other branch
-
-### frontend
-- allow runtime changing particle size in openGL mode
+- add python script support to generate initials
 
 ### usability
 - more runtime options vs compiletime options
@@ -37,6 +36,7 @@
 - linear consistency fix
 - investigate angular momentum (not)conservation
 - add collisional merging simulation
+- different materials (using recursive kernel launches)
 
 ### integration
 - better structure to different integrators
@@ -47,21 +47,26 @@
 - somehow automatically adjust particle attributes based on options
 - optimize the functions in models.h
 - add datastructures
+- try new graph style kernel launching
+- MPI support
+- share load between CPU and GPU
 
 ### output data handling
 - use pinned host memory here
 - remove the stream sync points
+- provide binary data format
+- provide python script to generate 3d html plots
 
 ### library / utils
 - add to string for cuda data types
 - fix opengl frontend camera
 - use logFlush for cuda assert
-- fix cmake bug with multiple cuda gencode arguments
 
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
 
-- runtime coloring switches on openGL
+- keys for some rendering settings in openGL mode
+- runtime coloring switches for openGL
 - resize callback for openGL
 - fix particle numbers that are not power of 2
 - write installation instructions
