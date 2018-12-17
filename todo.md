@@ -3,7 +3,6 @@
 ## high priority
 
 ### bugfixes
-- fix cmake bug with multiple cuda gencode arguments
 - fix initialisation of host particle buffer
 
 ## medium priority
@@ -57,21 +56,21 @@
 - provide binary data format
 - provide python script to generate 3d html plots
 
-### library / utils
-- add to string for cuda data types
-- fix opengl frontend camera
-- use logFlush for cuda assert
 
 # finished
-for motivation, all finished todo entries are moved here instead of beeing deleted
+for motivation, all finished todo entries are moved here instead of being deleted
 
+- fix opengl frontend camera in mpUtils
+- use logFlush for cuda assert in mpUtils
+- add output operator for cuda data types in mpUtils
+- fix cmake bug with multiple cuda gencode arguments in mpUtils
 - keys for some rendering settings in openGL mode
 - runtime coloring switches for openGL
 - resize callback for openGL
 - fix particle numbers that are not power of 2
 - write installation instructions
 
---- v0.2.0 ---
+--- v0.2.0 --- 13.12.2018
 - add some kind of structure to the deriviative computation
 - make all settings from the settings file actually work
 - add functionality to the console frontend

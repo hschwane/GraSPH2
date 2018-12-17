@@ -94,7 +94,7 @@ mpu::gph::ShaderProgram shader(nullptr);
 mpu::gph::ModelViewProjection mvp;
 mpu::gph::Camera &camera()
 {
-    static mpu::gph::Camera _internalCamera(std::make_shared<mpu::gph::SimpleWASDController>(&window(),40,2));
+    static mpu::gph::Camera _internalCamera(std::make_shared<mpu::gph::SimpleWASDController>(&window(),10,2));
     return _internalCamera;
 }
 

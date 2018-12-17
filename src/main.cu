@@ -306,10 +306,6 @@ int main()
 
             pb.unmapGraphicsResource(); // used for frontend stuff
         }
-        else
-        {
-            mpu::sleep_ms(2);
-        }
     }
 
     return 0;
