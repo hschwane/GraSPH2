@@ -50,7 +50,7 @@ constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, be
 
 // set a value for the smoothing length H
 // you can also define a radius for a single particle
-constexpr f1_t pradius = 0.1 / 25.398416831491186; // "radius" of a particle
+constexpr f1_t pradius = 0.1 / 25.4; // "radius" of a particle
 constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 
 // read data from a file

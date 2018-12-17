@@ -85,6 +85,8 @@ keyboard to start the simulation. You can pause it again at any time using the "
 key. The Camera can be moved using "W", "A", "S" and "D", like in a video  game.
 To fly up and down use "Q" and "E". "+" and "-" can be used to change the cameras movement speed.
 The console will display some timing information.
+Press "C" to switch between different color visualization modes.
+Use "X" and "V" to scale the transfer function and "Y"and "B" to set the starting value.
 
 ### settings
 

@@ -21,7 +21,6 @@
 - add 2d image source from the other branch
 
 ### frontend
-- runtime coloring switches on openGL
 - allow runtime changing particle size in openGL mode
 
 ### usability
@@ -62,6 +61,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of beeing deleted
 
+- runtime coloring switches on openGL
 - resize callback for openGL
 - fix particle numbers that are not power of 2
 - write installation instructions

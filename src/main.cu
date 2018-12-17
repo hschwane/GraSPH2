@@ -221,7 +221,7 @@ int main()
 #if defined(NDEBUG)
     buildType = "Release";
 #else
-    buildType = "Debug"
+    buildType = "Debug";
 #endif
 
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
@@ -252,6 +252,7 @@ int main()
 #if defined(FRONTEND_OPENGL)
     pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
     pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
+    pb.registerGLGraphicsResource<DEV_DENSITY>(fnd::getDensityBuffer(pb.size()));
     pb.mapGraphicsResource();
 #endif
 

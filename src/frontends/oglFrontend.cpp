@@ -20,6 +20,7 @@
 namespace fnd {
 namespace oglFronted {
 
+//!< differnt falloff types
 enum class Falloff
 {
     NONE,
@@ -28,6 +29,17 @@ enum class Falloff
     CUBED,
     ROOT
 };
+
+//!< different coloring modes
+enum class ColorMode
+{
+    CONSTANT = 0,
+    VELOCITY = 1,
+    SPEED = 2,
+    DENSITY = 3
+};
+int numColorModes=4;
+std::string colorModeToString[] = {"constant","velocity","speed","density"};
 
 // settings
 //--------------------
@@ -45,7 +57,9 @@ bool perspectiveSize        = true;
 bool roundParticles         = true;
 bool additiveBlending       = false;
 bool depthTest              = true;
-bool colorcodeVelocity      = false;
+ColorMode colorMode      = ColorMode::CONSTANT;
+float upperBound = 1;   // upper bound of density / velocity transfer function
+float lowerBound = 0.001;   // lower bound of density / velocity transfer function
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 double printIntervall       = 4.0;
 
@@ -56,6 +70,7 @@ constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
 
 constexpr int POS_BUFFER_BINDING = 0;
 constexpr int VEL_BUFFER_BINDING = 1;
+constexpr int DENSITY_BUFFER_BINDING = 2;
 //--------------------
 
 // internal global variables
@@ -72,6 +87,7 @@ std::function<void(bool)> pauseHandler; //!< function to be calles when the simu
 size_t particleCount{0};
 mpu::gph::Buffer positionBuffer(nullptr);
 mpu::gph::Buffer velocityBuffer(nullptr);
+mpu::gph::Buffer densityBuffer(nullptr);
 mpu::gph::VertexArray vao(nullptr);
 mpu::gph::ShaderProgram shader(nullptr);
 
@@ -88,6 +104,11 @@ double delta{0};
 double time{0};
 int frames{0};
 
+// input
+bool wasCpressed=false;
+bool needInfoPrintingUpper=false;
+bool needInfoPrintingLower=false;
+
 //--------------------
 
 void recompileShader()
@@ -97,8 +118,6 @@ void recompileShader()
         definitions.push_back({"PARTICLES_PERSPECTIVE"});
     if(roundParticles)
         definitions.push_back({"PARTICLES_ROUND"});
-    if(colorcodeVelocity)
-        definitions.push_back({"COLORCODE_VELOCITY"});
 
     switch(falloffStyle)
     {
@@ -127,6 +146,9 @@ void recompileShader()
     shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
     shader.uniformMat4("projection", glm::mat4(1.0f));
     shader.uniform4f("defaultColor",particleColor);
+    shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
+    shader.uniform1f("upperBound",upperBound);
+    shader.uniform1f("lowerBound",lowerBound);
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -214,6 +236,26 @@ uint32_t getVelocityBuffer(size_t n)
     return velocityBuffer;
 }
 
+uint32_t getDensityBuffer(size_t n)
+{
+    using namespace oglFronted;
+
+    if(particleCount != 0)
+    {
+        assert_critical(particleCount == n, "openGL Frontend",
+                        "You can not initialize position and density buffer with different particle numbers.");
+    }
+    else
+        particleCount = n;
+
+
+    densityBuffer.recreate();
+    densityBuffer.allocate<float>(particleCount);
+    vao.addAttributeBufferArray(DENSITY_BUFFER_BINDING,densityBuffer,0, sizeof(float),4,0);
+
+    return densityBuffer;
+}
+
 void setPauseHandler(std::function<void(bool)> f)
 {
     using namespace oglFronted;
@@ -249,6 +291,59 @@ bool handleFrontend(double t)
         pauseHandler(false);
     if(window().getKey(GLFW_KEY_2))
         pauseHandler(true);
+
+    // handle change of coloring mode
+    bool key_c = window().getKey(GLFW_KEY_C);
+    if( key_c && !wasCpressed)
+    {
+        colorMode = static_cast<ColorMode>( (static_cast<int>(colorMode) + 1) % numColorModes);
+        shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
+        logINFO("openGL Frontend") << "Color Mode: " << colorModeToString[static_cast<unsigned int>(colorMode)];
+        wasCpressed=true;
+    }
+    else if( !key_c && wasCpressed)
+        wasCpressed = false;
+
+    if(window().getKey(GLFW_KEY_V))
+    {
+        upperBound += (upperBound+0.1)*0.5f*delta;
+        shader.uniform1f("upperBound",upperBound);
+        needInfoPrintingUpper = true;
+    }
+    else if(window().getKey(GLFW_KEY_X))
+    {
+        upperBound -= (upperBound+0.1) * 0.5f*delta;
+        upperBound = (upperBound < 0) ? 0 : upperBound;
+        shader.uniform1f("upperBound",upperBound);
+        needInfoPrintingUpper = true;
+    }
+    else if(needInfoPrintingUpper)
+    {
+        logINFO("openGL Frontend") << "Transfer function lower bound: " << lowerBound << " upper bound: " << upperBound;
+        needInfoPrintingUpper = false;
+    }
+
+
+    if(window().getKey(GLFW_KEY_B))
+    {
+        lowerBound += (lowerBound+0.1)*0.5f*delta;
+        shader.uniform1f("lowerBound",lowerBound);
+        needInfoPrintingLower = true;
+
+    } else if(window().getKey(GLFW_KEY_Z))
+    {
+        lowerBound -= (lowerBound+0.1) * 0.5f*delta;
+        lowerBound = (lowerBound < 0) ? 0 : lowerBound;
+        shader.uniform1f("lowerBound",lowerBound);
+        needInfoPrintingLower = true;
+    }
+    else if(needInfoPrintingLower)
+    {
+        logINFO("openGL Frontend") << "Transfer function lower bound: " << lowerBound << " upper bound: " << upperBound;
+        needInfoPrintingLower = false;
+    }
+
+
 
     return window().update();
 }
