@@ -66,7 +66,6 @@ add_executable(GraSPH2 "src/dummy.cpp")
 target_sources(GraSPH2 PRIVATE
                 "src/main.cu"
                 "src/ResultStorageManager.cu"
-                "src/sph/eos.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
                 "src/initialConditions/particleSources/TextFile.cu"
             )
