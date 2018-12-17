@@ -60,6 +60,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.2.2 --- 17.12.2018
 - use different cuda stream for downloading data
 - fix opengl frontend camera in mpUtils
 - use logFlush for cuda assert in mpUtils
@@ -71,7 +72,11 @@ for motivation, all finished todo entries are moved here instead of being delete
 - fix particle numbers that are not power of 2
 - write installation instructions
 
---- v0.2.0 --- 13.12.2018
+--- v0.2.1 --- 13.12.2018
+- add example SLURM job script
+- fix compilation with older cmake 1.10
+
+--- v0.2.0 --- 12.12.2018
 - add some kind of structure to the deriviative computation
 - make all settings from the settings file actually work
 - add functionality to the console frontend
