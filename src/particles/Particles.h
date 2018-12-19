@@ -27,15 +27,15 @@
 //-------------------------------------------------------------------
 // create bases for particles and particle buffers
 
-MAKE_PARTICLE_BASE(POS,pos,f3_t);
-MAKE_PARTICLE_BASE(MASS,mass,f1_t);
-MAKE_PARTICLE_BASE(VEL,vel,f3_t);
-MAKE_PARTICLE_BASE(ACC,acc,f3_t);
-MAKE_PARTICLE_BASE(XVEL,xvel,f3_t);
-MAKE_PARTICLE_BASE(DENSITY,density,f1_t);
-MAKE_PARTICLE_BASE(DENSITY_DT,density_dt,f1_t);
-MAKE_PARTICLE_BASE(DSTRESS,dstress,m3_t);
-MAKE_PARTICLE_BASE(DSTRESS_DT,dstress_dt,m3_t);
+MAKE_PARTICLE_BASE(POS,pos,f3_t, deriv_of_nothing);
+MAKE_PARTICLE_BASE(MASS,mass,f1_t, deriv_of_nothing);
+MAKE_PARTICLE_BASE(VEL,vel,f3_t, POS);
+MAKE_PARTICLE_BASE(ACC,acc,f3_t, VEL);
+MAKE_PARTICLE_BASE(XVEL,xvel,f3_t, POS);
+MAKE_PARTICLE_BASE(DENSITY,density,f1_t, deriv_of_nothing);
+MAKE_PARTICLE_BASE(DENSITY_DT,density_dt,f1_t, DENSITY);
+MAKE_PARTICLE_BASE(DSTRESS,dstress,m3_t, deriv_of_nothing);
+MAKE_PARTICLE_BASE(DSTRESS_DT,dstress_dt,m3_t, DSTRESS);
 
 //-------------------------------------------------------------------
 // 3D position as f4_t
