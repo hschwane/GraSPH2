@@ -18,6 +18,9 @@
 #include "ext_base_cast.h"
 //--------------------
 
+//!< class to identify particle bases
+class Particle_base {};
+
 //-------------------------------------------------------------------
 /**
  * class Particle
@@ -35,6 +38,9 @@ template <typename... Args>
 class Particle : public Args...
 {
 public:
+    static_assert( mpu::conjunction_v< std::is_base_of<Particle_base,Args>...>,
+            "Only use the Particle class with template arguments generated with the macro \"MAKE_PARTICLE_BASE\"! See file Particles.h."); //!< check if only valid bases are used for the particle
+
     Particle()= default; //!< default construct particle values are undefined
 
     template <typename... T, std::enable_if_t< mpu::conjunction<mpu::is_list_initable<Args, T&&>...>::value, int> = 0>
@@ -58,7 +64,7 @@ public:
 //!< macro to generate classes that hold the members of the particle class
 #define MAKE_PARTICLE_BASE(class_name, member_name, member_type) \
 class r ## class_name; \
-class class_name \
+class class_name : Particle_base \
 { \
 public: \
     member_type member_name; \
@@ -68,7 +74,7 @@ public: \
     CUDAHOSTDEV class_name & operator=(const no_baseclass_flag & v) {return *this;}\
     using bind_ref_to_t = r ## class_name; \
 }; \
-class r ## class_name \
+class r ## class_name : Particle_base \
 { \
 public: \
     member_type & member_name; \

@@ -7,6 +7,7 @@
 
 ### particle management
 - somehow make it possible to get the host type from a base buffer
+- more safety / better errors when dealing with particles and bufffer
 - think about the particle management carefully
 - think about particles during init carefully
 - enhance compile time using particle
