@@ -64,6 +64,25 @@ public:
 };
 
 //-------------------------------------------------------------------
+// concatinate particles
+
+template <typename PA, typename PB>
+struct particle_concat;
+
+template <typename ...PA_bases, typename ...PB_bases>
+struct particle_concat <Particle<PA_bases...>,Particle<PB_bases...>>
+{
+    using type = Particle<PA_bases...,PB_bases...>;
+};
+
+/**
+ * @brief concatinate particles. Returns a particle that has all bases of both particles.
+ */
+template <typename PA, typename PB>
+using particle_concat_t=particle_concat<PA,PB>;
+
+
+//-------------------------------------------------------------------
 /**
  * @brief Macro to generate a base class to be used with the particle class template.
  *          It will also generate a second base whose name is prepended by an "r" and contains a reference which binds to non reference base.

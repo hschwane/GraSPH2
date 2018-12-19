@@ -42,7 +42,6 @@
 
 ### integration
 - better structure to different integrators
-- mark deriviatives in the particle buffer
 - adaptive algorithms
 
 ### performance
@@ -62,6 +61,10 @@
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
+
+- add function to concatenate particles
+- mark deriviatives in the particle buffer
+- better error messages when instantiating a particle wrong
 
 --- v0.2.2 --- 17.12.2018
 - use different cuda stream for downloading data
