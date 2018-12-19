@@ -5,13 +5,16 @@
 ### bugfixes
 - fix initialisation of host particle buffer
 
-## medium priority
-
 ### particle management
 - somehow make it possible to get the host type from a base buffer
 - think about the particle management carefully
 - think about particles during init carefully
 - enhance compile time using particle
+
+### simulation management
+- find better solution for the stuff in the algorithms file
+
+## medium priority
 
 ### particle creation
 - make modifiers work
@@ -26,7 +29,6 @@
 
 ### simulation managemant
 - make the compute derivitives function more organized
-- find better solution for the stuff in the algorithms file
 - find better solution to switch options on and off
 - find better solution for 2D simulation
 
