@@ -15,7 +15,7 @@
 //--------------------
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
-#include "ext_base_cast.h"
+#include "particle_tmp_utils.h"
 //--------------------
 
 //!< class to identify particle bases
@@ -62,25 +62,6 @@ public:
         return *this;
     }
 };
-
-//-------------------------------------------------------------------
-// concatinate particles
-
-template <typename PA, typename PB>
-struct particle_concat;
-
-template <typename ...PA_bases, typename ...PB_bases>
-struct particle_concat <Particle<PA_bases...>,Particle<PB_bases...>>
-{
-    using type = Particle<PA_bases...,PB_bases...>;
-};
-
-/**
- * @brief concatinate particles. Returns a particle that has all bases of both particles.
- */
-template <typename PA, typename PB>
-using particle_concat_t=particle_concat<PA,PB>;
-
 
 //-------------------------------------------------------------------
 /**
