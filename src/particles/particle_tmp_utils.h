@@ -90,7 +90,7 @@ using build_comp_index_list_t = typename build_comp_index_list<Tuple,Reference>:
  * @brief check if the order of types in Tuple is the same as in Reference and there are no duplicates
  */
 template <typename Tuple, typename Reference>
-using checkOrder = mpu::is_strict_rising< build_comp_index_list_t<Tuple,Reference> >;
+static constexpr bool checkOrder_v = mpu::is_strict_rising< build_comp_index_list_t<Tuple,Reference> >::value;
 
 
 //-------------------------------------------------------------------

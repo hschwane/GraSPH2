@@ -25,25 +25,15 @@
 //--------------------
 
 //-------------------------------------------------------------------
-// create bases for particles and particle buffers
-
-MAKE_PARTICLE_BASE(POS,pos,f3_t, deriv_of_nothing);
-MAKE_PARTICLE_BASE(MASS,mass,f1_t, deriv_of_nothing);
-MAKE_PARTICLE_BASE(VEL,vel,f3_t, POS);
-MAKE_PARTICLE_BASE(ACC,acc,f3_t, VEL);
-MAKE_PARTICLE_BASE(XVEL,xvel,f3_t, POS);
-MAKE_PARTICLE_BASE(DENSITY,density,f1_t, deriv_of_nothing);
-MAKE_PARTICLE_BASE(DENSITY_DT,density_dt,f1_t, DENSITY);
-MAKE_PARTICLE_BASE(DSTRESS,dstress,m3_t, deriv_of_nothing);
-MAKE_PARTICLE_BASE(DSTRESS_DT,dstress_dt,m3_t, DSTRESS);
-
-//-------------------------------------------------------------------
 // 3D position as f4_t
 struct pos_impl
 {
-    CUDAHOSTDEV static auto load(const f4_t & v) { return Particle<POS>(f3_t{v.x,v.y,v.z}); }
-    template <typename T> CUDAHOSTDEV static void store(f4_t & v, const T& p);
-    static constexpr f4_t defaultValue = {0,0,0,0};
+    using type = f4_t;
+    static constexpr type defaultValue = {0,0,0,0};
+    using particle = Particle<POS>;
+
+    CUDAHOSTDEV static auto load(const type & v) { return Particle<POS>(f3_t{v.x,v.y,v.z}); }
+    template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
 template<typename T> CUDAHOSTDEV void pos_impl::store(f4_t &v, const T &p) {}

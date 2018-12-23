@@ -7,7 +7,7 @@
 
 ### particle management
 - somehow make it possible to get the host type from a base buffer
-- more safety / better errors when dealing with particles and bufffer
+- more safety / better errors when dealing with and buffer
 - think about the particle management carefully
 - think about particles during init carefully
 - enhance compile time using particle
@@ -15,56 +15,75 @@
 ### simulation management
 - find better solution for the stuff in the algorithms file
 
+
 ## medium priority
 
 ### particle creation
+- add 2d image source from the other branch
 - make modifiers work
 - add modifieres
 - add sources
 - add constructors for uniform sphere
-- add 2d image source from the other branch
-- add python script support to generate initials
 
 ### usability
 - more runtime options vs compiletime options
 
 ### simulation managemant
 - make the compute derivitives function more organized
-- find better solution to switch options on and off
 - find better solution for 2D simulation
+
+### integration
+- automatically integrate what is needed using TMP
+
+### performance
+- somehow automatically adjust particle attributes based on options
+- optimize the functions in models.h
 
 ### simulation features
 - add functionality from the other branch
-- linear consistency fix
-- investigate angular momentum (not)conservation
-- add collisional merging simulation
-- different materials (using recursive kernel launches)
+
+### output data handling
+- use pinned host memory here
+- remove the stream sync points
+
+
+## low priority / ideas / long term projects
+
+### particle creation
+- add python script support to generate initials
+
+### simulation managemant
+- find better solution to switch options on and off
 
 ### integration
 - better structure to different integrators
 - adaptive algorithms
 
 ### performance
-- somehow automatically adjust particle attributes based on options
-- optimize the functions in models.h
 - add datastructures
 - try new graph style kernel launching
 - MPI support
 - share load between CPU and GPU
 
+### simulation features
+- linear consistency fix
+- investigate angular momentum (not)conservation
+- add collisional merging simulation
+- different materials (using recursive kernel launches)
+
 ### output data handling
-- use pinned host memory here
-- remove the stream sync points
 - provide binary data format
 - provide python script to generate 3d html plots
+
 
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
 - add function to concatenate particles
-- mark deriviatives in the particle buffer
-- better error messages when instantiating a particle wrong
+- mark derivatives in the particle buffer
+- safety measures when creating particles
+- better error messages when using Particles
 
 --- v0.2.2 --- 17.12.2018
 - use different cuda stream for downloading data

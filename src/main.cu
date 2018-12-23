@@ -209,6 +209,16 @@ __global__ void integrateLeapfrog(DeviceParticlesType particles, f1_t dt, bool n
     })
 }
 
+
+
+void particleTests()
+{
+    auto p1 = make_particle<MASS,POS>();
+    auto p2 = make_particle<POS,MASS>();
+
+    p1 = p2;
+}
+
 /**
  * @brief The main function of the simulation. Sets up the initial conditions and frontend and then manages running the simulation.
  *
@@ -227,6 +237,9 @@ int main()
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
+
+    particleTests();
+    return 0;
 
     // set up frontend
     fnd::initializeFrontend();
