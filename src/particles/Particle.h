@@ -65,24 +65,26 @@ public:
 //-------------------------------------------------------------------
 // create particle in a save way
 
-template<typename Tuple>
-struct mp_impl;
+namespace detail {
+    template<typename Tuple>
+    struct mp_impl;
 
-template<typename ... TArgs>
-struct mp_impl<std::tuple<TArgs...>>
-{
-    template<typename ...ConstrArgs, std::enable_if_t< (sizeof...(ConstrArgs)>0), int> _null =0>
-    static auto make_particle(ConstrArgs && ... args)
+    template<typename ... TArgs>
+    struct mp_impl<std::tuple<TArgs...>>
     {
-        return Particle<TArgs...>(std::forward<ConstrArgs>(args)...);
-    }
+        template<typename ...ConstrArgs, std::enable_if_t<(sizeof...(ConstrArgs) > 0), int> _null = 0>
+        static auto make_particle(ConstrArgs &&... args)
+        {
+            return Particle<TArgs...>(std::forward<ConstrArgs>(args)...);
+        }
 
-    template<typename ...ConstrArgs, std::enable_if_t< (sizeof...(ConstrArgs)==0), int> _null =0>
-    static auto make_particle(ConstrArgs && ... args)
-    {
-        return Particle<TArgs...>{};
-    }
-};
+        template<typename ...ConstrArgs, std::enable_if_t<(sizeof...(ConstrArgs) == 0), int> _null = 0>
+        static auto make_particle(ConstrArgs &&... args)
+        {
+            return Particle<TArgs...>{};
+        }
+    };
+}
 
 /**
  * @brief Creates a Particle in a save way from a std::tuple of attributes, making sure all attributes are in the correct order Particle Attribute values will be initialised to zero
@@ -92,7 +94,7 @@ struct mp_impl<std::tuple<TArgs...>>
 template <typename TupleType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<std::tuple,TupleType> , int> _null =0>
 auto make_particle(ConstrArgs && ... args)
 {
-    return mp_impl< reorderd_t<TupleType,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
+    return detail::mp_impl< reorderd_t<TupleType,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
 }
 
 /**
@@ -103,7 +105,7 @@ auto make_particle(ConstrArgs && ... args)
 template <typename ParticleType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<Particle,ParticleType> , int> _null =0>
 auto make_particle(ConstrArgs && ... args)
 {
-    return mp_impl< reorderd_t<particle_to_tuple_t<ParticleType> ,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
+    return detail::mp_impl< reorderd_t<particle_to_tuple_t<ParticleType> ,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
 }
 
 /**
