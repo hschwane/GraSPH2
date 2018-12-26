@@ -7,7 +7,7 @@
 
 ### particle management
 - somehow make it possible to get the host type from a base buffer
-- more safety / better errors when dealing with and buffer
+- more safety / better errors when dealing with particle buffers
 - think about the particle management carefully
 - think about particles during init carefully
 - enhance compile time using particle
@@ -80,7 +80,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
-- add function to concatenate particles
+- make it easier to use Particles in the correct way
+- add function to concatenate and merge particles
 - mark derivatives in the particle buffer
 - safety measures when creating particles
 - better error messages when using Particles

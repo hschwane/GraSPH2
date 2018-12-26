@@ -71,7 +71,14 @@ struct mp_impl;
 template<typename ... TArgs>
 struct mp_impl<std::tuple<TArgs...>>
 {
-    static auto make_particle()
+    template<typename ...ConstrArgs, std::enable_if_t< (sizeof...(ConstrArgs)>0), int> _null =0>
+    static auto make_particle(ConstrArgs && ... args)
+    {
+        return Particle<TArgs...>(std::forward<ConstrArgs>(args)...);
+    }
+
+    template<typename ...ConstrArgs, std::enable_if_t< (sizeof...(ConstrArgs)==0), int> _null =0>
+    static auto make_particle(ConstrArgs && ... args)
     {
         return Particle<TArgs...>{};
     }
@@ -82,10 +89,10 @@ struct mp_impl<std::tuple<TArgs...>>
  * @tparam TupleType the tuple to create the particle from
  * @return the created particle
  */
-template <typename TupleType, std::enable_if_t< mpu::is_instantiation_of_v<std::tuple,TupleType> , int> _null =0>
-auto make_particle()
+template <typename TupleType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<std::tuple,TupleType> , int> _null =0>
+auto make_particle(ConstrArgs && ... args)
 {
-    return mp_impl< reorderd_t<TupleType,particle_base_order>>::make_particle();
+    return mp_impl< reorderd_t<TupleType,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
 }
 
 /**
@@ -93,10 +100,10 @@ auto make_particle()
  * @tparam ParticleType the particle to create
  * @return the created particle
  */
-template <typename ParticleType, std::enable_if_t< mpu::is_instantiation_of_v<Particle,ParticleType> , int> _null =0>
-auto make_particle()
+template <typename ParticleType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<Particle,ParticleType> , int> _null =0>
+auto make_particle(ConstrArgs && ... args)
 {
-    return mp_impl< reorderd_t<particle_to_tuple_t<ParticleType> ,particle_base_order>>::make_particle();
+    return mp_impl< reorderd_t<particle_to_tuple_t<ParticleType> ,particle_base_order>>::make_particle(std::forward<ConstrArgs>(args)...);
 }
 
 /**
@@ -104,12 +111,30 @@ auto make_particle()
  * @tparam TypeArgs particle attributes to sort and use
  * @return the created particle
  */
-template <typename ...TypeArgs, std::enable_if_t< (sizeof...(TypeArgs)>1), int> _null =0>
-auto make_particle()
+template <typename ...TypeArgs, typename ...ConstrArgs, std::enable_if_t< (sizeof...(TypeArgs)>1), int> _null =0>
+auto make_particle(ConstrArgs && ... args)
 {
-    return make_particle<std::tuple<TypeArgs...>>();
+    return make_particle<std::tuple<TypeArgs...>>(std::forward<ConstrArgs>(args)...);
 }
 
+//-------------------------------------------------------------------
+// merge two particles
 
+/**
+ * @brief Merge two particles. A new particle with all attributes from both input particles is created and values are copied.
+ *          If both input particles share an attribute the value from pa is used.
+ * @tparam Ta the type of particle A
+ * @tparam Tb the type of particle B
+ * @param pa the first particle
+ * @param pb the second particle
+ * @return a new particle with all attributes from pa and pb
+ */
+template <typename Ta, typename Tb>
+auto merge_particles(const Ta& pa, const Tb& pb)
+{
+    auto p = make_particle< particle_concat_t<Ta,Tb> >(pb);
+    p = pa;
+    return p;
+}
 
 #endif //MPUTILS_PARTICLE_H

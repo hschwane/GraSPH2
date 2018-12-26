@@ -216,7 +216,7 @@ void particleTests()
 
     using ct = particle_concat_t<decltype(p1), decltype(p2)>;
 
-    auto p4 = make_particle< ct >();
+    auto p4 = make_particle< ct >(p1);
     std::cout << typeid(p4).name();
 
 }
