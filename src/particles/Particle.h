@@ -41,7 +41,7 @@ public:
     static_assert( mpu::conjunction_v< std::is_base_of<particle_base,Args>...>,
             "Only use the Particle class with template arguments generated with the macro \"MAKE_PARTICLE_BASE\"! See file Particles.h."); //!< check if only valid bases are used for the particle
     static_assert( checkOrder_v<std::tuple<Args...>,particle_base_order >,
-            "Use particle Attributes in correct order. See particle_base_order in particle_attributes.h.");
+            "Use particle Attributes in correct order without duplicates. See particle_base_order in particle_attributes.h.");
 
     Particle()= default; //!< default construct particle values are undefined
 
@@ -77,14 +77,30 @@ struct mp_impl<std::tuple<TArgs...>>
     }
 };
 
-template <typename TupleType>
+/**
+ * @brief Creates a Particle in a save way from a std::tuple of attributes, making sure all attributes are in the correct order Particle Attribute values will be initialised to zero
+ * @tparam TupleType the tuple to create the particle from
+ * @return the created particle
+ */
+template <typename TupleType, std::enable_if_t< mpu::is_instantiation_of_v<std::tuple,TupleType> , int> _null =0>
 auto make_particle()
 {
     return mp_impl< reorderd_t<TupleType,particle_base_order>>::make_particle();
 }
 
 /**
- * @brief Creates a Particle in a save way, making sure all attributes are in the correct order Particle Attribute values will be initialised to zero
+ * @brief Creates a Particle in a save way from another particle type (like what you get from concatenating particles), making sure all attributes are in the correct order Particle Attribute values will be initialised to zero
+ * @tparam ParticleType the particle to create
+ * @return the created particle
+ */
+template <typename ParticleType, std::enable_if_t< mpu::is_instantiation_of_v<Particle,ParticleType> , int> _null =0>
+auto make_particle()
+{
+    return mp_impl< reorderd_t<particle_to_tuple_t<ParticleType> ,particle_base_order>>::make_particle();
+}
+
+/**
+ * @brief Creates a Particle in a save way from a list of attributes, making sure all attributes are in the correct order Particle Attribute values will be initialised to zero
  * @tparam TypeArgs particle attributes to sort and use
  * @return the created particle
  */

@@ -209,14 +209,16 @@ __global__ void integrateLeapfrog(DeviceParticlesType particles, f1_t dt, bool n
     })
 }
 
-
-
 void particleTests()
 {
-    auto p1 = make_particle<MASS,POS>();
+    auto p1 = make_particle<MASS,VEL>();
     auto p2 = make_particle<POS,MASS>();
 
-    p1 = p2;
+    using ct = particle_concat_t<decltype(p1), decltype(p2)>;
+
+    auto p4 = make_particle< ct >();
+    std::cout << typeid(p4).name();
+
 }
 
 /**
@@ -225,6 +227,9 @@ void particleTests()
  */
 int main()
 {
+    particleTests();
+    return 0;
+
     mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
 
     std::string buildType;
@@ -237,9 +242,6 @@ int main()
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
-
-    particleTests();
-    return 0;
 
     // set up frontend
     fnd::initializeFrontend();

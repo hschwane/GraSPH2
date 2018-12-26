@@ -146,6 +146,25 @@ struct particle_concat < Class<PA_bases...>, Class<PB_bases...>>
  * @brief Concatenate particles or particle buffers. Returns a particle or buffer that has all bases of both particles/buffers.
  */
 template <typename PA, typename PB>
-using particle_concat_t=particle_concat<PA,PB>;
+using particle_concat_t= typename particle_concat<PA,PB>::type;
+
+//-------------------------------------------------------------------
+/**
+ * @brief Create a tuple of types from the attributes of a particle
+ */
+template <typename PA>
+struct particle_to_tuple;
+
+template <template<typename ...T> class Class, typename ...PA_bases>
+struct particle_to_tuple < Class<PA_bases...>>
+{
+    using type = std::tuple<PA_bases...>;
+};
+
+/**
+ * @brief Create a tuple of types from the attributes of a particle
+ */
+template <typename PA>
+using particle_to_tuple_t =typename particle_to_tuple<PA>::type;
 
 #endif //MPUTILS_EXT_BASE_CAST_H
