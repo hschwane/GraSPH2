@@ -8,6 +8,7 @@
 ### particle management
 - somehow make it possible to get the host type from a base buffer
 - more safety / better errors when dealing with particle buffers
+- add possibility to use pinned memory for particle buffers
 - think about the particle management carefully
 - think about particles during init carefully
 - enhance compile time using particle
