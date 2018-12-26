@@ -14,7 +14,6 @@
 // includes
 //--------------------
 #include <nvfunctional>
-#include "Particles.h"
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
 //--------------------

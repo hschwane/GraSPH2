@@ -121,8 +121,8 @@ constexpr f1_t xsph_factor = 0.5;
 constexpr size_t BLOCK_SIZE = 256;
 
 // types for particle buffer. you can remove things you don't need to save memory
-using DeviceParticlesType = Particles<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
-using HostParticlesType = Particles<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
+using DeviceParticlesType = ParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using HostParticlesType = ParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
 using ParticleType = Particle<POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
 
 
