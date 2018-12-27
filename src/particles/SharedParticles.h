@@ -28,10 +28,7 @@
  * usage:
  * Specify how many particles should be stored in shared memory and what attributes should be defined for them.
  * Beware that you have to take care of synchronization yourself.
- * Supported particle attributes are:
- * SHARED_POSM
- * SHARED_VEL
- * SHARED_ACC
+ * See particle_buffer_impl.h for all possible attributes.
  *
  */
 template <size_t n, template <size_t> class... TArgs>
