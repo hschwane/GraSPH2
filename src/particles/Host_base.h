@@ -21,29 +21,46 @@
 
 // forward declarations
 //--------------------
-template <typename T, typename lsFunctor>
+//!< class template that holds particle attributes in device memory
+template <typename implementation>
 class DEVICE_BASE;
+
+//!< class to identify particle buffer implementations
+class pb_impl;
 //--------------------
+
+//!< class to identify classes that hold attributes of particles in host memory
+class host_base {};
 
 //-------------------------------------------------------------------
 /**
  * class template HOST_BASE
  *
  * @brief Class Template that holds particle attributes in host memory
- * @tparam T type of the attribute
- * @tparam lsFunctor a struct that contains the following functions:
+ * @tparam implementation a struct that contains the following functions and typedefs:
+ *          - using type = the type of the internal data
+ *          - static constexpr type defaultValue = the default value for that particle buffer
+ *          - using particleType = the type of particle that can be loaded from or stored in this buffer
  *          - public static Particle< ...>load(const T& v) the attribute value v should be copied into the returned particle.
  *          - public template<typename U> static void store(T & v, const U& p) which should be specialized for different
  *              particle base classes and copy the attribute of the base p into the shared memory position referenced by v
- *          Reference implementations of such structs can be found in Particles.h.
+ *          Reference implementations of such structs can be found in particle_buffer_impl.h.
  */
-template <typename T, typename lsFunctor>
-class HOST_BASE
+template <typename implementation>
+class HOST_BASE : host_base
 {
 public:
+    static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");
+
+    // types
+    using impl = implementation;
+    using type = typename impl::type;
+    using particleType = typename impl::particleType;
+    using bind_ref_to_t = DEVICE_BASE<implementation>; //!< show to which device_base this can be assigned
+
     // constructors and destructor
     HOST_BASE() : m_size(0), m_data(nullptr) {}
-    explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new T[m_size] : nullptr) {}
+    explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new type[m_size] : nullptr) {}
     ~HOST_BASE() {delete[] m_data;}
 
     // copy swap idom for copy an move construction and assignment
@@ -59,10 +76,10 @@ public:
 
     // particle handling
     template<typename ... Args>
-    CUDAHOSTDEV void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members Note: while this is a host device function, calling it on the device will have no effect
+    void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members Note: while this is a host device function, calling it on the device will have no effect
     template<typename ... Args>
-    CUDAHOSTDEV void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
-    CUDAHOSTDEV void initialize(size_t i); //!< set all values to the default value
+    void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
+    void initialize(size_t i); //!< set all values to the default value
 
     void mapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
     void unmapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
@@ -70,45 +87,38 @@ public:
     // status checks
     size_t size() const { return m_size;} //!< returns the number of particles
 
-    // friends and types
-    template <typename Type, typename Functor> friend class DEVICE_BASE; // be friends with the corresponding device base
-    using bind_ref_to_t = DEVICE_BASE<T,lsFunctor>; //!< show to which device_base this can be assigned
+    // friends
+    friend class DEVICE_BASE<implementation>; // be friends with the corresponding device base
 
 protected:
     HOST_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class
 
-public:
+private:
     size_t m_size; //!< the number of particles stored in this buffer
-    T* m_data;  //!< the actual data
+    type* m_data;  //!< the actual data
 };
 
 //-------------------------------------------------------------------
 // function definitions for HOST_BASE class
-template<typename T, typename lsFunctor>
+template<typename implementation>
 template<typename... Args>
-void HOST_BASE<T, lsFunctor>::loadParticle(size_t id, Particle<Args ...> &p) const
+void HOST_BASE<implementation>::loadParticle(size_t id, Particle<Args ...> &p) const
 {
-#if !defined(__CUDA_ARCH__)
-    p = lsFunctor::load(m_data[id]);
-#endif
+    p = impl::load(m_data[id]);
 }
 
-template<typename T, typename lsFunctor>
+template<typename implementation>
 template<typename... Args>
-void HOST_BASE<T, lsFunctor>::storeParticle(size_t id, const Particle<Args ...> &p)
+void HOST_BASE<implementation>::storeParticle(size_t id, const Particle<Args ...> &p)
 {
-#if !defined(__CUDA_ARCH__)
-    int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
+    int i[] = {0, ((void)impl::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
-#endif
 }
 
-template<typename T, typename lsFunctor>
-void HOST_BASE<T, lsFunctor>::initialize(size_t i)
+template<typename implementation>
+void HOST_BASE<implementation>::initialize(size_t i)
 {
-#if !defined(__CUDA_ARCH__)
-    m_data[i] = T{lsFunctor::defaultValue};
-#endif
+    m_data[i] = type{impl::defaultValue};
 }
 
 #endif //GRASPH2_HOST_BASE_H

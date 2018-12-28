@@ -16,7 +16,6 @@
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
 #include "particle_tmp_utils.h"
-#include "particle_attrib.h"
 #include "partice_attributes.h"
 //--------------------
 
