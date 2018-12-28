@@ -37,6 +37,9 @@ class host_base {};
  * class template HOST_BASE
  *
  * @brief Class Template that holds particle attributes in host memory
+ *        You can use pinned host memory by calling pinMemory().
+ *        In case of move assignment or construction the type of memory used (pinned vs non pinned) will
+ *        be inherited by the new object. In case of copy construction or assignment only data is transferred.
  * @tparam implementation a struct that contains the following functions and typedefs:
  *          - using type = the type of the internal data
  *          - static constexpr type defaultValue = the default value for that particle buffer
@@ -59,19 +62,21 @@ public:
     using bind_ref_to_t = DEVICE_BASE<implementation>; //!< show to which device_base this can be assigned
 
     // constructors and destructor
-    HOST_BASE() : m_size(0), m_data(nullptr) {}
-    explicit HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new type[m_size] : nullptr) {}
-    ~HOST_BASE() {delete[] m_data;}
+    HOST_BASE();
+    explicit HOST_BASE(size_t n);
+    ~HOST_BASE();
 
-    // copy swap idom for copy an move construction and assignment
-    HOST_BASE(const HOST_BASE & other) : HOST_BASE(other.m_size) {std::copy(other.m_data,other.m_data+other.m_size,m_data);}
+    // copy swap idom for copy an move construction and move assignment
+    HOST_BASE(const HOST_BASE & other);
     HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
-    HOST_BASE& operator=(HOST_BASE other) {swap(*this,other); return *this;}
+    HOST_BASE& operator=(HOST_BASE&& other) {swap(*this,other); return *this;}
+    HOST_BASE& operator=(const HOST_BASE& other);
     friend void swap(HOST_BASE & first, HOST_BASE & second)
     {
         using thrust::swap;
         swap(first.m_data,second.m_data);
         swap(first.m_size,second.m_size);
+        swap(first.m_isPinned,second.m_isPinned);
     }
 
     // particle handling
@@ -79,13 +84,15 @@ public:
     void loadParticle(size_t id, Particle<Args ...> & p) const; //!< get a particle object with the requested members Note: while this is a host device function, calling it on the device will have no effect
     template<typename ... Args>
     void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object  Note: while this is a host device function, calling it on the device will have no effect
-    void initialize(size_t i); //!< set all values to the default value
+    void initialize(); //!< set all values to the default value
 
-    void mapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
-    void unmapGraphicsResource() {} //!< does nothing, just for compatibility with the particles class
+    // use pinned memory
+    void pinMemory();   //!< pin the used memory for faster transfer with gpu (takes some time)
+    void unpinMemory(); //!< unpin the used memory
 
     // status checks
     size_t size() const { return m_size;} //!< returns the number of particles
+    bool isPinned() const {return m_isPinned;} //!<  check if pinned memory is used
 
     // friends
     friend class DEVICE_BASE<implementation>; // be friends with the corresponding device base
@@ -96,10 +103,51 @@ protected:
 private:
     size_t m_size; //!< the number of particles stored in this buffer
     type* m_data;  //!< the actual data
+    bool m_isPinned; //!< whether or not pinned memory is used
 };
 
 //-------------------------------------------------------------------
 // function definitions for HOST_BASE class
+template<typename implementation>
+HOST_BASE<implementation>::HOST_BASE() : m_size(0), m_data(nullptr), m_isPinned(false)
+{
+}
+
+template<typename implementation>
+HOST_BASE<implementation>::HOST_BASE(size_t n) :  m_size(n), m_data(m_size ? new type[m_size] : nullptr), m_isPinned(false)
+{
+}
+
+template<typename implementation>
+HOST_BASE<implementation>::~HOST_BASE()
+{
+    if(m_isPinned)
+        unpinMemory();
+    delete[] m_data;
+}
+
+template<typename implementation>
+HOST_BASE<implementation>::HOST_BASE(const HOST_BASE &other) : HOST_BASE(other.m_size)
+{
+    std::copy(other.m_data,other.m_data+other.m_size,m_data);
+}
+
+template<typename implementation>
+HOST_BASE<implementation> &HOST_BASE<implementation>::operator=(const HOST_BASE& other)
+{
+    if(&other != this)
+    {
+        if(other.size() == m_size)
+            std::copy(other.m_data,other.m_data+other.m_size,m_data);
+        else
+        {
+            HOST_BASE copy(other);
+            swap(*this,copy);
+        }
+    }
+    return *this;
+}
+
 template<typename implementation>
 template<typename... Args>
 void HOST_BASE<implementation>::loadParticle(size_t id, Particle<Args ...> &p) const
@@ -116,9 +164,25 @@ void HOST_BASE<implementation>::storeParticle(size_t id, const Particle<Args ...
 }
 
 template<typename implementation>
-void HOST_BASE<implementation>::initialize(size_t i)
+void HOST_BASE<implementation>::initialize()
 {
-    m_data[i] = type{impl::defaultValue};
+    #pragma omp parallel for
+    for(int i = 0; i < m_size; i++)
+        m_data[i] = type{impl::defaultValue};
+}
+
+template<typename implementation>
+void HOST_BASE<implementation>::pinMemory()
+{
+    assert_cuda(cudaHostRegister(m_data, m_size * sizeof(type), cudaHostRegisterDefault));
+    m_isPinned = true;
+}
+
+template<typename implementation>
+void HOST_BASE<implementation>::unpinMemory()
+{
+    assert_cuda(cudaHostUnregister(m_data));
+    m_isPinned = false;
 }
 
 #endif //GRASPH2_HOST_BASE_H
