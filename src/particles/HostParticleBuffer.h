@@ -44,7 +44,7 @@ template <typename ... Args>
 class HostParticleBuffer : public Args...
 {
 public:
-    static_assert( mpu::conjunction_v< std::is_base_of<host_base,Args>...>,
+    static_assert( mpu::conjunction_v< std::is_base_of<host_base_flag,Args>...>,
                    "Only use the HostParticleBuffer class with instantiations of Host_base! See file particle_buffer_impl.h for possible bases."); //!< check if only valid bases are used for the particle
     static_assert( checkOrder_v<std::tuple<Args...>,host_base_order>,
                    "Use particle Attributes in correct order without duplicates. See host_base_order in particle_buffer_impl.h.");

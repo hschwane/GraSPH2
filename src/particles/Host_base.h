@@ -30,7 +30,7 @@ class pb_impl;
 //--------------------
 
 //!< class to identify classes that hold attributes of particles in host memory
-class host_base {};
+class host_base_flag {};
 
 //-------------------------------------------------------------------
 /**
@@ -39,7 +39,8 @@ class host_base {};
  * @brief Class Template that holds particle attributes in host memory
  *        You can use pinned host memory by calling pinMemory().
  *        In case of move assignment or construction the type of memory used (pinned vs non pinned) will
- *        be inherited by the new object. In case of copy construction or assignment only data is transferred.
+ *        be inherited by the new object. In case of copy construction or assignment from a buffer of the same size,
+ *        only data is transferred.
  * @tparam implementation a struct that contains the following functions and typedefs:
  *          - using type = the type of the internal data
  *          - static constexpr type defaultValue = the default value for that particle buffer
@@ -50,7 +51,7 @@ class host_base {};
  *          Reference implementations of such structs can be found in particle_buffer_impl.h.
  */
 template <typename implementation>
-class HOST_BASE : host_base
+class HOST_BASE : host_base_flag
 {
 public:
     static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");
@@ -59,7 +60,8 @@ public:
     using impl = implementation;
     using type = typename impl::type;
     using particleType = typename impl::particleType;
-    using bind_ref_to_t = DEVICE_BASE<implementation>; //!< show to which device_base this can be assigned
+    using device_type = DEVICE_BASE<implementation>;
+    using bind_ref_to_t = device_type; //!< show to which device_base this can be assigned
 
     // constructors and destructor
     HOST_BASE();
@@ -69,15 +71,19 @@ public:
     // copy swap idom for copy an move construction and move assignment
     HOST_BASE(const HOST_BASE & other);
     HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
-    HOST_BASE& operator=(HOST_BASE&& other) {swap(*this,other); return *this;}
-    HOST_BASE& operator=(const HOST_BASE& other);
-    friend void swap(HOST_BASE & first, HOST_BASE & second)
+    HOST_BASE& operator=(HOST_BASE&& other) noexcept {swap(*this,other); return *this;}
+    HOST_BASE& operator=(const HOST_BASE& other); // do not use swap here since that would screw up pinned memory
+    friend void swap(HOST_BASE & first, HOST_BASE & second) noexcept
     {
         using thrust::swap;
         swap(first.m_data,second.m_data);
         swap(first.m_size,second.m_size);
         swap(first.m_isPinned,second.m_isPinned);
     }
+
+    // construction and assignment from device_base
+    explicit HOST_BASE(const device_type & other); //!< construct from a compatible device base
+    HOST_BASE& operator=(const device_type& other); //!< assign from compatible device base
 
     // particle handling
     template<typename ... Args>
@@ -183,6 +189,27 @@ void HOST_BASE<implementation>::unpinMemory()
 {
     assert_cuda(cudaHostUnregister(m_data));
     m_isPinned = false;
+}
+
+template<typename implementation>
+HOST_BASE<implementation>::HOST_BASE(const HOST_BASE::device_type &other) : HOST_BASE(other.m_size)
+{
+    assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyDeviceToHost));
+}
+
+template<typename implementation>
+HOST_BASE<implementation> &HOST_BASE<implementation>::operator=(const HOST_BASE::device_type &other)
+{
+    if(size() != other.size())
+    {
+        HOST_BASE<implementation> base(other);
+        swap(*this,base);
+    }
+    else
+    {
+        assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyDeviceToHost));
+    }
+    return *this;
 }
 
 #endif //GRASPH2_HOST_BASE_H

@@ -20,8 +20,14 @@
 #include "Host_base.h"
 //--------------------
 
+// forward declarations
+//--------------------
+//!< class to identify particle buffer implementations
+class pb_impl;
+//--------------------
+
 //!< class to identify classes that hold attributes of particles in host memory
-class device_base {};
+class device_base_flag {};
 
 //-------------------------------------------------------------------
 /**
@@ -30,8 +36,10 @@ class device_base {};
  * @brief Class Template that holds particle attributes in device memory. You can use an openGL Buffer instead of the
  *              managed memory by casting the Particles object to the specific device base and calling the registerGLGraphics Resource.
  *              You can then use the map and unmap functions of the particles class to map or unmap the openGL Buffers of all its device bases.
- *              The resource will be automatically unregistered in the destructer. To unregister maually cast the Particles object to the base type
- *              and assign a new base object.
+ *              The resource will be automatically unregistered in the destructer.
+ *              In case of move assignment or construction the type of memory used (openGL vs native) will
+ *              be inherited by the new object. In case of copy construction or assignment from a buffer of the same size,
+ *              only data is transferred.
  * @tparam implementation a struct that contains the following functions and typedefs:
  *          - using type = the type of the internal data
  *          - static constexpr type defaultValue = the default value for that particle buffer
@@ -42,7 +50,7 @@ class device_base {};
  *          Reference implementations of such structs can be found in particle_buffer_impl.h.
  */
 template <typename implementation>
-class DEVICE_BASE : device_base
+class DEVICE_BASE : device_base_flag
 {
 public:
     static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");
@@ -59,12 +67,11 @@ public:
     explicit DEVICE_BASE(size_t n);
     ~DEVICE_BASE();
 
-    // copy swap idom where copy construction is only allowed on th host
-    // to copy on the device use device copy
+    // copy swap idom for copy an move construction and move assignment
     DEVICE_BASE(const DEVICE_BASE & other);
     DEVICE_BASE( DEVICE_BASE&& other) noexcept : DEVICE_BASE() {swap(*this,other);}
     DEVICE_BASE& operator=(DEVICE_BASE&& other) noexcept {swap(*this,other); return *this;}
-    DEVICE_BASE& operator=(DEVICE_BASE other) noexcept {swap(*this,other); return *this;}
+    DEVICE_BASE& operator=(const DEVICE_BASE& other); // do not use swap here since that would screw up pinned memory
     friend void swap(DEVICE_BASE & first, DEVICE_BASE & second) noexcept
     {
         using thrust::swap;
@@ -73,15 +80,9 @@ public:
         swap(first.m_graphicsResource,second.m_graphicsResource);
     }
 
-    // converting from and to a compatible host base
-    DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
+    // construction and assignment from host_base
+    explicit DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
     DEVICE_BASE& operator=(const host_type& other); //!< assign from compatible host base
-    operator host_type() const; //!< convert to a compatible host base
-
-    // mapping of graphics resources
-    void registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag = cudaGraphicsMapFlagsNone); //!< register an openGL Buffer to be used instead of the allocated memory
-    void mapGraphicsResource(); //!< if an opengl buffer is used map the buffer to enable cuda usage
-    void unmapGraphicsResource(); //!< unmap the opengl buffer so it can be used by openGL again
 
     // particle handling
     template<typename ... Args>
@@ -89,8 +90,16 @@ public:
     template<typename ... Args>
     void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
 
+    // mapping of graphics resources
+    void registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag = cudaGraphicsMapFlagsNone); //!< register an openGL Buffer to be used instead of the allocated memory
+    void mapGraphicsResource(); //!< if an opengl buffer is used map the buffer to enable cuda usage
+    void unmapGraphicsResource(); //!< unmap the opengl buffer so it can be used by openGL again
+
     // status checks
-    size_t size() { return m_size;} //!< returns the number of particles
+    size_t size() const { return m_size;} //!< returns the number of particles
+
+    // friends
+    friend class HOST_BASE<implementation>; // be friends with the corresponding host base
 
 protected:
     DEVICE_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class
@@ -98,7 +107,7 @@ protected:
 private:
     void unregisterGraphicsResource(); //!< unregister the opengl resource from cuda
 
-    size_t m_size; //!< the umber of particles
+    size_t m_size; //!< the number of particles
     type* m_data; //!< the actual data
     cudaGraphicsResource* m_graphicsResource; //!< a cuda graphics resource that can be used as memory
 };
@@ -126,6 +135,22 @@ DEVICE_BASE<implementation>::~DEVICE_BASE()
         assert_cuda(cudaFree(m_data));
 }
 
+template<typename implementation>
+DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE_BASE& other)
+{
+    if(&other != this)
+    {
+        if(other.size() == m_size)
+            assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyDeviceToDevice));
+        else
+        {
+            DEVICE_BASE copy(other);
+            swap(*this,copy);
+        }
+    }
+    return *this;
+}
+
 template <typename implementation>
 DEVICE_BASE<implementation>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : DEVICE_BASE(other.m_size)
 {
@@ -133,24 +158,16 @@ DEVICE_BASE<implementation>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : 
 }
 
 template <typename implementation>
-DEVICE_BASE<implementation>::operator host_type() const
+DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE_BASE::host_type& other)
 {
-    host_type host(m_size);
-    assert_cuda( cudaMemcpy(host.m_data,m_data,m_size*sizeof(type),cudaMemcpyDeviceToHost));
-    return host;
-}
-
-template <typename implementation>
-DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE_BASE::host_type& host)
-{
-    if(size() != host.size())
+    if(size() != other.size())
     {
-        DEVICE_BASE<implementation> base(host);
+        DEVICE_BASE<implementation> base(other);
         swap(*this,base);
     }
     else
     {
-        assert_cuda( cudaMemcpy(m_data, host.m_data, m_size*sizeof(type), cudaMemcpyHostToDevice));
+        assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyHostToDevice));
     }
     return *this;
 }
@@ -159,19 +176,22 @@ template <typename implementation>
 template<typename... Args>
 void DEVICE_BASE<implementation>::loadParticle(size_t id, Particle<Args ...> &p) const
 {
-#if defined(__CUDA_ARCH__)
-    p = lsFunctor::load(m_data[id]);
-#endif
+    // download one piece of data
+    type v;
+    assert_cuda( cudaMemcpy( &v, &m_data[id], sizeof(type), cudaMemcpyDeviceToHost));
+    p = impl::load(v); // make it into a particle
 }
 
 template <typename implementation>
 template<typename... Args>
 void DEVICE_BASE<implementation>::storeParticle(size_t id, const Particle<Args ...> &p)
 {
-#if defined(__CUDA_ARCH__)
-    int i[] = {0, ((void)lsFunctor::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
+    // pack particle into piece of data
+    type v;
+    int i[] = {0, ((void)impl::template store(v, ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
-#endif
+    // upload piece of data
+    assert_cuda( cudaMemcpy( &m_data[id], &v, sizeof(type), cudaMemcpyHostToDevice));
 }
 
 template <typename implementation>
@@ -212,16 +232,5 @@ void DEVICE_BASE<implementation>::unregisterGraphicsResource()
     m_data=nullptr;
     m_graphicsResource = nullptr;
 }
-
-//template <typename implementation>
-//DEVICE_BASE<implementation> DEVICE_BASE<implementation>::createDeviceCopy() const
-//{
-//    DEVICE_BASE b;
-//    b.m_data=m_data;
-//    b.m_size = m_size;
-//    b.m_isDeviceCopy=true;
-//    b.m_graphicsResource=nullptr;
-//    return b;
-//};
 
 #endif //GRASPH2_DEVICE_BASE_H
