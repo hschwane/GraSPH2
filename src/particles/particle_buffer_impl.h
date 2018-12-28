@@ -93,6 +93,10 @@ template<> CUDAHOSTDEV inline void posm_impl::store<MASS>(type & v, const MASS& 
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(POSM,posm_impl);
 
 
+using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM>;
+using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM>;
+//using shared_base_order = std::tuple<SHARED_POS,SHARED_MASS,SHARED_POSM>;
+
 //    //-------------------------------------------------------------------
 //    // 3D velocity as f4_t
 //    struct vel_impl
