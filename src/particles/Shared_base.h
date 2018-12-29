@@ -66,4 +66,9 @@ private:
     type * m_data;
 };
 
+// include forward declared classes
+//--------------------
+#include "particle_buffer_impl.h"
+//--------------------
+
 #endif //GRASPH2_SHARED_BASE_H

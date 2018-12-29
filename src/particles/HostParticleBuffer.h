@@ -160,4 +160,9 @@ void HostParticleBuffer<Args...>::unpinMemory()
     (void)t[0]; // silence compiler warning abut t being unused
 }
 
+// include forward declared classes
+//--------------------
+#include "DeviceParticleBuffer.h"
+//--------------------
+
 #endif //GRASPH2_HOSTPARTICLEBUFFER_H

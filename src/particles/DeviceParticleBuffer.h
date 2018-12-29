@@ -21,13 +21,6 @@
 #include "HostParticleBuffer.h"
 //--------------------
 
-// forward declarations
-//--------------------
-//!< class template that manages the storage of a lot of particles in host memory.
-template <typename ... Args>
-class HostParticleBuffer;
-//--------------------
-
 //-------------------------------------------------------------------
 /**
  * class template ParticleBuffer

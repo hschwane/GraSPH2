@@ -239,4 +239,10 @@ void DEVICE_BASE<implementation>::unregisterGraphicsResource()
     m_graphicsResource = nullptr;
 }
 
+// include forward declared classes
+//--------------------
+#include "Device_reference.h"
+#include "particle_buffer_impl.h"
+//--------------------
+
 #endif //GRASPH2_DEVICE_BASE_H

@@ -212,4 +212,10 @@ HOST_BASE<implementation> &HOST_BASE<implementation>::operator=(const HOST_BASE:
     return *this;
 }
 
+// include forward declared classes
+//--------------------
+#include "Device_base.h"
+#include "particle_buffer_impl.h"
+//--------------------
+
 #endif //GRASPH2_HOST_BASE_H
