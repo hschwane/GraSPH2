@@ -45,7 +45,7 @@ class DEVICE_REFERENCE : device_reference_flag
 public:
     static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");
 
-    template<typename nbft, std::enable_if_t< std::is_same_v<nbft,no_baseclass_flag> || std::is_same_v<nbft,size_t >, int> _null = 0 >
+    template<typename nbft, std::enable_if_t< std::is_same<nbft,no_baseclass_flag>::value || std::is_same<nbft,size_t>::value, int> _null = 0 >
     CUDAHOSTDEV explicit DEVICE_REFERENCE(nbft v) { static_assert(mpu::always_false_v<nbft>,
                       "Cannot construct DeviceParticleReference from this DeviceParticleReference or DeviceParticleBuffer, because the latter is missing at least one attribute!"); }
 

@@ -187,7 +187,7 @@ template<typename... Args>
 template<class base>
 void DeviceParticleBuffer<Args...>::registerGLGraphicsResource(uint32_t resourceID, cudaGraphicsMapFlags flag)
 {
-    static_assert( mpu::disjunction_v<std::is_same_v<base,Args>...> , "The attribute you try to map to openGL is not part of this Buffer!");
+    static_assert( mpu::disjunction_v< std::is_same<base,Args>...> , "The attribute you try to map to openGL is not part of this Buffer!");
     static_cast<base*>(this)->registerGLGraphicsResource(resourceID,flag);
 }
 
