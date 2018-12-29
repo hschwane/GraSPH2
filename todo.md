@@ -3,13 +3,16 @@
 ## high priority
 
 ### particle management
-- add device buffer
+
 - add reference buffer
 - implement initialisation of device particles again
 - somehow make it possible to get the particle type from a base buffer
 - somehow make it possible to get the different buffer types from each other
 
 - add shared buffer
+- better defaults for particle load and store
+- check for valid parameters on all template calls
+- save make functions for all buffers (like the one the particle has)
 - more safety / better errors when dealing with particle buffers
 
 - think about the particle management carefully
@@ -97,6 +100,7 @@ for motivation, all finished todo entries are moved here instead of being delete
 - derivatives are now marked as such in the particle buffer
 
 - add device reference
+- add device buffer
 
 - make it easier to use Particles in the correct way
 - safety measures when creating particles

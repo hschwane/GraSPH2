@@ -13,9 +13,6 @@
 
 // includes
 //--------------------
-#include <thrust/swap.h>
-#include <tuple>
-#include <cuda_gl_interop.h>
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
 #include "particle_tmp_utils.h"
@@ -23,11 +20,18 @@
 #include "particle_buffer_impl.h"
 //--------------------
 
+// forward declarations
+//--------------------
+//!< class template that manages the storage of a lot of particles in device memory.
+template <typename ... Args>
+class DeviceParticleBuffer;
+//--------------------
+
 //-------------------------------------------------------------------
 /**
  * class template ParticleBuffer
  *
- * Manages the storage of a lot of particles in Host Memory.
+ * Manages the storage of a lot of particles in host memory.
  *
  * usage:
  * The required number of particles should be passed to the constructor.
@@ -53,11 +57,17 @@ public:
     HostParticleBuffer() : m_numParticles(0), Args()... {} //!< default constructor
     explicit HostParticleBuffer(size_t n) : m_numParticles(n), Args(n)... {} //!< construct particle buffer which can contain n particles
 
-    // conversions
+    // conversions between different instantiations of this template
     template <typename... TArgs>
     HostParticleBuffer(const HostParticleBuffer<TArgs...>& other);  //!< construct this from a particle buffer with different attributes
     template <typename... TArgs>
-    HostParticleBuffer& operator=(const HostParticleBuffer<TArgs...> &b); //!< assignment between particles buffers with different atributes
+    HostParticleBuffer& operator=(const HostParticleBuffer<TArgs...> &b); //!< assignment between particles buffers with different attributes
+
+    // assign and construct from a DeviceParticleBuffer
+    template <typename... TArgs>
+    HostParticleBuffer(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
+    template <typename... TArgs>
+    HostParticleBuffer& operator=(const DeviceParticleBuffer<TArgs...> &b); //!< assignment from a DeviceParticleBuffer
 
     // particle handling
     template<typename... particleArgs>
@@ -90,6 +100,21 @@ HostParticleBuffer<Args...>::HostParticleBuffer(const HostParticleBuffer<TArgs..
 template<typename... Args>
 template<typename... TArgs>
 HostParticleBuffer<Args...> & HostParticleBuffer<Args...>::operator=(const HostParticleBuffer<TArgs...> &b)
+{
+    int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
+    (void)t[0]; // silence compiler warning abut t being unused
+    return *this;
+}
+
+template<typename... Args>
+template<typename... TArgs>
+HostParticleBuffer<Args...>::HostParticleBuffer(const DeviceParticleBuffer<TArgs...> &other)
+        : m_numParticles(other.size()),
+          Args(ext_base_cast<Args>(other))... {}
+
+template<typename... Args>
+template<typename... TArgs>
+HostParticleBuffer<Args...> &HostParticleBuffer<Args...>::operator=(const DeviceParticleBuffer<TArgs...> &b)
 {
     int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
     (void)t[0]; // silence compiler warning abut t being unused

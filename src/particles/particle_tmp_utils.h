@@ -33,7 +33,7 @@ CUDAHOSTDEV inline const B &ext_base_cast(const T &x)
     return static_cast<const B &>(x);
 }
 
-// this overload is selected B has a type bind_ref_to_t which is a base of B and x is const
+// this overload is selected if B has a type bind_ref_to_t which is a base of B and x is const
 template <typename B, typename T, std::enable_if_t<mpu::is_base_of_v<typename B::bind_ref_to_t,T> && !std::is_base_of<B,T>::value , int> = 0>
 CUDAHOSTDEV inline auto &ext_base_cast(const T &x)
 {

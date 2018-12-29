@@ -101,6 +101,7 @@ public:
 
     // status checks
     size_t size() const { return m_size;} //!< returns the number of particles
+    bool isRegistered() const {return (m_graphicsResource != nullptr);} //!< check if openGL VBO is used instead of native cuda memory
 
     // friends
     friend class HOST_BASE<implementation>; // be friends with the corresponding host base
