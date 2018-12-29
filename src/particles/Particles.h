@@ -1,6 +1,6 @@
 /*
  * mpUtils
- * ParticleBuffer.h
+ * Particles.h
  *
  * @author: Hendrik Schwanekamp
  * @mail:   hendrik.schwanekamp@gmx.net
@@ -18,7 +18,6 @@
 //--------------------
 #include "Particle.h"
 #include "SharedParticles.h"
-#include "ParticleBuffer.h"
 #include "algorithms.h"
 //--------------------
 

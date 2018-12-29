@@ -45,6 +45,10 @@ class DEVICE_REFERENCE : device_reference_flag
 public:
     static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");
 
+    template<typename nbft, std::enable_if_t< std::is_same_v<nbft,no_baseclass_flag> || std::is_same_v<nbft,size_t >, int> _null = 0 >
+    CUDAHOSTDEV explicit DEVICE_REFERENCE(nbft v) { static_assert(mpu::always_false_v<nbft>,
+                      "Cannot construct DeviceParticleReference from this DeviceParticleReference or DeviceParticleBuffer, because the latter is missing at least one attribute!"); }
+
     // types
     using impl = implementation;
     using type = typename impl::type;
@@ -52,14 +56,14 @@ public:
     using device_type = DEVICE_BASE<implementation>;
     using bind_ref_to_t = device_type;
 
-    // construction only from a compatible host base
+    // construction only from a compatible device base in host code
     DEVICE_REFERENCE(const device_type & other); //!< construct from a compatible device base
 
     // default copy and move construction, no assignment since this is a reference
     CUDAHOSTDEV DEVICE_REFERENCE(const DEVICE_REFERENCE & other)= default;
-    CUDAHOSTDEV DEVICE_REFERENCE( DEVICE_REFERENCE&& other) = default;
-    DEVICE_REFERENCE& operator=(DEVICE_REFERENCE&& other) = delete;
-    DEVICE_REFERENCE& operator=(DEVICE_REFERENCE other) = delete;
+    CUDAHOSTDEV DEVICE_REFERENCE( DEVICE_REFERENCE&& other) noexcept = default;
+    CUDAHOSTDEV DEVICE_REFERENCE& operator=(DEVICE_REFERENCE&& other) = delete;
+    CUDAHOSTDEV DEVICE_REFERENCE& operator=(DEVICE_REFERENCE other) = delete;
 
     // particle handling
     template<typename ... Args>

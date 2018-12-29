@@ -21,6 +21,7 @@
 #include "Host_base.h"
 #include "Device_base.h"
 #include "Shared_base.h"
+#include "Device_reference.h"
 //--------------------
 
 //!< class to identify particle buffer implementations
@@ -33,7 +34,8 @@ class pb_impl {};
 template <size_t n> \
 using SHARED_ ## NAME = SHARED_BASE<n,IMPL>; \
 using HOST_ ## NAME = HOST_BASE<IMPL>; \
-using DEV_ ## NAME = DEVICE_BASE<IMPL>
+using DEV_ ## NAME = DEVICE_BASE<IMPL>; \
+using DREF_ ## NAME = DEVICE_BASE<IMPL>
 
 //-------------------------------------------------------------------
 // 3D position as f4_t
@@ -95,6 +97,8 @@ MAKE_PARTICLE_BUFFER_IMPLEMENTATION(POSM,posm_impl);
 
 using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM>;
 using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM>;
+using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM>;
+
 //using shared_base_order = std::tuple<SHARED_POS,SHARED_MASS,SHARED_POSM>;
 
 //    //-------------------------------------------------------------------

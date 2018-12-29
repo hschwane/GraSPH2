@@ -56,12 +56,12 @@ CUDAHOSTDEV inline no_baseclass_flag ext_base_cast(const T &x)
     return no_baseclass_flag{};
 }
 
-// Overload taken if B is not a base of T and B has a member called size.
+// Overload taken if B is not a base of T and T has a member called size.
 // In this case we return the size so the new object can
 // be constructed with an appropriate size
 template <typename B, typename T, std::enable_if_t< !std::is_base_of<B,T>::value
                                                     && !std::is_base_of<typename B::bind_ref_to_t,T>::value
-                                                    && mpu::is_detected<sizeMember_t,B>(), int> = 0>
+                                                    && mpu::is_detected<sizeMember_t,T>(), int> = 0>
 CUDAHOSTDEV inline size_t ext_base_cast(const T &x)
 {
     return x.size();

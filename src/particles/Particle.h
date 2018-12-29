@@ -38,7 +38,7 @@ class Particle : public Args...
 {
 public:
     static_assert( mpu::conjunction_v< std::is_base_of<particle_attrib,Args>...>,
-            "Only use the Particle class with template arguments generated with the macro \"MAKE_PARTICLE_BASE\"! See file ParticleBuffer.h."); //!< check if only valid bases are used for the particle
+            "Only use the Particle class with template arguments generated with the macro \"MAKE_PARTICLE_BASE\"! See file particle_attributes.h."); //!< check if only valid bases are used for the particle
     static_assert( checkOrder_v<std::tuple<Args...>,particle_base_order >,
             "Use particle Attributes in correct order without duplicates. See particle_base_order in particle_attributes.h.");
 
