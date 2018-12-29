@@ -22,6 +22,10 @@
 
 // forward declarations
 //--------------------
+//!< class template that references a DEVICE_BASE for use in device code
+template <typename implementation>
+class DEVICE_REFERENCE;
+
 //!< class to identify particle buffer implementations
 class pb_impl;
 //--------------------
@@ -100,6 +104,7 @@ public:
 
     // friends
     friend class HOST_BASE<implementation>; // be friends with the corresponding host base
+    friend class DEVICE_REFERENCE<implementation>; // be friends with the corresponding device reference
 
 protected:
     DEVICE_BASE & operator=(const size_t & f) {return *this;} //!< ignore assignments of size_t from the base class

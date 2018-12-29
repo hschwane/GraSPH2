@@ -2,16 +2,20 @@
 
 ## high priority
 
-### bugfixes
-- fix initialisation of host particle buffer
-
 ### particle management
-- somehow make it possible to get the host type from a base buffer
+- add device buffer
+- add reference buffer
+- implement initialisation of device particles again
+- somehow make it possible to get the particle type from a base buffer
+- somehow make it possible to get the different buffer types from each other
+
+- add shared buffer
 - more safety / better errors when dealing with particle buffers
-- add possibility to use pinned memory for particle buffers
+
 - think about the particle management carefully
 - think about particles during init carefully
-- enhance compile time using particle
+
+- use the new particle things in a correct way
 
 ### simulation management
 - find better solution for the stuff in the algorithms file
@@ -29,7 +33,7 @@
 ### usability
 - more runtime options vs compiletime options
 
-### simulation managemant
+### simulation management
 - make the compute derivitives function more organized
 - find better solution for 2D simulation
 
@@ -46,6 +50,7 @@
 ### output data handling
 - use pinned host memory here
 - remove the stream sync points
+- cuda memcopy is not async
 
 
 ## low priority / ideas / long term projects
@@ -53,7 +58,10 @@
 ### particle creation
 - add python script support to generate initials
 
-### simulation managemant
+### particle management
+- enhance compile time using particle
+
+### simulation management
 - find better solution to switch options on and off
 
 ### integration
@@ -81,9 +89,16 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
-- make it easier to use Particles in the correct way
+- fix initialisation function of particle buffer
+- mapped and pinned state of resources is not overwritten after most assignments
+- device particles can now be accessed from host code
+- pinned host memory can be used for host particle buffer
 - add function to concatenate and merge particles
-- mark derivatives in the particle buffer
+- derivatives are now marked as such in the particle buffer
+
+- add device reference
+
+- make it easier to use Particles in the correct way
 - safety measures when creating particles
 - better error messages when using Particles
 
