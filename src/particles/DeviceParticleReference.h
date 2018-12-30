@@ -49,7 +49,7 @@ public:
 
     // construction only from a compatible DeviceParticleBuffer in host code
     template <typename... TArgs>
-    DeviceParticleReference(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
+    explicit DeviceParticleReference(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
 
     // default copy and move construction, no assignment since this is a reference
     template <typename... TArgs>
@@ -61,9 +61,9 @@ public:
 
     // particle handling
     template<typename... particleArgs>
-    CUDAHOSTDEV Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
+    __device__ Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
     template<typename... particleArgs>
-    CUDAHOSTDEV void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
+    __device__ void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
 
     // status checks
     CUDAHOSTDEV size_t size() const {return m_numParticles;} //!< return the number of particles in this buffer
@@ -89,7 +89,7 @@ CUDAHOSTDEV DeviceParticleReference<Args...>::DeviceParticleReference(const Devi
 
 template<typename... Args>
 template<typename... particleArgs>
-Particle<particleArgs...> DeviceParticleReference<Args...>::loadParticle(size_t id) const
+__device__ Particle<particleArgs...> DeviceParticleReference<Args...>::loadParticle(size_t id) const
 {
     Particle<particleArgs...> p{};
     int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
@@ -99,7 +99,7 @@ Particle<particleArgs...> DeviceParticleReference<Args...>::loadParticle(size_t 
 
 template<typename... Args>
 template<typename... particleArgs>
-void DeviceParticleReference<Args...>::storeParticle(size_t id, const Particle<particleArgs...> &p)
+__device__ void DeviceParticleReference<Args...>::storeParticle(size_t id, const Particle<particleArgs...> &p)
 {
     int t[] = {0, ((void)Args::storeParticle(id,p),1)...};
     (void)t[0]; // silence compiler warning abut t being unused

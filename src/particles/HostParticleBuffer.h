@@ -70,7 +70,7 @@ public:
 
     // assign and construct from a DeviceParticleBuffer
     template <typename... TArgs>
-    HostParticleBuffer(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
+    explicit HostParticleBuffer(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
     template <typename... TArgs>
     HostParticleBuffer& operator=(const DeviceParticleBuffer<TArgs...> &b); //!< assignment from a DeviceParticleBuffer
 
