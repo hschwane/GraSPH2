@@ -134,23 +134,40 @@ using reorderd_t = make_tpl_t< mpu::is_rm_duplicates_t< mpu::is_sort_asc_t< buil
  * @brief Concatenate particles or particle buffers. Returns a particle or buffer that has all bases of both particles/buffers.
  */
 template <typename PA, typename PB>
-struct particle_concat;
+struct particle_concat_impl;
 
 template <template<typename ...T> class Class, typename ...PA_bases, typename ...PB_bases>
-struct particle_concat < Class<PA_bases...>, Class<PB_bases...>>
+struct particle_concat_impl < Class<PA_bases...>, Class<PB_bases...>>
 {
     using type = Class<PA_bases...,PB_bases...>;
+};
+
+template <typename ...Particles>
+struct particle_concat;
+
+template <typename first ,typename ...rest>
+struct particle_concat<first,rest...>
+{
+    using type = particle_concat_impl<first, particle_concat<rest...>>;
+};
+
+template <typename first>
+struct particle_concat<first>
+{
+    using type = first;
 };
 
 /**
  * @brief Concatenate particles or particle buffers. Returns a particle or buffer that has all bases of both particles/buffers.
  */
-template <typename PA, typename PB>
-using particle_concat_t= typename particle_concat<PA,PB>::type;
+template <typename ...Particles>
+using particle_concat_t= typename particle_concat<Particles...>::type;
+
+
 
 //-------------------------------------------------------------------
 /**
- * @brief Create a tuple of types from the attributes of a particle
+ * @brief Create a tuple of types from the attributes of a particle or buffer
  */
 template <typename PA>
 struct particle_to_tuple;
@@ -162,7 +179,7 @@ struct particle_to_tuple < Class<PA_bases...>>
 };
 
 /**
- * @brief Create a tuple of types from the attributes of a particle
+ * @brief Create a tuple of types from the attributes of a particle or buffer
  */
 template <typename PA>
 using particle_to_tuple_t =typename particle_to_tuple<PA>::type;

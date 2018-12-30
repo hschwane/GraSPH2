@@ -64,6 +64,7 @@ public:
     using type = typename impl::type;
     using particleType = typename impl::particleType;
     using host_type = HOST_BASE<implementation>; //!< the type of host base this device base can be converted to
+    using reference_type = DEVICE_REFERENCE<implementation>; //!< the type of device reference this device base can be converted to
     using bind_ref_to_t = host_type; //!< the type of host base this device base can be converted to
 
     //construction and destruction

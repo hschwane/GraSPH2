@@ -53,6 +53,11 @@ public:
     static_assert( checkOrder_v<std::tuple<Args...>,host_base_order>,
                    "Use particle Attributes in correct order without duplicates. See host_base_order in particle_buffer_impl.h.");
 
+    // types
+    using attributes = std::tuple<Args...>;
+    using particleType = Particle< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::particleType ...>>, particle_base_order>>;
+    using deviceBufferType =  DeviceParticleBuffer< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::device_type ...>>, device_base_order>>;
+
     // constructors
     HostParticleBuffer() : m_numParticles(0), Args()... {} //!< default constructor
     explicit HostParticleBuffer(size_t n) : m_numParticles(n), Args(n)... {} //!< construct particle buffer which can contain n particles

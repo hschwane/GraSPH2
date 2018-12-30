@@ -19,6 +19,7 @@
 #include "Particle.h"
 #include "particle_buffer_impl.h"
 #include "HostParticleBuffer.h"
+#include "DeviceParticleReference.h"
 //--------------------
 
 //-------------------------------------------------------------------
@@ -51,6 +52,12 @@ public:
                    "Only use the DeviceParticleBuffer class with instantiations of Device_base! See file particle_buffer_impl.h for possible bases."); //!< check if only valid bases are used for the particle
     static_assert( checkOrder_v<std::tuple<Args...>,device_base_order>,
                    "Use particle Attributes in correct order without duplicates. See host_base_order in particle_buffer_impl.h.");
+
+    // types
+    using attributes = std::tuple<Args...>;
+    using particleType = Particle< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::particleType ...>>, particle_base_order>>;
+    using hostBufferType =  DeviceParticleBuffer< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::host_type ...>>, host_base_order>>;
+    using referenceType =  DeviceParticleReference< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::device_reference ...>>, dref_base_order>>;
 
     // constructors
     DeviceParticleBuffer() : m_numParticles(0), Args()... {} //!< default constructor

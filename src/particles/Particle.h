@@ -42,6 +42,8 @@ public:
     static_assert( checkOrder_v<std::tuple<Args...>,particle_base_order >,
             "Use particle Attributes in correct order without duplicates. See particle_base_order in particle_attributes.h.");
 
+    using attributes = std::tuple<Args...>;
+
     Particle()= default; //!< default construct particle values are undefined
 
     template <typename... T, std::enable_if_t< mpu::conjunction<mpu::is_list_initable<Args, T&&>...>::value, int> = 0>
@@ -119,22 +121,24 @@ auto make_particle(ConstrArgs && ... args)
 }
 
 //-------------------------------------------------------------------
-// merge two particles
+// merge multiple particles
 
 /**
- * @brief Merge two particles. A new particle with all attributes from both input particles is created and values are copied.
- *          If both input particles share an attribute the value from pa is used.
- * @tparam Ta the type of particle A
- * @tparam Tb the type of particle B
+ * @brief Merge multiple particles. A new particle with all attributes from all input particles is created and values are copied.
+ *          If input particles share an attribute the value from particle Pa or the last particle with the attribute in question is used.
  * @param pa the first particle
  * @param pb the second particle
  * @return a new particle with all attributes from pa and pb
  */
-template <typename Ta, typename Tb>
-auto merge_particles(const Ta& pa, const Tb& pb)
+template <typename PTa, typename ...PTs>
+auto merge_particles(const PTa& pa,const PTs& ... ps)
 {
-    auto p = make_particle< particle_concat_t<Ta,Tb> >(pb);
+    auto p = make_particle< particle_concat_t<PTa, PTs...> >();
+
+    int t[] = {0, ((void)p=ps,1)...};
+    (void)t[0]; // silence compiler warning about t being unused
     p = pa;
+
     return p;
 }
 

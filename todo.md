@@ -5,8 +5,6 @@
 ### particle management
 
 - implement initialisation of device particles again
-- somehow make it possible to get the particle type from a base buffer
-- somehow make it possible to get the different buffer types from each other
 
 - add shared buffer
 - better defaults for particle load and store
@@ -98,13 +96,15 @@ for motivation, all finished todo entries are moved here instead of being delete
 - add function to concatenate and merge particles
 - derivatives are now marked as such in the particle buffer
 
+- somehow make it possible to get the particle type from a base buffer
+- somehow make it possible to get the different buffer types from each other
 - add reference buffer
 - add device reference
 - add device buffer
 
 - make it easier to use Particles in the correct way
-- safety measures when creating particles
-- better error messages when using Particles
+- safety measures when creating particles and buffers
+- better error messages when using Particles and buffers
 
 --- v0.2.2 --- 17.12.2018
 - use different cuda stream for downloading data
