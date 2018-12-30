@@ -76,8 +76,10 @@ public:
     DeviceParticleBuffer& operator=(const HostParticleBuffer<TArgs...> &b); //!< assignment from a HostParticleBuffer
 
     // particle handling
-    template<typename... particleArgs>
-    Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) > 0),int> =0>
+    auto loadParticle(size_t id) const; //!< get a particle object with the requested members
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) == 0),int> =0>
+    auto loadParticle(size_t id) const; //!< default if no attributes are specified, returns a particle with all attributes stored by this buffer
     template<typename... particleArgs>
     void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
     void initialize(); //!< set all particle attributes to there default values
@@ -163,10 +165,20 @@ DeviceParticleBuffer<Args...> &DeviceParticleBuffer<Args...>::operator=(const Ho
 }
 
 template<typename... Args>
-template<typename... particleArgs>
-Particle<particleArgs...> DeviceParticleBuffer<Args...>::loadParticle(size_t id) const
+template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) > 0),int>>
+auto DeviceParticleBuffer<Args...>::loadParticle(size_t id) const
 {
     Particle<particleArgs...> p{};
+    int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
+    (void)t[0]; // silence compiler warning abut t being unused
+    return p;
+}
+
+template<typename... Args>
+template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) == 0),int>>
+auto DeviceParticleBuffer<Args...>::loadParticle(size_t id) const
+{
+    particleType p;
     int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
     (void)t[0]; // silence compiler warning abut t being unused
     return p;

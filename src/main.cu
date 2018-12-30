@@ -78,9 +78,11 @@ int main()
 
     auto hpb1 = dpb1.getHostBuffer();
 
-    auto p2 = hpb1.loadParticle<POS,MASS>(5);
 
-    std::cout << p2.mass << std::endl;
+
+    auto p2 = hpb1.loadParticle(5);
+
+    std::cout << typeid(decltype(p2)).name() << " -VALUE FOR MASS: " << p2.mass << std::endl;
 
 
 }

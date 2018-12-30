@@ -60,8 +60,10 @@ public:
     CUDAHOSTDEV DeviceParticleReference& operator=(DeviceParticleReference other) = delete;
 
     // particle handling
-    template<typename... particleArgs>
-    __device__ Particle<particleArgs...> loadParticle(size_t id) const; //!< get a particle object with the requested members
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) > 0),int> =0>
+    __device__ auto loadParticle(size_t id) const; //!< get a particle object with the requested members
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) == 0),int> =0>
+    __device__ auto loadParticle(size_t id) const; //!< default if no attributes are specified, returns a particle with all attributes stored by this buffer
     template<typename... particleArgs>
     __device__ void storeParticle(size_t id, const Particle<particleArgs...>& p); //!< set the attributes of particle id according to the particle object
 
@@ -88,10 +90,20 @@ CUDAHOSTDEV DeviceParticleReference<Args...>::DeviceParticleReference(const Devi
           Args(ext_base_cast<Args>(other))... {}
 
 template<typename... Args>
-template<typename... particleArgs>
-__device__ Particle<particleArgs...> DeviceParticleReference<Args...>::loadParticle(size_t id) const
+template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) > 0),int>>
+__device__ auto DeviceParticleReference<Args...>::loadParticle(size_t id) const
 {
     Particle<particleArgs...> p{};
+    int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
+    (void)t[0]; // silence compiler warning abut t being unused
+    return p;
+}
+
+template<typename... Args>
+template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) == 0),int>>
+__device__ auto DeviceParticleReference<Args...>::loadParticle(size_t id) const
+{
+    particleType p;
     int t[] = {0, ((void)Args::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
     (void)t[0]; // silence compiler warning abut t being unused
     return p;

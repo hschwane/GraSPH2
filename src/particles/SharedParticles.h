@@ -49,11 +49,19 @@ public:
     SharedParticles(const SharedParticles&)=delete;
     SharedParticles& operator=(const SharedParticles&)=delete;
 
-    template<typename... particleArgs>
-    __device__
-    Particle<particleArgs...> loadParticle(size_t id) //!< get a particle object with the requested members
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) > 0),int> =0>
+    __device__ auto loadParticle(size_t id) const //!< get a particle object with the requested members
     {
         Particle<particleArgs...> p{};
+        int t[] = {0, ((void)TArgs<n>::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
+        (void)t[0]; // silence compiler warning abut t being unused
+        return p;
+    }
+
+    template<typename... particleArgs, std::enable_if_t< (sizeof...(particleArgs) == 0),int> =0>
+    __device__ auto loadParticle(size_t id) const //!< default if no attributes are specified, returns a particle with all attributes stored by this buffer
+    {
+        particleType p;
         int t[] = {0, ((void)TArgs<n>::loadParticle(id,p),1)...}; // call load particle functions of all the base classes
         (void)t[0]; // silence compiler warning abut t being unused
         return p;

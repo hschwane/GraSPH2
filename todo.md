@@ -4,7 +4,6 @@
 
 ### particle management
 
-- better defaults for particle load and store
 - check for valid parameters on all template calls
 - save make functions for all buffers (like the one the particle has)
 - more safety / better errors when dealing with particle buffers
@@ -93,6 +92,7 @@ for motivation, all finished todo entries are moved here instead of being delete
 - add function to concatenate and merge particles
 - derivatives are now marked as such in the particle buffer
 
+- better defaults for particle load
 - add shared buffer
 - implement initialisation of device particles again
 - somehow make it possible to get the particle type from a base buffer
