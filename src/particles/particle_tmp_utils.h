@@ -148,7 +148,7 @@ struct particle_concat;
 template <typename first ,typename ...rest>
 struct particle_concat<first,rest...>
 {
-    using type = particle_concat_impl<first, particle_concat<rest...>>;
+    using type = typename particle_concat_impl<first, typename particle_concat<rest...>::type >::type;
 };
 
 template <typename first>

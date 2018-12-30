@@ -63,9 +63,9 @@ public:
     using impl = implementation;
     using type = typename impl::type;
     using particleType = typename impl::particleType;
-    using host_type = HOST_BASE<implementation>; //!< the type of host base this device base can be converted to
-    using reference_type = DEVICE_REFERENCE<implementation>; //!< the type of device reference this device base can be converted to
-    using bind_ref_to_t = host_type; //!< the type of host base this device base can be converted to
+    using hostType = HOST_BASE<implementation>; //!< the type of host base this device base can be converted to
+    using referenceType = DEVICE_REFERENCE<implementation>; //!< the type of device reference this device base can be converted to
+    using bind_ref_to_t = hostType; //!< the type of host base this device base can be converted to
 
     //construction and destruction
     DEVICE_BASE() : m_size(0), m_data(nullptr), m_graphicsResource(nullptr) {}
@@ -86,8 +86,8 @@ public:
     }
 
     // construction and assignment from host_base
-    explicit DEVICE_BASE(const host_type & other); //!< construct from a compatible host base
-    DEVICE_BASE& operator=(const host_type& other); //!< assign from compatible host base
+    explicit DEVICE_BASE(const hostType & other); //!< construct from a compatible host base
+    DEVICE_BASE& operator=(const hostType& other); //!< assign from compatible host base
 
     // particle handling
     template<typename ... Args>
@@ -159,13 +159,13 @@ DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE
 }
 
 template <typename implementation>
-DEVICE_BASE<implementation>::DEVICE_BASE(const DEVICE_BASE::host_type &other) : DEVICE_BASE(other.m_size)
+DEVICE_BASE<implementation>::DEVICE_BASE(const DEVICE_BASE::hostType &other) : DEVICE_BASE(other.m_size)
 {
     assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyHostToDevice));
 }
 
 template <typename implementation>
-DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE_BASE::host_type& other)
+DEVICE_BASE<implementation> &DEVICE_BASE<implementation>::operator=(const DEVICE_BASE::hostType& other)
 {
     if(size() != other.size())
     {

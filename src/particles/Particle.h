@@ -120,6 +120,12 @@ auto make_particle(ConstrArgs && ... args)
     return make_particle<std::tuple<TypeArgs...>>(std::forward<ConstrArgs>(args)...);
 }
 
+/**
+ * @brief The type of particle generated when calling make particle with the template arguments Args
+ */
+template <typename ...Args>
+using make_particle_t = decltype(make_particle<Args...>());
+
 //-------------------------------------------------------------------
 // merge multiple particles
 
@@ -135,11 +141,14 @@ auto merge_particles(const PTa& pa,const PTs& ... ps)
 {
     auto p = make_particle< particle_concat_t<PTa, PTs...> >();
 
-    int t[] = {0, ((void)p=ps,1)...};
+    int t[] = {0, ((void)(p=ps),1)...};
     (void)t[0]; // silence compiler warning about t being unused
     p = pa;
 
     return p;
 }
+
+template <typename ... Args>
+using merge_particles_t = decltype(merge_particles<Args...>(Args()...));
 
 #endif //MPUTILS_PARTICLE_H

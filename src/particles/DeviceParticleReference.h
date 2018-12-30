@@ -45,8 +45,7 @@ public:
 
     // types
     using attributes = std::tuple<Args...>;
-    using particleType = Particle< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::particleType ...>>, particle_base_order>>;
-    using deviceBufferType =  DeviceParticleBuffer< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::device_type ...>>, device_base_order>>;
+    using particleType = merge_particles_t < typename Args::particleType ... >;
 
     // construction only from a compatible DeviceParticleBuffer in host code
     template <typename... TArgs>

@@ -293,3 +293,89 @@ __global__ void nbodyForces(DeviceParticlesType particles, f1_t eps2)
                                  pi.acc -= pi.vel * 0.01;
                          })
 }
+
+
+//-------------------------------------------------------------------
+// create HostParticleBuffer in a save way
+
+namespace detail {
+template<typename Tuple>
+struct mhpb_impl;
+
+template<typename ... TArgs>
+struct mhpb_impl<std::tuple<TArgs...>>
+{
+template<typename ...ConstrArgs>
+static auto make_hpb(ConstrArgs &&... args)
+{
+    return HostParticleBuffer<TArgs...>(std::forward<ConstrArgs>(args)...);
+}
+};
+}
+
+/**
+ * @brief Creates a HostParticleBuffer in a save way from a std::tuple of attributes, making sure all attributes are in the correct order.
+ * @tparam TupleType the tuple to create the particle from
+ * @return the created particle
+ */
+template <typename TupleType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<std::tuple,TupleType> , int> _null =0>
+auto make_hpb(ConstrArgs && ... args)
+{
+    return detail::mhpb_impl< reorderd_t<TupleType,host_base_order >>::make_hpb(std::forward<ConstrArgs>(args)...);
+}
+
+/**
+ * @brief Creates a HostParticleBuffer in a save way from another HostParticleBuffer type (like what you get from concatenating particles), making sure all attributes are in the correct order.
+ * @tparam BufferType the particle to create
+ * @return the created particle
+ */
+template <typename BufferType, typename ...ConstrArgs, std::enable_if_t< mpu::is_instantiation_of_v<HostParticleBuffer,BufferType> , int> _null =0>
+auto make_hpb(ConstrArgs && ... args)
+{
+    return detail::mhpb_impl< reorderd_t<particle_to_tuple_t<BufferType> ,host_base_order>>::make_hpb(std::forward<ConstrArgs>(args)...);
+}
+
+/**
+ * @brief Creates a HostParticleBuffer in a save way from a list of attributes, making sure all attributes are in the correct order.
+ * @tparam TypeArgs particle attributes to sort and use
+ * @return the created particle
+ */
+template <typename ...TypeArgs, typename ...ConstrArgs, std::enable_if_t< (sizeof...(TypeArgs)>1), int> _null =0>
+auto make_hpb(ConstrArgs && ... args)
+{
+    return make_hpb<std::tuple<TypeArgs...>>(std::forward<ConstrArgs>(args)...);
+}
+
+/**
+ * @brief The type of HostParticleBuffer generated when calling make_hpb with the template arguments Args
+ */
+template <typename ...Args>
+using make_hpb_t = decltype(make_hpb<Args...>());
+
+//-------------------------------------------------------------------
+// merge multiple particles
+
+/**
+ * @brief Merge multiple HostParticleBuffer. A new HostParticleBuffer with all attributes from all input particles is created and values are copied.
+ *          If input particles share an attribute the value from particle Pa or the last particle with the attribute in question is used.
+ * @param pa the first particle
+ * @param pb the second particle
+ * @return a new particle with all attributes from pa and pb
+ */
+template <typename PTa, typename ...PTs>
+auto merge_hpb(const PTa& pa,const PTs& ... ps)
+{
+    auto p = make_hpb< particle_concat_t<PTa, PTs...> >();
+
+    int t[] = {0, ((void)(p=ps),1)...};
+    (void)t[0]; // silence compiler warning about t being unused
+    p = pa;
+
+    return p;
+}
+
+/**
+ * @brief The type of HostParticleBuffer generated when calling merge_hpb with the template arguments Args
+ */
+template <typename ... Args>
+using merge_hpb_t = decltype(merge_particles<Args...>(Args()...));

@@ -60,8 +60,8 @@ public:
     using impl = implementation;
     using type = typename impl::type;
     using particleType = typename impl::particleType;
-    using device_type = DEVICE_BASE<implementation>;
-    using bind_ref_to_t = device_type; //!< show to which device_base this can be assigned
+    using deviceType = DEVICE_BASE<implementation>;
+    using bind_ref_to_t = deviceType; //!< show to which device_base this can be assigned
 
     // constructors and destructor
     HOST_BASE();
@@ -82,8 +82,8 @@ public:
     }
 
     // construction and assignment from device_base
-    explicit HOST_BASE(const device_type & other); //!< construct from a compatible device base
-    HOST_BASE& operator=(const device_type& other); //!< assign from compatible device base
+    explicit HOST_BASE(const deviceType & other); //!< construct from a compatible device base
+    HOST_BASE& operator=(const deviceType& other); //!< assign from compatible device base
 
     // particle handling
     template<typename ... Args>
@@ -192,13 +192,13 @@ void HOST_BASE<implementation>::unpinMemory()
 }
 
 template<typename implementation>
-HOST_BASE<implementation>::HOST_BASE(const HOST_BASE::device_type &other) : HOST_BASE(other.m_size)
+HOST_BASE<implementation>::HOST_BASE(const HOST_BASE::deviceType &other) : HOST_BASE(other.m_size)
 {
     assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyDeviceToHost));
 }
 
 template<typename implementation>
-HOST_BASE<implementation> &HOST_BASE<implementation>::operator=(const HOST_BASE::device_type &other)
+HOST_BASE<implementation> &HOST_BASE<implementation>::operator=(const HOST_BASE::deviceType &other)
 {
     if(size() != other.size())
     {

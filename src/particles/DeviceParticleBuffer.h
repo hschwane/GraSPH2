@@ -55,9 +55,9 @@ public:
 
     // types
     using attributes = std::tuple<Args...>;
-    using particleType = Particle< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::particleType ...>>, particle_base_order>>;
-    using hostBufferType =  DeviceParticleBuffer< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::host_type ...>>, host_base_order>>;
-    using referenceType =  DeviceParticleReference< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::device_reference ...>>, dref_base_order>>;
+    using particleType = merge_particles_t < typename Args::particleType ... >;
+    using hostType = mpu::instantiate_from_tuple_t<HostParticleBuffer, reorderd_t< std::tuple<typename Args::hostType ...>, host_base_order >>;
+    using referenceType = mpu::instantiate_from_tuple_t<DeviceParticleReference, reorderd_t< std::tuple<typename Args::referenceType ...>, dref_base_order>>;
 
     // constructors
     DeviceParticleBuffer() : m_numParticles(0), Args()... {} //!< default constructor
@@ -88,6 +88,10 @@ public:
     void mapGraphicsResource(); //!< if an opengl buffer is used in any base class, map the buffer to enable cuda usage
     void unmapGraphicsResource(); //!< unmap the opengl buffer of all bases so it can be used by openGL again
 
+    // generate other buffer
+    auto getDeviceReference(); //!< generates a device reference that points to this buffer
+    auto getHostBuffer(); //!< generates a host particle buffer and copies all data to it
+
     // status checks
     size_t size() const {return m_numParticles;} //!< return the number of particles in this buffer
     bool isRegistered() const {return isRegisteredImpl;} //!< check if any internal attribute uses an openGL VBO instead of native cuda memory
@@ -113,17 +117,17 @@ private:
 //-------------------------------------------------------------------
 // helper functions
 
-//namespace detail {
-//    template<typename ... Args>
-//    __global__ void _initializeParticles()
-//    {
-//        for(const auto &i : mpu::gridStrideRange(particles.size()))
-//        {
-//            int t[] = {0, ((void)static_cast<Args*>(&particles)->initialize(i),1)...};
-//            (void)t[0]; // silence compiler warning abut t being unused
-//        }
-//    }
-//}
+namespace detail {
+    template<typename ... Args>
+    __global__ void _initializeParticles(DeviceParticleReference<Args...> particles)
+    {
+        for(const auto &i : mpu::gridStrideRange(particles.size()))
+        {
+            int t[] = {0, ((void)static_cast<Args*>(&particles)->initialize(i),1)...};
+            (void)t[0]; // silence compiler warning abut t being unused
+        }
+    }
+}
 
 //-------------------------------------------------------------------
 // function definitions for ParticleBuffer class
@@ -199,9 +203,21 @@ void DeviceParticleBuffer<Args...>::registerGLGraphicsResource(uint32_t resource
 }
 
 template<typename... Args>
+auto DeviceParticleBuffer<Args...>::getDeviceReference()
+{
+    return referenceType(*this);
+}
+
+template<typename... Args>
+auto DeviceParticleBuffer<Args...>::getHostBuffer()
+{
+    return hostType(*this);
+}
+
+template<typename... Args>
 void DeviceParticleBuffer<Args...>::initialize()
 {
-//    detail::_initializeParticles<<<(size()+255)/256, 256>>>(createDeviceCopy());
+    detail::_initializeParticles<<<(size()+255)/256, 256>>>(getDeviceReference());
 }
 
 #endif //GRASPH2_DEVICEPARTICLEBUFFER_H

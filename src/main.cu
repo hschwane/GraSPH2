@@ -63,6 +63,26 @@ int main()
     p.mass = 0;
     hm2.loadParticle(1,p);
     std::cout << p.mass <<std::endl;
+
+    DeviceParticleBuffer<DEV_POS, DEV_MASS> dpb1(600);
+    using test=DeviceParticleBuffer<DEV_POS, DEV_MASS>;
+
+    std::cout << typeid(test).name() << std::endl;
+    std::cout << typeid(typename test::particleType).name() << std::endl;
+    std::cout << typeid(typename test::hostType).name() << std::endl;
+    std::cout << typeid(typename test::referenceType).name() << std::endl;
+    std::cout << typeid(typename test::hostType::deviceType).name() << std::endl;
+
+
+    dpb1.initialize();
+
+    auto hpb1 = dpb1.getHostBuffer();
+
+    auto p2 = hpb1.loadParticle<POS,MASS>(5);
+
+    std::cout << p2.mass << std::endl;
+
+
 }
 
 //

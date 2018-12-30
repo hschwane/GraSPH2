@@ -55,8 +55,8 @@ public:
 
     // types
     using attributes = std::tuple<Args...>;
-    using particleType = Particle< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::particleType ...>>, particle_base_order>>;
-    using deviceBufferType =  DeviceParticleBuffer< reorderd_t <particle_to_tuple_t< particle_concat_t<typename Args::device_type ...>>, device_base_order>>;
+    using particleType = merge_particles_t < typename Args::particleType ... >;
+    using deviceType =  mpu::instantiate_from_tuple_t<DeviceParticleBuffer, reorderd_t< std::tuple<typename Args::deviceType ...>, device_base_order>>;
 
     // constructors
     HostParticleBuffer() : m_numParticles(0), Args()... {} //!< default constructor
@@ -84,6 +84,9 @@ public:
     // using pinned memory
     void pinMemory();   //!< pin the used memory for faster transfer with gpu (takes some time)
     void unpinMemory(); //!< unpin the used memory
+
+    // generate other buffer
+    auto getDeviceBuffer(); //!< generates a device particle buffer and copies all data to it
 
     // status checks
     bool isPinned() const {return std::tuple_element<0,std::tuple<Args...>>::type::isPinned();} //!<  check if pinned memory is used
@@ -163,6 +166,12 @@ void HostParticleBuffer<Args...>::unpinMemory()
 {
     int t[] = {0, ((void)Args::unpinMemory(),1)...};
     (void)t[0]; // silence compiler warning abut t being unused
+}
+
+template<typename... Args>
+auto HostParticleBuffer<Args...>::getDeviceBuffer()
+{
+    return deviceType(*this);
 }
 
 // include forward declared classes

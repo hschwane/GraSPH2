@@ -53,11 +53,11 @@ public:
     using impl = implementation;
     using type = typename impl::type;
     using particleType = typename impl::particleType;
-    using device_type = DEVICE_BASE<implementation>;
-    using bind_ref_to_t = device_type;
+    using deviceType = DEVICE_BASE<implementation>;
+    using bind_ref_to_t = deviceType;
 
     // construction only from a compatible device base in host code
-    DEVICE_REFERENCE(const device_type & other); //!< construct from a compatible device base
+    DEVICE_REFERENCE(const deviceType & other); //!< construct from a compatible device base
 
     // default copy and move construction, no assignment since this is a reference
     CUDAHOSTDEV DEVICE_REFERENCE(const DEVICE_REFERENCE & other)= default;
@@ -71,33 +71,40 @@ public:
     template<typename ... Args>
     __device__ void storeParticle(size_t id, const Particle<Args ...> & p); //!< set the attributes of particle id according to the particle object
 
+    __device__ void initialize(size_t id); //!< initialises the particle ad position id
+
 public:
 
-    const type* m_data; //!< pointer to the actual data
+    type* const m_data; //!< pointer to the actual data
 };
 
 //-------------------------------------------------------------------
 // function definitions for DEVICE_BASE class
 
 template<typename implementation>
-DEVICE_REFERENCE<implementation>::DEVICE_REFERENCE(const DEVICE_REFERENCE::device_type &other)
+DEVICE_REFERENCE<implementation>::DEVICE_REFERENCE(const DEVICE_REFERENCE::deviceType &other) : m_data(other.m_data)
 {
-    m_data = other.m_data;
 }
 
 template <typename implementation>
 template<typename... Args>
-void DEVICE_REFERENCE<implementation>::loadParticle(size_t id, Particle<Args ...> &p) const
+__device__ void DEVICE_REFERENCE<implementation>::loadParticle(size_t id, Particle<Args ...> &p) const
 {
     p = impl::load(m_data[id]);
 }
 
 template <typename implementation>
 template<typename... Args>
-void DEVICE_REFERENCE<implementation>::storeParticle(size_t id, const Particle<Args ...> &p)
+__device__ void DEVICE_REFERENCE<implementation>::storeParticle(size_t id, const Particle<Args ...> &p)
 {
     int i[] = {0, ((void)impl::template store(m_data[id], ext_base_cast<Args>(p)),1)...};
     (void)i[0]; // silence compiler warning abut i being unused
+}
+
+template<typename implementation>
+__device__ void DEVICE_REFERENCE<implementation>::initialize(size_t id)
+{
+    m_data[id] = impl::defaultValue;
 }
 
 #endif //GRASPH2_DEVICE_REFERENCE_H

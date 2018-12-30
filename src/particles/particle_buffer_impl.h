@@ -35,7 +35,7 @@ template <size_t n> \
 using SHARED_ ## NAME = SHARED_BASE<n,IMPL>; \
 using HOST_ ## NAME = HOST_BASE<IMPL>; \
 using DEV_ ## NAME = DEVICE_BASE<IMPL>; \
-using DREF_ ## NAME = DEVICE_BASE<IMPL>
+using DREF_ ## NAME = DEVICE_REFERENCE<IMPL>
 
 //-------------------------------------------------------------------
 // 3D position as f4_t
