@@ -16,9 +16,13 @@
 
 // includes
 //--------------------
+#include "partice_attributes.h"
+#include "particle_buffer_impl.h"
 #include "Particle.h"
+#include "HostParticleBuffer.h"
+#include "DeviceParticleBuffer.h"
+#include "DeviceParticleReference.h"
 #include "SharedParticles.h"
-#include "algorithms.h"
 //--------------------
 
 #endif //MPUTILS_PARTICLES_H

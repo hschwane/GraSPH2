@@ -2,24 +2,14 @@
 
 ## high priority
 
-### particle management
-
-- check for valid parameters on all template calls
-- save make functions for all buffers (like the one the particle has)
-- more safety / better errors when dealing with particle buffers
-
-- think about the particle management carefully
-- think about particles during init carefully
-
-- use the new particle things in a correct way
-
-### simulation management
 - find better solution for the stuff in the algorithms file
+- use the new particle things in a correct way
 
 
 ## medium priority
 
 ### particle creation
+- think about particles during init carefully
 - add 2d image source from the other branch
 - make modifiers work
 - add modifieres
@@ -86,24 +76,17 @@
 for motivation, all finished todo entries are moved here instead of being deleted
 
 - fix initialisation function of particle buffer
-- mapped and pinned state of resources is not overwritten after most assignments
-- device particles can now be accessed from host code
-- pinned host memory can be used for host particle buffer
 - add function to concatenate and merge particles
-- derivatives are now marked as such in the particle buffer
-
-- better defaults for particle load
-- add shared buffer
-- implement initialisation of device particles again
-- somehow make it possible to get the particle type from a base buffer
-- somehow make it possible to get the different buffer types from each other
-- add reference buffer
-- add device reference
-- add device buffer
-
-- make it easier to use Particles in the correct way
-- safety measures when creating particles and buffers
-- better error messages when using Particles and buffers
+- big overhaul of the particle storage system including:
+    - easier to use correctly
+    - better error messages if used incorrectly
+    - load_particle without arguments now returns a particle with all attributes stored in the buffer, instead of an empty particle
+    - host buffer, device buffer and device reference (previously device copy) have separate classes
+    - device buffer can now load and store particles from host code
+    - different particle buffers can be created from each other
+    - pinned host memory can be used for host particle buffer
+    - derivatives are now marked as such in the particle buffer
+    - mapped and pinned state of resources is not overwritten after most assignments
 
 --- v0.2.2 --- 17.12.2018
 - use different cuda stream for downloading data
