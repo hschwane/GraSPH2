@@ -25,7 +25,7 @@ class pb_impl;
 //--------------------
 
 //!< class to identify classes that hold attributes of particles in shared memory
-class shared_base {};
+class Shared_base {};
 
 //-------------------------------------------------------------------
 /**
@@ -43,7 +43,7 @@ class shared_base {};
  *          Reference implementations of such structs can be found in particle_buffer_impl.h.
  */
 template <size_t n, typename implementation>
-class SHARED_BASE : shared_base
+class SHARED_BASE : Shared_base
 {
 public:
     static_assert( std::is_base_of<pb_impl,implementation>::value, "Implementation needs to be a subclass of pb_impl. See particle_buffer_impl.h");

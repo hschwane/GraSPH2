@@ -98,8 +98,7 @@ MAKE_PARTICLE_BUFFER_IMPLEMENTATION(POSM,posm_impl);
 using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM>;
 using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM>;
 using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM>;
-
-//using shared_base_order = std::tuple<SHARED_POS,SHARED_MASS,SHARED_POSM>;
+using shared_base_order = std::tuple<SHARED_POS<0>,SHARED_MASS<0>,SHARED_POSM<0>>;
 
 //    //-------------------------------------------------------------------
 //    // 3D velocity as f4_t

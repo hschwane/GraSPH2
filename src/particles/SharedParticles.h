@@ -17,6 +17,7 @@
 #include "Particle.h"
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
+#include "particle_buffer_impl.h"
 //--------------------
 
 //-------------------------------------------------------------------
@@ -35,6 +36,15 @@ template <size_t n, template <size_t> class... TArgs>
 class SharedParticles : public TArgs<n>...
 {
 public:
+    static_assert( mpu::conjunction_v< std::is_base_of<Shared_base, TArgs<0>>...>,
+                   "Only use the SharedParticles class with instantiations of Shared_base! See file particle_buffer_impl.h for possible bases."); //!< check if only valid bases are used for the particle
+    static_assert( checkOrder_v<std::tuple<TArgs<0>...>,shared_base_order >,
+                   "Use particle Attributes in correct order without duplicates. See dref_base_order in particle_buffer_impl.h.");
+
+    // types
+    using attributes = std::tuple<TArgs<n>...>;
+    using particleType = merge_particles_t < typename TArgs<n>::particleType ... >;
+
     __device__ SharedParticles() : TArgs<n>()... {}
     SharedParticles(const SharedParticles&)=delete;
     SharedParticles& operator=(const SharedParticles&)=delete;
