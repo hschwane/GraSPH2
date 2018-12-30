@@ -29,75 +29,89 @@
 //#include "ResultStorageManager.h"
 //#include "settings/settings.h"
 
-#include "particles/particle_buffer_impl.h"
-#include "particles/HostParticleBuffer.h"
-#include "particles/Device_base.h"
+#include "particles/Particles.h"
+
+class TestAlgorithm
+{
+public:
+    using load_type = Particle<POS>;
+    using store_type = Particle<MASS>;
+
+    static CUDAHOSTDEV store_type for_each(merge_particles_t<load_type,store_type> p, size_t id)
+    {
+        p.mass = id * (p.pos.x + p.pos.y + p.pos.z);
+        return p;
+    }
+};
 
 int main()
 {
-    Particle<MASS> p;
-    p.mass = 10;
+//    HostParticleBuffer<HOST_POS,HOST_MASS> pb(128);
+    DeviceParticleBuffer<DEV_POS,DEV_MASS > pb(128);
 
-    HOST_MASS hm1(10);
-    DEV_MASS hm2(10);
+    pb.storeParticle(1, Particle<POS>(f3_t{2.0f,2.0f,2.0f}));
 
-    hm1.storeParticle(1,p);
-    hm2.storeParticle(1,p);
-
-    DEV_MASS hm3(hm1);
-    HOST_MASS hm4(hm2);
-
-    hm1 = hm3;
-    hm2 = hm4;
-
-    HOST_MASS hm5(hm1);
-    DEV_MASS hm6(hm2);
-
-    hm1 = hm5;
-    hm2 = hm6;
-
-    p.mass = 0;
-    hm1.loadParticle(1,p);
-    std::cout << p.mass <<std::endl;
-
-    p.mass = 0;
-    hm2.loadParticle(1,p);
-    std::cout << p.mass <<std::endl;
-
-    DeviceParticleBuffer<DEV_POS, DEV_MASS> dpb1(600);
-    using test=DeviceParticleBuffer<DEV_POS, DEV_MASS>;
-
-    std::cout << typeid(test).name() << std::endl;
-    std::cout << typeid(typename test::particleType).name() << std::endl;
-    std::cout << typeid(typename test::hostType).name() << std::endl;
-    std::cout << typeid(typename test::referenceType).name() << std::endl;
-    std::cout << typeid(typename test::hostType::deviceType).name() << std::endl;
+    do_for_each<TestAlgorithm>(pb);
 
 
-    dpb1.initialize();
-
-    auto hpb1 = dpb1.getHostBuffer();
+    auto p = pb.loadParticle(1);
+    std::cout << p.mass << std::endl;
 
 
 
-    auto p2 = hpb1.loadParticle(5);
-
-    std::cout << typeid(decltype(p2)).name() << " -VALUE FOR MASS: " << p2.mass << std::endl;
+//    Particle<MASS> p;
+//    p.mass = 10;
+//
+//    HOST_MASS hm1(10);
+//    DEV_MASS hm2(10);
+//
+//    hm1.storeParticle(1,p);
+//    hm2.storeParticle(1,p);
+//
+//    DEV_MASS hm3(hm1);
+//    HOST_MASS hm4(hm2);
+//
+//    hm1 = hm3;
+//    hm2 = hm4;
+//
+//    HOST_MASS hm5(hm1);
+//    DEV_MASS hm6(hm2);
+//
+//    hm1 = hm5;
+//    hm2 = hm6;
+//
+//    p.mass = 0;
+//    hm1.loadParticle(1,p);
+//    std::cout << p.mass <<std::endl;
+//
+//    p.mass = 0;
+//    hm2.loadParticle(1,p);
+//    std::cout << p.mass <<std::endl;
+//
+//    DeviceParticleBuffer<DEV_POS, DEV_MASS> dpb1(600);
+//    using test=DeviceParticleBuffer<DEV_POS, DEV_MASS>;
+//
+//    std::cout << typeid(test).name() << std::endl;
+//    std::cout << typeid(typename test::particleType).name() << std::endl;
+//    std::cout << typeid(typename test::hostType).name() << std::endl;
+//    std::cout << typeid(typename test::referenceType).name() << std::endl;
+//    std::cout << typeid(typename test::hostType::deviceType).name() << std::endl;
+//
+//
+//    dpb1.initialize();
+//
+//    auto hpb1 = dpb1.getHostBuffer();
+//
+//    auto p2 = hpb1.loadParticle(5);
+//
+//    std::cout << typeid(decltype(p2)).name() << " -VALUE FOR MASS: " << p2.mass << std::endl;
 
 
 }
 
-//
-//    /**
-//     * @brief calculates the number of cuda blocks to be launched
-//     * @param particles number of particles to be processed
-//     * @return the number of cuda blocks that should be launched
-//     */
-//    constexpr size_t NUM_BLOCKS(size_t particles)
-//    {
-//        return (particles + BLOCK_SIZE - 1) / BLOCK_SIZE;
-//    }
-//
+
+
+
 //    constexpr f1_t H2 = H*H; //!< square of the smoothing length
 //
 //    /**
