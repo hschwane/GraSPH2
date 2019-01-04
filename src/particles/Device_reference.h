@@ -104,7 +104,7 @@ __device__ void DEVICE_REFERENCE<implementation>::storeParticle(size_t id, const
 template<typename implementation>
 __device__ void DEVICE_REFERENCE<implementation>::initialize(size_t id)
 {
-    m_data[id] = impl::defaultValue;
+    m_data[id] = type{impl::defaultValue};
 }
 
 #endif //GRASPH2_DEVICE_REFERENCE_H
