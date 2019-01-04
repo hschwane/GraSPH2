@@ -25,6 +25,74 @@
 //--------------------
 
 //-------------------------------------------------------------------
+// reference implementation for jobs to be executed using the algorithms
+
+//!< reference implementation for a job that is executed on every particle
+//!< using the call do_for_each<do_for_each_reference_job>(particleBuffer);
+struct do_for_each_reference_job
+{
+    using load_type = Particle<POS>; //!< particle attributes to load from main memory
+    using store_type = Particle<MASS>; //!< particle attributes to store to main memory
+    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
+
+    //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
+    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
+    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id)
+    {
+        //!< here you can perform operations on particle p
+        p.mass = id * (p.pos.x + p.pos.y + p.pos.z);
+
+        return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
+    }
+
+    // optionally you can define constant data member and a constructor,
+    // any arguments appended to the do_for_each call will be forwarded to the constructor
+
+};
+
+//!< reference implementation for a job that is executed on every pair of particles
+//!< using the call do_for_each_pair<do_for_each_reference_job>(particleBuffer);
+//!< or call do_for_each_pair_fast<do_for_each_reference_job>(particleBuffer);
+struct do_for_each_pair_reference_job
+{
+    using load_type = Particle<POS>; //!< particle attributes to load from main memory
+    using store_type = Particle<MASS>; //!< particle attributes to store to main memory
+    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
+
+    using pj_type = Particle<POS,MASS>; //!< the particle attributes to load from main memory of all the interaction partners j
+
+    //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
+    template<size_t n>
+    using shared = SharedParticles<n,SHARED_POSM>;
+
+    //!< This function is executed for each particle. Before the interactions are computed.
+    //!< In p the current particle and in id its position in the buffer is given.
+    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
+    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
+    {
+        //!< here you can perform operations on particle pi
+    }
+
+    //!< This function will be called for each pair of particles.
+    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
+    {
+        //!< here you can perform operations on particle pi using the attributes of the interaction partner pj
+        //!< this function is called for every pair of particles
+    }
+
+    //!< This function will be called for particle i after the interactions with the other particles are computed.
+    CUDAHOSTDEV store_type do_after(pi_type& pi)
+    {
+        return pi; //!< return particle pi, all attributes it shares with load_type will be stored in memory
+    }
+
+    // optionally you can define data member that can then be accessed in all 3 functions
+    // optionally you can define constant data member and a constructor,
+    // any arguments appended to the do_for_each_pair call will be forwarded to the constructor
+
+};
+
+//-------------------------------------------------------------------
 // template functions to execute some common algorithms on particles
 
 /**

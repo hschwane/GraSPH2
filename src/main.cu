@@ -31,23 +31,6 @@
 
 #include "particles/Particles.h"
 
-struct TestAlgorithm
-{
-    using load_type = Particle<POS>;
-    using store_type = Particle<MASS>;
-    using pi_type = merge_particles_t<load_type,store_type>;
-
-    const float value;
-
-    CUDAHOSTDEV TestAlgorithm(float v) : value(v) {}
-
-    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id)
-    {
-        p.mass = id * value;  // (p.pos.x + p.pos.y + p.pos.z);
-        return p;
-    }
-};
-
 struct TestAlgorithmB
 {
     using load_type = Particle<POS>;
