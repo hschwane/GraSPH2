@@ -31,30 +31,64 @@
 
 #include "particles/Particles.h"
 
-class TestAlgorithm
+struct TestAlgorithm
 {
-public:
     using load_type = Particle<POS>;
     using store_type = Particle<MASS>;
+    using pi_type = merge_particles_t<load_type,store_type>;
 
-    static CUDAHOSTDEV store_type for_each(merge_particles_t<load_type,store_type> p, size_t id)
+    const float value;
+
+    CUDAHOSTDEV TestAlgorithm(float v) : value(v) {}
+
+    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id)
     {
-        p.mass = id * (p.pos.x + p.pos.y + p.pos.z);
+        p.mass = id * value;  // (p.pos.x + p.pos.y + p.pos.z);
         return p;
+    }
+};
+
+struct TestAlgorithmB
+{
+    using load_type = Particle<POS>;
+    using store_type = Particle<MASS>;
+    using pi_type = merge_particles_t<load_type,store_type>;
+
+    using pj_type = Particle<POS,MASS>;
+
+    template<size_t n>
+    using shared = SharedParticles<n,SHARED_POSM>;
+
+    int m_id{-1};
+    int j{0};
+
+    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
+    {
+        m_id = id;
+    }
+
+    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, pj_type pj)
+    {
+        printf( "i: %i j: %i \n" , m_id , j++ );
+    }
+
+    CUDAHOSTDEV store_type do_after(pi_type& pi)
+    {
+        return pi;
     }
 };
 
 int main()
 {
 //    HostParticleBuffer<HOST_POS,HOST_MASS> pb(128);
-    DeviceParticleBuffer<DEV_POS,DEV_MASS > pb(128);
+    DeviceParticleBuffer<DEV_POS,DEV_MASS > pb(10);
 
     pb.storeParticle(1, Particle<POS>(f3_t{2.0f,2.0f,2.0f}));
 
-    do_for_each<TestAlgorithm>(pb);
+    do_for_each_pair_fast<TestAlgorithmB>(pb);
 
 
-    auto p = pb.loadParticle(1);
+    auto p = pb.loadParticle(4);
     std::cout << p.mass << std::endl;
 
 

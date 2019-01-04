@@ -54,7 +54,7 @@ public:
     __device__ SHARED_BASE() { __shared__ static type mem[n]; m_data = mem;}
 
     template<typename ... Args>
-    __device__ void loadParticle(size_t id, Particle<Args ...> & p) {p = impl::load(m_data[id]);}
+    __device__ void loadParticle(size_t id, Particle<Args ...> & p) const {p = impl::load(m_data[id]);}
     template<typename ... Args>
     __device__ void storeParticle(size_t id, const Particle<Args ...> & p)
     {

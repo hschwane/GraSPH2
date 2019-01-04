@@ -2,7 +2,6 @@
 
 ## high priority
 
-- find better solution for the stuff in the algorithms file
 - use the new particle things in a correct way
 
 
@@ -75,6 +74,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- algorithms now use templates instead of macros
 - fix initialisation function of particle buffer
 - add function to concatenate and merge particles
 - big overhaul of the particle storage system including:
