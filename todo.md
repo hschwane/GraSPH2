@@ -21,6 +21,7 @@
 ### simulation management
 - make the compute derivitives function more organized
 - find better solution for 2D simulation
+- fix xsph
 
 ### integration
 - automatically integrate what is needed using TMP
@@ -45,6 +46,8 @@
 
 ### particle management
 - enhance compile time when using particle templates
+- have attributes that are the same for all particles in constant memory
+- better storage for long data types like matrices
 
 ### simulation management
 - find better solution to switch options on and off
@@ -58,6 +61,7 @@
 - try new graph style kernel launching
 - MPI support
 - share load between CPU and GPU
+- better memory alignment for matrices
 
 ### simulation features
 - linear consistency fix
