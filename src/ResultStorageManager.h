@@ -23,8 +23,8 @@
 //--------------------
 
 // particle parameters that are saved to disk
-using DeviceDiscPT = ParticleBuffer<DEV_POSM,DEV_VEL,DEV_DENSITY>;
-using HostDiscPT = ParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>;
+using DeviceDiscPT = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_DENSITY>;
+using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>;
 #define DiscPbases POS,MASS,VEL,DENSITY
 using DiscPT = Particle<DiscPbases>;
 

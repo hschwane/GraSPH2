@@ -57,6 +57,7 @@
 - adaptive algorithms
 
 ### performance
+- check out shuffle operations an vote functions
 - add datastructures
 - try new graph style kernel launching
 - MPI support

@@ -33,7 +33,7 @@ constexpr Dim dimension=Dim::three;
 constexpr f1_t timestep=0.0003;
 
 // storing results as file
-#define STORE_RESULTS
+//#define STORE_RESULTS
 constexpr char RESULT_FOLDER[] = "/home/hendrik/test/"; // results will be stored in this folder
 constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
@@ -121,9 +121,8 @@ constexpr f1_t xsph_factor = 0.5;
 constexpr size_t BLOCK_SIZE = 256;
 
 // types for particle buffer. you can remove things you don't need to save memory
-using DeviceParticlesType = ParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
-using HostParticlesType = ParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
-using ParticleType = Particle<POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
+using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
 
 
 // DO NOT MODIFY BELOW HERE

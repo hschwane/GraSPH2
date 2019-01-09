@@ -52,8 +52,8 @@ struct pos_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto pos_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
-template<typename T> CUDAHOSTDEV void pos_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto pos_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
+template<typename T> CUDAHOSTDEV inline void pos_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void pos_impl::store<POS>(type & v, const POS& p) {v=type{p.pos.x,p.pos.y,p.pos.z,0.0f};}
 
 
@@ -69,8 +69,8 @@ struct mass_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto mass_impl::load(const type & v) { return particleType(v); }
-template<typename T> CUDAHOSTDEV void mass_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto mass_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void mass_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void mass_impl::store<MASS>(type & v, const MASS& p) {v=p.mass;}
 
 
@@ -86,8 +86,8 @@ struct posm_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto posm_impl::load(const type & v) { return particleType( f3_t{v.x,v.y,v.z}, v.w); }
-template<typename T> CUDAHOSTDEV void posm_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto posm_impl::load(const type & v) { return particleType( f3_t{v.x,v.y,v.z}, v.w); }
+template<typename T> CUDAHOSTDEV inline void posm_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void posm_impl::store<POS>(type & v, const POS& p) {v.x=p.pos.x; v.y=p.pos.y; v.z=p.pos.z;}
 template<> CUDAHOSTDEV inline void posm_impl::store<MASS>(type & v, const MASS& p) {v.w=p.mass;}
 
@@ -104,8 +104,8 @@ struct vel_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto vel_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
-template<typename T> CUDAHOSTDEV void vel_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto vel_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
+template<typename T> CUDAHOSTDEV inline void vel_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void vel_impl::store<VEL>(type & v, const VEL& p) {v=type{p.vel.x,p.vel.y,p.vel.z,0.0f};}
 
 
@@ -121,8 +121,8 @@ struct acc_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto acc_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
-template<typename T> CUDAHOSTDEV void acc_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto acc_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
+template<typename T> CUDAHOSTDEV inline void acc_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void acc_impl::store<ACC>(type & v, const ACC& p) {v=type{p.acc.x,p.acc.y,p.acc.z,0.0f};}
 
 
@@ -138,8 +138,8 @@ struct xvel_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto xvel_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
-template<typename T> CUDAHOSTDEV void xvel_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto xvel_impl::load(const type & v) { return particleType(f3_t{v.x,v.y,v.z}); }
+template<typename T> CUDAHOSTDEV inline void xvel_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void xvel_impl::store<XVEL>(type & v, const XVEL& p) {v=type{p.xvel.x,p.xvel.y,p.xvel.z,0.0f};}
 
 
@@ -155,8 +155,8 @@ struct density_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto density_impl::load(const type & v) { return particleType(v); }
-template<typename T> CUDAHOSTDEV void density_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto density_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void density_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void density_impl::store<DENSITY>(type & v, const DENSITY& p) {v=p.density;}
 
 
@@ -172,8 +172,8 @@ struct density_dt_impl : pb_impl
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto density_dt_impl::load(const type & v) { return particleType(v); }
-template<typename T> CUDAHOSTDEV void density_dt_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto density_dt_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void density_dt_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void density_dt_impl::store<DENSITY_DT>(type & v, const DENSITY_DT& p) {v=p.density_dt;}
 
 
@@ -182,15 +182,15 @@ template<> CUDAHOSTDEV inline void density_dt_impl::store<DENSITY_DT>(type & v, 
 struct deviatoric_stress_impl : pb_impl
 {
     using type = m3_t;
-    static constexpr type f1_t = {0};
+    static constexpr f1_t defaultValue = {0};
     using particleType = Particle<DSTRESS>;
 
     CUDAHOSTDEV static auto load(const type & v);
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto deviatoric_stress_impl::load(const type & v) { return particleType(v); }
-template<typename T> CUDAHOSTDEV void deviatoric_stress_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto deviatoric_stress_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void deviatoric_stress_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void deviatoric_stress_impl::store<DSTRESS>(type & v, const DSTRESS& p) {v=p.dstress;}
 
 
@@ -199,15 +199,15 @@ template<> CUDAHOSTDEV inline void deviatoric_stress_impl::store<DSTRESS>(type &
 struct deviatoric_stress_dt_impl : pb_impl
 {
     using type = m3_t;
-    static constexpr type f1_t = {0};
+    static constexpr f1_t defaultValue = {0};
     using particleType = Particle<DSTRESS_DT>;
 
     CUDAHOSTDEV static auto load(const type & v);
     template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
 };
 
-CUDAHOSTDEV auto deviatoric_stress_dt_impl::load(const type & v) { return particleType(v); }
-template<typename T> CUDAHOSTDEV void deviatoric_stress_dt_impl::store(type &v, const T &p) {}
+CUDAHOSTDEV inline auto deviatoric_stress_dt_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void deviatoric_stress_dt_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void deviatoric_stress_dt_impl::store<DSTRESS_DT>(type & v, const DSTRESS_DT& p) {v=p.dstress_dt;}
 
 

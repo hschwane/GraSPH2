@@ -16,6 +16,7 @@
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpCuda.h>
 #include <thrust/swap.h>
+#include <cuda_gl_interop.h>
 #include "Particle.h"
 #include "Host_base.h"
 //--------------------
