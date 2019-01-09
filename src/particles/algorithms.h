@@ -36,7 +36,8 @@ struct do_for_each_reference_job
     using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
 
     //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
-    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
+    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero).
+    //!< You can add additional arguments to the function and append the value to your call to do_for_each.
     CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id)
     {
         //!< here you can perform operations on particle p
@@ -44,10 +45,6 @@ struct do_for_each_reference_job
 
         return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
     }
-
-    // optionally you can define constant data member and a constructor,
-    // any arguments appended to the do_for_each call will be forwarded to the constructor
-
 };
 
 //!< reference implementation for a job that is executed on every pair of particles
@@ -65,15 +62,19 @@ struct do_for_each_pair_reference_job
     template<size_t n>
     using shared = SharedParticles<n,SHARED_POSM>;
 
-    //!< This function is executed for each particle. Before the interactions are computed.
+    //!< This function is executed for each particle before the interactions are computed.
     //!< In p the current particle and in id its position in the buffer is given.
     //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
+    //!< You can add additional arguments to the function and append the value to your call do_for_each_pair.
+    //!< (if you do that you have to append the same arguments to each of the three functions)
     CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
     {
         //!< here you can perform operations on particle pi
     }
 
     //!< This function will be called for each pair of particles.
+    //!< You can add additional arguments to the function and append the value to your call do_for_each_pair.
+    //!< (if you do that you have to append the same arguments to each of the three functions)
     CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
     {
         //!< here you can perform operations on particle pi using the attributes of the interaction partner pj
@@ -81,15 +82,14 @@ struct do_for_each_pair_reference_job
     }
 
     //!< This function will be called for particle i after the interactions with the other particles are computed.
+    //!< You can add additional arguments to the function and append the value to your call do_for_each_pair.
+    //!< (if you do that you have to append the same arguments to each of the three functions)
     CUDAHOSTDEV store_type do_after(pi_type& pi)
     {
         return pi; //!< return particle pi, all attributes it shares with load_type will be stored in memory
     }
 
-    // optionally you can define data member that can then be accessed in all 3 functions
-    // optionally you can define constant data member and a constructor,
-    // any arguments appended to the do_for_each_pair call will be forwarded to the constructor
-
+    // optionally you can declare data member that can then be accessed in all 3 functions
 };
 
 //-------------------------------------------------------------------
@@ -173,16 +173,19 @@ namespace detail {
         }
     };
 
+
+
     template<typename job, typename deviceReference, typename ... Ts>
     __global__ void do_for_each_impl(deviceReference pb, Ts ... args)
     {
         for(const auto &i : mpu::gridStrideRange(pb.size()))
         {
-            auto pi = load_helper<typename job::load_type, deviceReference>::load(pb, i);
+            job job_i;
 
-            job job_i(args...);
-            auto result = job_i.do_for_each(pi, i);
+            typename job::pi_type pi{};
+            pi = load_helper<typename job::load_type, deviceReference>::load(pb, i);
 
+            typename job::store_type result = job_i.do_for_each(pi, i, args...);
             pb.storeParticle(i, result);
         }
     }
@@ -195,12 +198,12 @@ void do_for_each(hostBuffer& pb, Ts...args)
     #pragma omp parallel for
     for(int i = 0; i < pb.size(); i++)
     {
-        job job_i(args...);
+        job job_i;
 
         typename job::pi_type pi{};
-        pi = detail::load_helper< typename job::load_type, hostBuffer>::load(pb,i);
+        pi = detail::load_helper< typename job::load_type, hostBuffer>::load(pb, i, args...);
 
-        typename job::store_type result = job_i.do_for_each( pi, i);
+        typename job::store_type result = job_i.do_for_each(pi, i, args...);
         pb.storeParticle( i, result);
     }
 }
@@ -209,6 +212,7 @@ template<typename job, size_t blockSize, typename deviceBuffer, typename ... Ts,
 void do_for_each(deviceBuffer& pb, Ts...args)
 {
     detail::do_for_each_impl<job><<< mpu::numBlocks(pb.size(),blockSize), blockSize>>>( pb.getDeviceReference(), args...);
+    assert_cuda(cudaGetLastError());
 }
 
 namespace detail {
@@ -218,19 +222,23 @@ namespace detail {
     {
         for(const auto &i : mpu::gridStrideRange(pb.size()))
         {
-            job job_i(args...);
+            job job_i;
 
             typename job::pi_type pi{};
             pi = detail::load_helper< typename job::load_type, deviceReference>::load(pb,i);
-            job_i.do_before( pi, i);
+
+            job_i.do_before( pi, i, args...);
 
             for(int j = 0; j < pb.size(); j++)
             {
                 const auto pj = detail::load_helper< typename job::pj_type, deviceReference>::load(pb,j);
-                job_i.do_for_each_pair( pi, pj);
+                job_i.do_for_each_pair( pi, pj, args...);
+
             }
 
-            typename job::store_type result = job_i.do_after( pi);
+            typename job::store_type result = job_i.do_after( pi, args...);
+
+
             pb.storeParticle( i, result);
         }
     }
@@ -242,19 +250,21 @@ void do_for_each_pair(hostBuffer& pb, Ts...args)
     #pragma omp parallel for
     for(int i = 0; i < pb.size(); i++)
     {
-        job job_i(args...);
+        job job_i;
 
         typename job::pi_type pi{};
         pi = detail::load_helper< typename job::load_type, hostBuffer>::load(pb,i);
-        job_i.do_before( pi, i);
+
+        job_i.do_before( pi, i, args...);
 
         for(int j = 0; j < pb.size(); j++)
         {
             const auto pj = detail::load_helper< typename job::pj_type, hostBuffer>::load(pb,j);
-            job_i.do_for_each_pair( pi, pj);
+            job_i.do_for_each_pair( pi, pj, args...);
         }
 
-        typename job::store_type result = job_i.do_after( pi);
+        typename job::store_type result = job_i.do_after( pi, args...);
+
         pb.storeParticle( i, result);
     }
 }
@@ -263,6 +273,7 @@ template<typename job, size_t blockSize, typename deviceBuffer, typename ... Ts,
 void do_for_each_pair(deviceBuffer& pb, Ts...args)
 {
     detail::do_for_each_pair_impl<job><<< mpu::numBlocks(pb.size(),blockSize), blockSize>>>( pb.getDeviceReference(), args...);
+    assert_cuda(cudaGetLastError());
 }
 
 namespace detail {
@@ -278,10 +289,12 @@ namespace detail {
         const int remain = pb.size() % tileSize;
         for(const auto &i : mpu::gridStrideRange( pb.size()))
         {
-            job job_i(args...);
+            job job_i;
             typename job::pi_type pi{};
             pi = detail::load_helper< typename job::load_type, deviceReference>::load(pb,i);
-            job_i.do_before( pi, i);
+
+            // do code before
+            job_i.do_before( pi, i, args...);
 
             const int thisTileSize = (i < pb.size() - remain) ? tileSize : remain;
             const int numTiles = (pb.size() + thisTileSize - 1) / thisTileSize;
@@ -298,12 +311,14 @@ namespace detail {
                 for(int j = 0; j < thisTileSize && (j+remain < thisTileSize || tile < numTiles); j++)
                 {
                     const auto pj = detail::load_helper< typename job::pj_type, SharedType>::load(shared,loadIndex);
-                    job_i.do_for_each_pair( pi, pj);
+                    job_i.do_for_each_pair( pi, pj, args...);
                 }
                 __syncthreads();
             }
 
-            typename job::store_type result = job_i.do_after( pi);
+            typename job::store_type result = job_i.do_after( pi, args...);
+
+
             pb.storeParticle( i, result);
         }
     }
@@ -330,6 +345,7 @@ void do_for_each_pair_fast(deviceBuffer& pb, Ts...args)
                         See the job example in algorithms.h.)");
 
     detail::do_for_each_pair_fast_impl<job,blockSize><<< mpu::numBlocks(pb.size(),blockSize), blockSize>>>( pb.getDeviceReference(), args...);
+    assert_cuda(cudaGetLastError());
 }
 
 #endif //MPUTILS_ALGORITHMS_H
