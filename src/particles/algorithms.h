@@ -310,7 +310,7 @@ namespace detail {
 
                 for(int j = 0; j < thisTileSize && (j+remain < thisTileSize || tile < numTiles); j++)
                 {
-                    const auto pj = detail::load_helper< typename job::pj_type, SharedType>::load(shared,loadIndex);
+                    const auto pj = detail::load_helper< typename job::pj_type, SharedType>::load(shared,j);
                     job_i.do_for_each_pair( pi, pj, args...);
                 }
                 __syncthreads();

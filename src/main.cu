@@ -34,7 +34,7 @@ constexpr f1_t H2 = H*H; //!< square of the smoothing length
 
 
 /**
- * @brief computes deriviatives of particle attributes
+ * @brief computes derivatives of particle attributes
  * @param particles device copy of the particle Buffer
  * @param speedOfSound your materials sound speed
  */
@@ -277,9 +277,9 @@ int main()
     f1_t timeSinceStore=timestep;
 #endif
 
-//    // start simulating
-//    do_for_each_pair_fast<computeDerivatives>(pb,SOUNDSPEED);
-//    do_for_each<integrateLeapfrog>(pb,timestep,false,tanfr);
+    // start simulating
+    do_for_each_pair_fast<computeDerivatives>(pb,SOUNDSPEED);
+    do_for_each<integrateLeapfrog>(pb,timestep,false,tanfr);
 
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
@@ -294,22 +294,20 @@ int main()
             pb.mapGraphicsResource(); // used for frontend stuff
 
             // run simulation
-            do_for_each_pair<computeDerivatives>(pb,SOUNDSPEED);
-            assert_cuda(cudaDeviceSynchronize());
-            do_for_each<integrateLeapfrog>(pb,timestep,false,tanfr);
-            assert_cuda(cudaDeviceSynchronize());
+            do_for_each_pair_fast<computeDerivatives>(pb,SOUNDSPEED);
+            do_for_each<integrateLeapfrog>(pb,timestep,true,tanfr);
 
             simulatedTime += timestep;
-//
-//#if defined(STORE_RESULTS)
-//            timeSinceStore += timestep;
-//            if( timeSinceStore >= store_intervall)
-//            {
-//                storage.printToFile(pb,simulatedTime);
-//                timeSinceStore-=store_intervall;
-//            }
-//#endif
-//
+
+#if defined(STORE_RESULTS)
+            timeSinceStore += timestep;
+            if( timeSinceStore >= store_intervall)
+            {
+                storage.printToFile(pb,simulatedTime);
+                timeSinceStore-=store_intervall;
+            }
+#endif
+
             pb.unmapGraphicsResource(); // used for frontend stuff
         }
     }

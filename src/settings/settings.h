@@ -33,7 +33,7 @@ constexpr Dim dimension=Dim::three;
 constexpr f1_t timestep=0.0003;
 
 // storing results as file
-//#define STORE_RESULTS
+#define STORE_RESULTS
 constexpr char RESULT_FOLDER[] = "/home/hendrik/test/"; // results will be stored in this folder
 constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)

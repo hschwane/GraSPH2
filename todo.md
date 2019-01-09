@@ -2,9 +2,6 @@
 
 ## high priority
 
-- use the new particle things in a correct way
-
-
 ## medium priority
 
 ### particle creation
