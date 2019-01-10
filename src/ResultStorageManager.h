@@ -25,8 +25,6 @@
 // particle parameters that are saved to disk
 using DeviceDiscPT = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_DENSITY>;
 using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>;
-#define DiscPbases POS,MASS,VEL,DENSITY
-using DiscPT = Particle<DiscPbases>;
 
 /**
  * @brief store information about ongoing memory transfer
@@ -68,8 +66,11 @@ public:
     ResultStorageManager(std::string directory, std::string prefix, int maxJobs);
     ~ResultStorageManager();
 
-    template<typename deviceParticleType>
-    void printToFile(deviceParticleType particles, f1_t time); //!< add a simulation snapshot to the storage queue
+    template<typename deviceParticleType, std::enable_if_t< mpu::is_instantiation_of<DeviceParticleBuffer,deviceParticleType>::value,int> =0>
+    void printToFile(deviceParticleType particles, f1_t time); //!< add a simulation snapshot from the device to the storage queue
+
+    template<typename hostParticleType, std::enable_if_t< mpu::is_instantiation_of<HostParticleBuffer,hostParticleType>::value,int> =0>
+    void printToFile(hostParticleType particles, f1_t time); //!< add a simulation snapshot from the host to the storage queue
 
 private:
 
@@ -79,15 +80,13 @@ private:
 
     const int m_maxQueue; //!< the maximum number of jobs waiting in the queue before the simulation is paused
 
-    using hdcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >; //!< type of elements in first queue
-    using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >; //!< type of elements in third queue
+    using hdcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >; //!< type of elements in first queue
+    using ddcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >; //!< type of elements in second queue
 
-    std::queue<hdcQueueType> m_hostDeviceCopy; //!< device data that is waiting to be transfered to host memory
-    std::queue<OngoingTransfer> m_ongoingTransfers; //!< currently running memory transfers from device to host
+    std::queue<hdcQueueType> m_hostDiskCopy; //!< device data that is waiting to be transfered to host memory
     std::queue<ddcQueueType> m_deviceDiskCopy; //!< host data waiting to be written to a file
 
-    std::mutex m_hdcMutex; //!< murtex for first queue
-    std::mutex m_ddcMutex; //!< mutex for third queue
+    std::mutex m_queueMutex; //!< mutex for first queue
     std::mutex m_workerMutex; //!< mutex for the conditional variable of the worker thread
     std::condition_variable m_workSignal; //!< conditional variable to signal the worker thread when work is availible
 
@@ -96,14 +95,14 @@ private:
     std::thread m_workerThread; //!< handle to the worker thread
     void worker(); //!< main function of the worker thread
 
-    void printTextFile(ddcQueueType data); //!< function to actually print data to a file
+    void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file
 };
 
 
 //-------------------------------------------------------------------
 // definitions of template functions of the ResultStorageManager
 
-template<typename deviceParticleType>
+template<typename deviceParticleType, std::enable_if_t< mpu::is_instantiation_of<DeviceParticleBuffer,deviceParticleType>::value,int>>
 void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
 {
     // wait for things to be written so memory frees up
@@ -124,24 +123,45 @@ void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
     {
         std::unique_ptr<DeviceDiscPT> downloadCopy(new DeviceDiscPT(particles));
         assert_cuda(cudaGetLastError());
-        assert_cuda(cudaStreamSynchronize(nullptr));
 
-        std::lock_guard<std::mutex> lock(m_hdcMutex);
-        m_hostDeviceCopy.emplace(std::move(downloadCopy),time);
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_deviceDiskCopy.emplace(std::move(downloadCopy),time);
         m_workSignal.notify_one();
     }
     catch (const std::exception& e)
     {
         logWARNING("ResultStorage") << "Could not duplicate simulation data on the device. Copying directly to main memory.";
 
-        std::unique_ptr<HostDiscPT> hostData(new HostDiscPT(particles));
+        std::unique_ptr<HostDiscPT> hostData(new HostDiscPT(particles, true));
         assert_cuda(cudaGetLastError());
-        assert_cuda(cudaStreamSynchronize(nullptr));
 
-        std::lock_guard<std::mutex> lock(m_ddcMutex);
-        m_deviceDiskCopy.emplace(std::move(hostData),time);
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_hostDiskCopy.emplace(std::move(hostData),time);
         m_workSignal.notify_one();
     }
+}
+
+template<typename hostParticleType, std::enable_if_t< mpu::is_instantiation_of<HostParticleBuffer,hostParticleType>::value,int>>
+void ResultStorageManager::printToFile(hostParticleType particles, f1_t time)
+{
+    // wait for things to be written so memory frees up
+    if(m_numberJobs > m_maxQueue)
+    {
+        logWARNING("ResultStorageManager") << "Storage Queue full. Pausing simulation until data is written to file.";
+        while( m_numberJobs>1)
+        {
+            mpu::yield();
+            mpu::sleep_ms(10);
+        }
+    }
+    m_numberJobs++;
+
+    std::unique_ptr<HostDiscPT> hostData(new HostDiscPT(particles));
+
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    m_hostDiskCopy.emplace(std::move(hostData),time);
+    m_workSignal.notify_one();
+
 }
 
 #endif //GRASPH2_RESULTSTORAGEMANAGER_H

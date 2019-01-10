@@ -32,6 +32,7 @@ ResultStorageManager::ResultStorageManager(std::string directory, std::string pr
 void ResultStorageManager::worker()
 {
     std::unique_lock<std::mutex> lck(m_workerMutex);
+    HostDiscPT hostData;
     while(!m_terminateWorker)
     {
         // wait until there is work to do
@@ -41,44 +42,38 @@ void ResultStorageManager::worker()
         {
             // download data from gpu to cpu if any
             {
-                std::unique_lock<std::mutex> hdc_lck(m_hdcMutex);
-                if(!m_hostDeviceCopy.empty())
+                std::unique_lock<std::mutex> hdc_lck(m_queueMutex);
+                if(!m_deviceDiskCopy.empty())
                 {
-                    hdcQueueType deviceData = std::move(m_hostDeviceCopy.front());
-                    m_hostDeviceCopy.pop();
+                    ddcQueueType deviceJob = std::move(m_deviceDiskCopy.front());
+                    m_deviceDiskCopy.pop();
                     hdc_lck.unlock();
 
-                    std::unique_ptr<HostDiscPT> hostData(new HostDiscPT(*(deviceData.first)));
-                    cudaEvent_t event;
-                    cudaEventCreate(&event);
-                    cudaEventRecord(event, 0);
-                    m_ongoingTransfers.emplace(std::move(deviceData.first), std::move(hostData), deviceData.second,
-                                               event);
+                    if(hostData.size() != deviceJob.first->size())
+                    {
+                        hostData = HostDiscPT(deviceJob.first->size());
+                        hostData.pinMemory();
+                    }
+                    hostData = *deviceJob.first;
+                    assert_cuda(cudaGetLastError());
+
+                    printTextFile(hostData,deviceJob.second);
+                    m_numberJobs--;
+                    logDEBUG("ResultStorageManager") << "Results stored for t= " << deviceJob.second;
                 }
             }
 
-            // handle finished memory transfers if any
-            if(!m_ongoingTransfers.empty() && cudaEventQuery(m_ongoingTransfers.front().event) != cudaErrorNotReady)
             {
-                OngoingTransfer transfer = std::move(m_ongoingTransfers.front());
-                m_ongoingTransfers.pop();
-
-                std::lock_guard<std::mutex> ddc_lck(m_ddcMutex);
-                m_deviceDiskCopy.emplace(std::move(transfer.target),transfer.time);
-            }
-
-            // put data from cpu to files in memory
-            {
-                std::unique_lock<std::mutex> ddc_lck(m_ddcMutex);
-                if(!m_deviceDiskCopy.empty())
+                std::unique_lock<std::mutex> hdc_lck(m_queueMutex);
+                if(!m_hostDiskCopy.empty())
                 {
-                    ddcQueueType hostData = std::move(m_deviceDiskCopy.front());
-                    m_deviceDiskCopy.pop();
-                    ddc_lck.unlock();
+                    hdcQueueType hostJob = std::move(m_hostDiskCopy.front());
+                    m_hostDiskCopy.pop();
+                    hdc_lck.unlock();
 
-                    printTextFile(std::move(hostData));
+                    printTextFile(*hostJob.first, hostJob.second);
                     m_numberJobs--;
-                    logDEBUG("ResultStorageManager") << "Results stored for t= " << hostData.second;
+                    logDEBUG("ResultStorageManager") << "Results stored for t= " << hostJob.second;
                 }
             }
         }
@@ -95,9 +90,9 @@ ResultStorageManager::~ResultStorageManager()
     m_workerThread.join();
 }
 
-void ResultStorageManager::printTextFile(ResultStorageManager::ddcQueueType data)
+void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
 {
-    std::string filename = m_directory + m_prefix + m_startTime + "_" + mpu::toString(data.second)+".tsv";
+    std::string filename = m_directory + m_prefix + m_startTime + "_" + mpu::toString(time)+".tsv";
     std::ofstream file(filename);
 
     if(!file.is_open())
@@ -107,9 +102,9 @@ void ResultStorageManager::printTextFile(ResultStorageManager::ddcQueueType data
         throw std::runtime_error("Could not open output file.");
     }
 
-    for(int i = 0; i < data.first->size(); ++i)
+    for(int i = 0; i < data.size(); ++i)
     {
-        auto p = data.first->loadParticle<DiscPbases>(i);
+        auto p = data.loadParticle(i);
 
         file << p.pos.x << "\t"
              << p.pos.y << "\t"

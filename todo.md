@@ -30,11 +30,6 @@
 ### simulation features
 - add functionality from the other branch
 
-### output data handling
-- use pinned host memory here
-- remove the stream sync points
-- cuda memcopy is not async
-
 
 ## low priority / ideas / long term projects
 
@@ -76,6 +71,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- improve performance of storing result data
 - algorithms now use templates instead of macros
 - fix initialisation function of particle buffer
 - add function to concatenate and merge particles
