@@ -69,7 +69,7 @@ public:
     ~HOST_BASE();
 
     // copy swap idom for copy an move construction and move assignment
-    HOST_BASE(const HOST_BASE & other);
+    HOST_BASE(const HOST_BASE & other, bool pin = false);
     HOST_BASE( HOST_BASE&& other) noexcept : HOST_BASE() {swap(*this,other);}
     HOST_BASE& operator=(HOST_BASE&& other) noexcept {swap(*this,other); return *this;}
     HOST_BASE& operator=(const HOST_BASE& other); // do not use swap here since that would screw up pinned memory
@@ -82,7 +82,7 @@ public:
     }
 
     // construction and assignment from device_base
-    explicit HOST_BASE(const deviceType & other); //!< construct from a compatible device base
+    explicit HOST_BASE(const deviceType & other, bool pin = false); //!< construct from a compatible device base
     HOST_BASE& operator=(const deviceType& other); //!< assign from compatible device base
 
     // particle handling
@@ -133,8 +133,10 @@ HOST_BASE<implementation>::~HOST_BASE()
 }
 
 template<typename implementation>
-HOST_BASE<implementation>::HOST_BASE(const HOST_BASE &other) : HOST_BASE(other.m_size)
+HOST_BASE<implementation>::HOST_BASE(const HOST_BASE &other, bool pin) : HOST_BASE(other.m_size)
 {
+    if(pin)
+        pinMemory();
     std::copy(other.m_data,other.m_data+other.m_size,m_data);
 }
 
@@ -192,8 +194,10 @@ void HOST_BASE<implementation>::unpinMemory()
 }
 
 template<typename implementation>
-HOST_BASE<implementation>::HOST_BASE(const HOST_BASE::deviceType &other) : HOST_BASE(other.m_size)
+HOST_BASE<implementation>::HOST_BASE(const HOST_BASE::deviceType &other, bool pin) : HOST_BASE(other.m_size)
 {
+    if(pin)
+        pinMemory();
     assert_cuda( cudaMemcpy(m_data, other.m_data, m_size*sizeof(type), cudaMemcpyDeviceToHost));
 }
 

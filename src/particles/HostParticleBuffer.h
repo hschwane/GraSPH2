@@ -70,7 +70,7 @@ public:
 
     // assign and construct from a DeviceParticleBuffer
     template <typename... TArgs>
-    explicit HostParticleBuffer(const DeviceParticleBuffer<TArgs...>& other);  //!< construct this from a DeviceParticleBuffer
+    explicit HostParticleBuffer(const DeviceParticleBuffer<TArgs...>& other, bool pin = false);  //!< construct this from a DeviceParticleBuffer
     template <typename... TArgs>
     HostParticleBuffer& operator=(const DeviceParticleBuffer<TArgs...> &b); //!< assignment from a DeviceParticleBuffer
 
@@ -118,9 +118,9 @@ HostParticleBuffer<Args...> & HostParticleBuffer<Args...>::operator=(const HostP
 
 template<typename... Args>
 template<typename... TArgs>
-HostParticleBuffer<Args...>::HostParticleBuffer(const DeviceParticleBuffer<TArgs...> &other)
+HostParticleBuffer<Args...>::HostParticleBuffer(const DeviceParticleBuffer<TArgs...> &other, bool pin)
         : m_numParticles(other.size()),
-          Args(ext_base_cast<Args>(other))... {}
+          Args(ext_base_cast<Args>(other),pin)... {}
 
 template<typename... Args>
 template<typename... TArgs>
