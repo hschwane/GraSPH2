@@ -57,6 +57,8 @@ public: \
     \
     CUDAHOSTDEV type getMember() {return member_name;} \
     CUDAHOSTDEV void setMember(const type& v) {member_name = v;} \
+    CUDAHOSTDEV type& getMemberRef() {return member_name;} \
+    CUDAHOSTDEV const type& getMemberRef() const {return member_name;} \
     \
     type member_name; \
 }; \
@@ -75,6 +77,8 @@ public: \
     \
     CUDAHOSTDEV type getMember() {return member_name;} \
     CUDAHOSTDEV void setMember(const type& v) {member_name = v;} \
+    CUDAHOSTDEV type& getMemberRef() {return member_name;} \
+    CUDAHOSTDEV const type& getMemberRef() const {return member_name;} \
     \
     member_type & member_name; \
 }

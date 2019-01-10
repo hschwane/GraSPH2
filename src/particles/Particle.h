@@ -44,6 +44,74 @@ public:
 
     using attributes = std::tuple<Args...>;
 
+    CUDAHOSTDEV constexpr size_t numAttributes() //!< the number of attributes this particle has
+    {
+        return std::tuple_size<attributes >::value;
+    }
+
+    //!< attribute which attribute T is the derivative of
+    template <typename T>
+    using isDerivOf_t = typename T::is_derivative_of;
+
+    template <size_t id>
+    CUDAHOSTDEV auto getAttribute() //!< get the value of the idth attribute
+    {
+        return std::tuple_element_t<id,attributes>::getMember();
+    }
+
+    template <typename T>
+    CUDAHOSTDEV auto getAttribute() //!< get the value of the attribute T
+    {
+        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        return T::getMember();
+    }
+
+    template <size_t id, typename V>
+    CUDAHOSTDEV void setAttribute(V& value) //!< set the value of the idth attribute
+    {
+        std::tuple_element_t<id,attributes>::setMember(value);
+    }
+
+    template <typename T, typename V>
+    CUDAHOSTDEV void setAttribute(T& value) //!< set the value of attribute T
+    {
+        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        return T::setMember(value);
+    }
+
+    template <size_t id>
+    CUDAHOSTDEV auto& getAttributeRef() //!< get a reference to the idth attribute
+    {
+        return std::tuple_element_t<id,attributes>::getMemberRef();
+    }
+
+    template <typename T>
+    CUDAHOSTDEV auto& getAttributeRef() //!< get a reference to the attribute T
+    {
+        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        return T::getMemberRef();
+    }
+
+    template <size_t id>
+    CUDAHOSTDEV const auto& getAttributeRef() const //!< get a const reference to the idth attribute
+    {
+        return std::tuple_element_t<id,attributes>::getMemberRef();
+    }
+
+    template <typename T>
+    CUDAHOSTDEV const auto& getAttributeRef() const //!< get a const reference to the attribute T
+    {
+        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        return T::getMemberRef();
+    }
+
+    template <typename F>
+    CUDAHOSTDEV void doForEachAttribute(F f) //!< execute functor for each attribute of the particle operator() of f needs to be static and over
+    {
+        int t[] = {0, ((void)(f(Args::getMemberRef())),1)...};
+        (void)t[0]; // silence compiler warning about t being unused
+    }
+
     Particle()= default; //!< default construct particle values are undefined
 
     template <typename... T, std::enable_if_t< mpu::conjunction<mpu::is_list_initable<Args, T&&>...>::value, int> = 0>
