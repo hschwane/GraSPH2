@@ -68,14 +68,15 @@ TextFile::ptType TextFile::generateParticle(size_t id)
     p.pos.z = std::stod(token);
 
     std::getline(line,token,m_seperator);
+    p.mass = std::stod(token);
+
+    std::getline(line,token,m_seperator);
     p.vel.x = std::stod(token);
     std::getline(line,token,m_seperator);
     p.vel.y = std::stod(token);
     std::getline(line,token,m_seperator);
     p.vel.z = std::stod(token);
 
-    std::getline(line,token,m_seperator);
-    p.mass = std::stod(token);
     std::getline(line,token,m_seperator);
     p.density = std::stod(token);
 

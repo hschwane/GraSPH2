@@ -90,6 +90,64 @@ ResultStorageManager::~ResultStorageManager()
     m_workerThread.join();
 }
 
+template<typename T>
+void ResultStorageManager::attributePrinter::operator()(T v)
+{
+#ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
+    m_stream << v << "\t";
+#endif
+}
+
+template<>
+void ResultStorageManager::attributePrinter::operator()(f2_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_stream << v.x << "\t"
+             << v.y << "\t";
+#endif
+}
+
+template<>
+void ResultStorageManager::attributePrinter::operator()(f3_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_stream << v.x << "\t"
+             << v.y << "\t"
+             << v.z << "\t";
+#endif
+}
+
+template<>
+void ResultStorageManager::attributePrinter::operator()(f4_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_stream << v.x << "\t"
+             << v.y << "\t"
+             << v.z << "\t"
+             << v.w << "\t";
+#endif
+}
+
+template<>
+void ResultStorageManager::attributePrinter::operator()(m3_t v)
+{
+#ifndef __CUDA_ARCH__
+    for(int i = 0; i < 9; ++i)
+    {
+        m_stream << v(i) << "\t";
+    }
+#endif
+}
+
+ResultStorageManager::attributePrinter::attributePrinter(std::ostream& s) : m_stream(s)
+{
+}
+
+ResultStorageManager::attributePrinter::~attributePrinter()
+{
+    m_stream << "\n"; // particle finished, end the line
+}
+
 void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
 {
     std::string filename = m_directory + m_prefix + m_startTime + "_" + mpu::toString(time)+".tsv";
@@ -105,15 +163,7 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     for(int i = 0; i < data.size(); ++i)
     {
         auto p = data.loadParticle(i);
-
-        file << p.pos.x << "\t"
-             << p.pos.y << "\t"
-             << p.pos.z << "\t"
-             << p.vel.x << "\t"
-             << p.vel.y << "\t"
-             << p.vel.z << "\t"
-             << p.mass << "\t"
-             << p.density << "\n";
+        p.doForEachAttribute(attributePrinter(file));
     }
 
     if(file.fail())

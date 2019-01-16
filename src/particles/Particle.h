@@ -62,7 +62,7 @@ public:
     template <typename T>
     CUDAHOSTDEV auto getAttribute() //!< get the value of the attribute T
     {
-        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        static_assert(mpu::index_of_v<T,attributes> > 0, "The attribute you are asking for does not exist.");
         return T::getMember();
     }
 
@@ -75,7 +75,7 @@ public:
     template <typename T, typename V>
     CUDAHOSTDEV void setAttribute(T& value) //!< set the value of attribute T
     {
-        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        static_assert(mpu::index_of_v<T,attributes> > 0, "The attribute you are asking for does not exist.");
         return T::setMember(value);
     }
 
@@ -88,7 +88,7 @@ public:
     template <typename T>
     CUDAHOSTDEV auto& getAttributeRef() //!< get a reference to the attribute T
     {
-        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        static_assert(mpu::index_of_v<T,attributes> > 0, "The attribute you are asking for does not exist.");
         return T::getMemberRef();
     }
 
@@ -101,7 +101,7 @@ public:
     template <typename T>
     CUDAHOSTDEV const auto& getAttributeRef() const //!< get a const reference to the attribute T
     {
-        mpu::index_of_v<T,attributes>; // throws static assert if T is not in attributes
+        static_assert(mpu::index_of_v<T,attributes> > 0, "The attribute you are asking for does not exist.");
         return T::getMemberRef();
     }
 

@@ -108,7 +108,7 @@ In the file `src/settings/settings.h` you can name a folder where simulation res
 For each step of the simulation a new .tsv is generated. It contains
 one line for every particle using the following format:
 ```
-POS_x \t POS_y \t POS_z \t VEL_x \t VEL_y \t VEL_z \t MASS \t DENSITY \n
+POS_x \t POS_y \t POS_z \t MASS \t VEL_x \t VEL_y \t VEL_z \t DENSITY \n
 ```
 This .tsv files can be opened for example by a text editor, a table calculation tool, python, etc.
 

@@ -71,6 +71,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add possibility to store result data with different particle attributes
 - improve performance of storing result data
 - algorithms now use templates instead of macros
 - fix initialisation function of particle buffer

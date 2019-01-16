@@ -23,24 +23,7 @@
 //--------------------
 
 // particle parameters that are saved to disk
-using DeviceDiscPT = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_DENSITY>;
 using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>;
-
-/**
- * @brief store information about ongoing memory transfer
- */
-struct OngoingTransfer
-{
-    std::unique_ptr<DeviceDiscPT> source;
-    std::unique_ptr<HostDiscPT> target;
-    f1_t time;
-    cudaEvent_t event;
-
-    OngoingTransfer(std::unique_ptr<DeviceDiscPT> s, std::unique_ptr<HostDiscPT> t, f1_t ti, cudaEvent_t e)
-        : source(std::move(s)), target(std::move(t)), time(ti), event(e)
-    {
-    }
-};
 
 //-------------------------------------------------------------------
 /**
@@ -81,7 +64,7 @@ private:
     const int m_maxQueue; //!< the maximum number of jobs waiting in the queue before the simulation is paused
 
     using hdcQueueType=std::pair<std::unique_ptr<HostDiscPT>,f1_t >; //!< type of elements in first queue
-    using ddcQueueType=std::pair<std::unique_ptr<DeviceDiscPT>,f1_t >; //!< type of elements in second queue
+    using ddcQueueType=std::pair<std::unique_ptr<HostDiscPT::deviceType>,f1_t >; //!< type of elements in second queue
 
     std::queue<hdcQueueType> m_hostDiskCopy; //!< device data that is waiting to be transfered to host memory
     std::queue<ddcQueueType> m_deviceDiskCopy; //!< host data waiting to be written to a file
@@ -94,6 +77,16 @@ private:
     std::atomic_int m_numberJobs; //!< the number of jobs currently in all queues
     std::thread m_workerThread; //!< handle to the worker thread
     void worker(); //!< main function of the worker thread
+
+    struct attributePrinter
+    {
+    public:
+        template <typename T> CUDAHOSTDEV void operator()(T v);
+        explicit attributePrinter(std::ostream& s);
+        ~attributePrinter();
+    private:
+        std::ostream& m_stream;
+    };
 
     void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file
 };
@@ -121,7 +114,7 @@ void ResultStorageManager::printToFile(deviceParticleType particles, f1_t time)
     // try to buffer in gpu memory
     try
     {
-        std::unique_ptr<DeviceDiscPT> downloadCopy(new DeviceDiscPT(particles));
+        std::unique_ptr<HostDiscPT::deviceType> downloadCopy(new HostDiscPT::deviceType(particles));
         assert_cuda(cudaGetLastError());
 
         std::lock_guard<std::mutex> lock(m_queueMutex);
