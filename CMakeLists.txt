@@ -44,6 +44,7 @@ include(CMakeDependentOption)
 
 # switch between different frontends
 cmake_dependent_option(OPENGL_FRONTEND "Use the opengl frontend" ON "mpUtils_OPENGL_AVAILIBLE" OFF)
+option(USE_FAST_MATH OFF "Use fast math settings for nvcc. Faster simulation, but lower accuracy.")
 
 # check if that worked as we want it
 if( OPENGL_FRONTEND AND (NOT mpUtils_OPENGL_AVAILIBLE))
@@ -116,6 +117,9 @@ target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION_SHA=\"${VERSION_SHA1}
 
 target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread>)
 target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+if (USE_FAST_MATH)
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+endif ()
 
 # force c++17 if using opengl
 if(OPENGL_FRONTEND)
