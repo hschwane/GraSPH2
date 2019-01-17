@@ -71,6 +71,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.2.3 --- 17.01.2018
+- option to use fast math computation to further enhance speed
 - add possibility to store result data with different particle attributes
 - improve performance of storing result data
 - algorithms now use templates instead of macros
