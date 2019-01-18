@@ -2,12 +2,31 @@
 
 ## high priority
 
-## medium priority
+### bugfix / simulation management
+- fix xsph
 
 ### particle creation
 - think about particles during init carefully
-- add 2d image source from the other branch
 - make modifiers work
+- generate plummer distribution
+- generate velocities in dynamical equilibrium
+
+### boundary conditions
+- support boundary conditions
+- have boundary condition for being in orbit around something
+
+### simulation feature
+- add (some) functionality from the other branch
+- balsara switch
+- linear consistency fix
+- investigate angular momentum (not)conservation
+- huberts new gas particle model
+
+
+## medium priority
+
+### particle creation
+- add 2d image source from the other branch
 - add modifieres
 - add sources
 - add constructors for uniform sphere
@@ -16,9 +35,8 @@
 - more runtime options vs compiletime options
 
 ### simulation management
-- make the compute derivitives function more organized
+- make the compute derivatives function more organized
 - find better solution for 2D simulation
-- fix xsph
 
 ### integration
 - automatically integrate what is needed using TMP
@@ -57,14 +75,12 @@
 - better memory alignment for matrices
 
 ### simulation features
-- linear consistency fix
-- investigate angular momentum (not)conservation
 - add collisional merging simulation
 - different materials (using recursive kernel launches)
 
 ### output data handling
 - provide binary data format
-- provide python script to generate 3d html plots
+- provide python script to generate (3d html) plots
 
 
 

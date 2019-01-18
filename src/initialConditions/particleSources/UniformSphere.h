@@ -35,7 +35,7 @@ namespace ps {
  *
  *
  */
-class UniformSphere : public ParticleSource<Particle<PS_DEFAULT_PARTICLE_BASES, ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>>
+class UniformSphere : public ParticleSource<Particle<PS_DEFAULT_PARTICLE_BASES, ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>,UniformSphere>
 {
 public:
     UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity);

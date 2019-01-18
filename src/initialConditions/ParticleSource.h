@@ -48,7 +48,7 @@ namespace detail {
  * Then override the generateParticle(size_t id) where you return the particle with the index id.
  *
  */
-template<typename particleType>
+template<typename particleType, typename Derived>
 class ParticleSource : public detail::ParticleSourceBaseFlag
 {
 public:
@@ -58,12 +58,12 @@ public:
 
     // transformation
     template<typename vecType>
-    ParticleSource &move(vecType position); //!< move the generated particles to a position
+    Derived &move(vecType position); //!< move the generated particles to a position
 
     //ParticleSource rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
 
-    ParticleSource &addAngularVelocity(f3_t omega); //!< add angular velocity around axis omega with strength length(omega)
-    ParticleSource &addLinearVelocity(f3_t v); //!< add linear velocity to particles
+    Derived &addAngularVelocity(f3_t omega); //!< add angular velocity around axis omega with strength length(omega)
+    Derived &addLinearVelocity(f3_t v); //!< add linear velocity to particles
 
     template<typename particleBufferType>
     void operator()(particleBufferType &particles, size_t id,
@@ -86,40 +86,40 @@ private:
 // template function definitions of the ParticleSource class
 //-------------------------------------------------------------------
 
-template<typename particleType>
+template<typename particleType, typename Derived>
 template<typename vecType>
-ParticleSource<particleType> &ParticleSource<particleType>::move(vecType position)
+Derived &ParticleSource<particleType,Derived>::move(vecType position)
 {
     m_operations.push_back([position](particleType &p)
                            {
                                 p.pos += position;
                            });
-    return *this;
+    return *static_cast<Derived*>(this);
 }
 
-template<typename particleType>
-ParticleSource<particleType> &ParticleSource<particleType>::addAngularVelocity(f3_t omega)
+template<typename particleType, typename Derived>
+Derived &ParticleSource<particleType,Derived>::addAngularVelocity(f3_t omega)
 {
     m_operations.push_back([omega](particleType &p)
                            {
                                 p.vel += cross(omega,p.pos);
                            });
-    return *this;
+    return *static_cast<Derived*>(this);
 }
 
-template<typename particleType>
-ParticleSource<particleType> &ParticleSource<particleType>::addLinearVelocity(f3_t v)
+template<typename particleType, typename Derived>
+Derived &ParticleSource<particleType,Derived>::addLinearVelocity(f3_t v)
 {
     m_operations.push_back([v](particleType &p)
                            {
                                p.vel += v;
                            });
-    return *this;
+    return *static_cast<Derived*>(this);
 }
 
-template<typename particleType>
+template<typename particleType, typename Derived>
 template<typename particleBufferType>
-void ParticleSource<particleType>::operator()(particleBufferType &particles, size_t id, size_t pos)
+void ParticleSource<particleType, Derived>::operator()(particleBufferType &particles, size_t id, size_t pos)
 {
     particleType p = generateParticle(id);
     for(const auto &operation : m_operations)

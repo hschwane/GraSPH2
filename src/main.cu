@@ -244,12 +244,9 @@ int main()
     InitGenerator<HostParticlesType> generator;
 
 #if defined(READ_FROM_FILE)
-    ps::TextFile tf(FILENAME,SEPERATOR);
-    generator.addParticles(tf);
+    generator.addParticles(tf(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    ps::UniformSphere us(particle_count,1.0,tmass,rho0);
-    us.addAngularVelocity(angVel);
-    generator.addParticles(us);
+    generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel) );
 #endif
 
     auto hpb = generator.generate();

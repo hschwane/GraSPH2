@@ -39,7 +39,7 @@ namespace ps {
  * Spaces and empty lines are ignored.
  *
  */
-class TextFile : public ParticleSource<Particle<PS_DEFAULT_PARTICLE_BASES, ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>>
+class TextFile : public ParticleSource<Particle<PS_DEFAULT_PARTICLE_BASES, ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>,TextFile>
 {
 public:
     TextFile(std::string filename, char seperator='\t'); //!< construct this using a filename and a seperator
