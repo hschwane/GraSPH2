@@ -31,9 +31,9 @@ UniformSphere::UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, 
     m_numberOfParticles = particleCount;
 }
 
-UniformSphere::ptType UniformSphere::generateParticle(size_t id)
+Particle<POS,MASS,DENSITY> UniformSphere::generateParticle(size_t id)
 {
-    ptType p{};
+    Particle<POS,MASS,DENSITY> p;
 
     mpu::randUniformSphere(  m_dist(m_rng),  m_dist(m_rng),  m_dist(m_rng), m_radius, p.pos.x, p.pos.y, p.pos.z);
     p.mass = m_particleMass;

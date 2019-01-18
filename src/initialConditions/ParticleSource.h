@@ -18,7 +18,8 @@
 // includes
 //--------------------
 #include <types.h>
-#include <glm/glm.hpp>
+#include <random>
+#include <particles/Particles.h>
 //--------------------
 
 // namespace
@@ -56,32 +57,30 @@ public:
 
     size_t getNumParticles() { return m_numberOfParticles; } //!< the number of particles provided by this source
 
-    // transformation
+    // transformation (affecting )
     template<typename vecType>
     Derived &move(vecType position); //!< move the generated particles to a position
-
-    //ParticleSource rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
+    Derived &rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
+    Derived &addPositionalNoise(f1_t strength, int seed = 10258); //!< add a values from a uniform random distribution to each position
 
     Derived &addAngularVelocity(f3_t omega); //!< add angular velocity around axis omega with strength length(omega)
     Derived &addLinearVelocity(f3_t v); //!< add linear velocity to particles
+    Derived &addRandomVelocity(f1_t strength, int seed = 4568); //!< adds a value from a uniform random distribution to the velocity
+
+    template <typename Attrib>
+    Derived &setConstant(typename Attrib::type v); //!< set the attribute "Attrib" of all particles to the value v
 
     template<typename particleBufferType>
-    void operator()(particleBufferType &particles, size_t id,
-                    size_t pos); //!< function to generate a single id < getNumparticles(), pos is the position in the buffer where the particle is saved
+    void operator()(particleBufferType &particles, size_t id, size_t pos); //!< function to generate a single id < getNumparticles(), pos is the position in the buffer where the particle is saved
 protected:
     size_t m_numberOfParticles{0}; //!< number of particles provided by this source
-    using ptType=particleType; //!< the type of particle created by this source (shorthand to be used in derived classes)
 
 private:
     virtual particleType
     generateParticle(size_t id) = 0; //!< function to be overridden ny derived classes to provide particles
 
-    std::vector<std::function<void(
-            particleType &)>> m_operations; //!< a list of modifiers that are performed on the particles after generation e.g. add velocity
+    std::vector<std::function<void(full_particle &)>> m_operations; //!< a list of modifiers that are performed on the particles after generation e.g. add velocity
 };
-
-//!< bases that every particle should have, so modifiers can work
-#define PS_DEFAULT_PARTICLE_BASES POS,MASS,VEL
 
 // template function definitions of the ParticleSource class
 //-------------------------------------------------------------------
@@ -90,7 +89,7 @@ template<typename particleType, typename Derived>
 template<typename vecType>
 Derived &ParticleSource<particleType,Derived>::move(vecType position)
 {
-    m_operations.push_back([position](particleType &p)
+    m_operations.push_back([position](full_particle &p)
                            {
                                 p.pos += position;
                            });
@@ -100,7 +99,7 @@ Derived &ParticleSource<particleType,Derived>::move(vecType position)
 template<typename particleType, typename Derived>
 Derived &ParticleSource<particleType,Derived>::addAngularVelocity(f3_t omega)
 {
-    m_operations.push_back([omega](particleType &p)
+    m_operations.push_back([omega](full_particle &p)
                            {
                                 p.vel += cross(omega,p.pos);
                            });
@@ -110,9 +109,68 @@ Derived &ParticleSource<particleType,Derived>::addAngularVelocity(f3_t omega)
 template<typename particleType, typename Derived>
 Derived &ParticleSource<particleType,Derived>::addLinearVelocity(f3_t v)
 {
-    m_operations.push_back([v](particleType &p)
+    m_operations.push_back([v](full_particle &p)
                            {
                                p.vel += v;
+                           });
+    return *static_cast<Derived*>(this);
+}
+
+template<typename particleType, typename Derived>
+Derived &ParticleSource<particleType, Derived>::rotate(f3_t axis, f1_t angle)
+{
+    // build rotation matrix according to http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/
+    axis = normalize(axis);
+    f1_t c = std::cos(angle);
+    m3_t M1 = c * m3_t(1.0);
+    m3_t M2 = (1-c) * m3_t( axis.x*axis.x, axis.x*axis.y, axis.x*axis.z,
+                           axis.x*axis.y, axis.y*axis.y, axis.y*axis.z,
+                           axis.x*axis.z, axis.z*axis.y, axis.z*axis.z);
+    m3_t M3 = std::sin(angle) * m3_t( 0, -axis.z, axis.y,
+                                      axis.z, 0, -axis.x,
+                                      -axis.y, axis.x, 0);
+    m3_t R = M1 + M2 + M3;
+
+    m_operations.push_back([R](full_particle &p)
+                           {
+                               p.pos = R * p.pos;
+                               p.vel = R * p.vel;
+                           });
+
+    return *static_cast<Derived*>(this);
+}
+
+template<typename particleType, typename Derived>
+template<typename Attrib>
+Derived &ParticleSource<particleType, Derived>::setConstant(typename Attrib::type v)
+{
+    m_operations.push_back([v](full_particle &p)
+                           {
+                               p.template setAttribute<Attrib>(v);
+                           });
+    return *static_cast<Derived*>(this);
+}
+
+template<typename particleType, typename Derived>
+Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength, int seed)
+{
+    m_operations.push_back([strength,seed](full_particle &p)
+                           {
+                                static std::default_random_engine rng(seed);
+                                static std::uniform_real_distribution<f1_t> dist(-strength,strength);
+                                p.pos += f3_t{dist(rng),dist(rng),dist(rng)};
+                           });
+    return *static_cast<Derived*>(this);
+}
+
+template<typename particleType, typename Derived>
+Derived &ParticleSource<particleType, Derived>::addRandomVelocity(f1_t strength, int seed)
+{
+    m_operations.push_back([strength,seed](full_particle &p)
+                           {
+                               static std::default_random_engine rng(seed);
+                               static std::uniform_real_distribution<f1_t> dist(-strength,strength);
+                               p.vel += f3_t{dist(rng),dist(rng),dist(rng)};
                            });
     return *static_cast<Derived*>(this);
 }
@@ -121,7 +179,8 @@ template<typename particleType, typename Derived>
 template<typename particleBufferType>
 void ParticleSource<particleType, Derived>::operator()(particleBufferType &particles, size_t id, size_t pos)
 {
-    particleType p = generateParticle(id);
+    full_particle p{};
+    p = generateParticle(id);
     for(const auto &operation : m_operations)
     {
         operation(p);

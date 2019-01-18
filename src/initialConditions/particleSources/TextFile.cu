@@ -50,9 +50,9 @@ TextFile::TextFile(std::string filename, char seperator) : m_data(), m_seperator
     m_numberOfParticles = m_data.size();
 }
 
-TextFile::ptType TextFile::generateParticle(size_t id)
+Particle<POS,MASS,VEL,DENSITY> TextFile::generateParticle(size_t id)
 {
-    ptType p;
+    Particle<POS,MASS,VEL,DENSITY> p;
     std::string token;
 
     // read the line into a stringstream

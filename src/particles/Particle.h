@@ -131,6 +131,9 @@ public:
     }
 };
 
+//!< particle containing all possible attributes (avoid using if at all possible)
+using full_particle = mpu::instantiate_from_tuple_t<Particle,particle_base_order >;
+
 //-------------------------------------------------------------------
 // create particle in a save way
 
