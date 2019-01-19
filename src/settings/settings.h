@@ -45,6 +45,7 @@ constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, be
 // enable / disable SPH simulation
 #define ENABLE_SPH
 
+
 //--------------------
 // initial conditions
 
@@ -56,10 +57,11 @@ constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
-// The Order of the parameter is assumed to be as follows:
+// The option "particleToRead" specifies the particle attributes to be read. For example Particle<POS,MASS,VEL,DENSITY> would assume the following file structure:
 // POS_x | POS_y | POS_z | MASS | VEL_x | VEL_y | VEL_z | DENSITY
 //#define READ_FROM_FILE
-#define FILENAME "/home/hendrik/inputData.tsv"
+using particleToRead = Particle<POS,MASS,VEL,DENSITY>;
+constexpr char FILENAME[] = "/home/hendrik/inputData.tsv";
 constexpr char SEPERATOR='\t';
 constexpr double startTime = 0; // if you continue a old simulation you can set the start time to match displayed simulation times
 

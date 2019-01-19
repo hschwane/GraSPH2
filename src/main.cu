@@ -244,7 +244,7 @@ int main()
     InitGenerator<HostParticlesType> generator;
 
 #if defined(READ_FROM_FILE)
-    generator.addParticles(tf(FILENAME,SEPERATOR));
+    generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
     generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel) );
 #endif

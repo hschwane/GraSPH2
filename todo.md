@@ -6,8 +6,6 @@
 - fix xsph
 
 ### particle creation
-- think about particles during init carefully
-- make modifiers work
 - generate plummer distribution
 - generate velocities in dynamical equilibrium
 
@@ -28,7 +26,6 @@
 ### particle creation
 - add 2d image source from the other branch
 - add modifieres
-- add sources
 - add constructors for uniform sphere
 
 ### usability
@@ -86,6 +83,10 @@
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
+
+- reading from file can now be done for all combinations of particle attributes
+- add new modifiers for the initial conditions
+- rework initial condition generation to work better with the new particle storage system
 
 --- v0.3.0 --- 17.01.2018
 - option to use fast math computation to further enhance speed
