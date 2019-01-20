@@ -67,11 +67,16 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 
 // generate a rotating sphere with uniform density
 // only use this with 3D simulations
-#define ROTATING_UNIFORM_SPHERE
-constexpr f1_t tmass = 0.5; // total mass of the sphere
+//#define ROTATING_UNIFORM_SPHERE
+
+// generate a rotating sphere with density distribution according to plummers law
+// only use this with 3D simulations
+#define ROTATING_PLUMMER_SPHERE
+
+// parameter for generated initial conditions
+constexpr f1_t tmass = 1.0; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles
 constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
-
 
 // --------------------
 // Material settings
@@ -132,8 +137,8 @@ using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XV
 // DO NOT MODIFY BELOW HERE
 // check if options are valid...
 
-#if defined(READ_FROM_FILE) && defined(ROTATING_UNIFORM_SPHERE)
-    #error "Choose one input method, not both!"
+#if (defined(READ_FROM_FILE) && defined(ROTATING_UNIFORM_SPHERE)) || (defined(READ_FROM_FILE) && defined(ROTATING_PLUMMER_SPHERE)) || (defined(ROTATING_UNIFORM_SPHERE) && defined(ROTATING_PLUMMER_SPHERE))
+    #error "Choose only one input method!"
 #endif
 
 #if defined(PLASTICITY_MIESE) && defined(PLASTICITY_MC)
