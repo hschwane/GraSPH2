@@ -42,8 +42,13 @@ Particle<POS, MASS, DENSITY> PlummerSphere::generateParticle(size_t id)
     // therefore: r(m) = a * ( (m/M)^(-2/3) -1 )^(-1/2)
     // where M is total mass of the system and a is the structural length scale / plummer radius
     // choosing a random value for m in range [0,M] <=> choosing random value for m/M in range [0,1]
-    p.pos *= m_plummerRadius / std::sqrt( std::pow(  m_dist(m_rng), -2.0/3.0) -1 );
 
+    // now find radius within reasonable bounds
+    f1_t radius = m_plummerRadius * 11;
+    while(radius > m_plummerRadius * 10)
+        radius = m_plummerRadius / std::sqrt( std::pow(  m_dist(m_rng), -2.0/3.0) -1 );
+
+    p.pos *= radius;
     p.mass = m_particleMass;
     p.density = m_matDensity;
 
