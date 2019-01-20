@@ -68,6 +68,7 @@ target_sources(GraSPH2 PRIVATE
                 "src/main.cu"
                 "src/ResultStorageManager.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
+                "src/initialConditions/particleSources/PlummerSphere.cu"
             )
 
 # add frontend dependend source files

@@ -17,6 +17,7 @@
 #include <mpUtils/mpCuda.h>
 #include <cuda_gl_interop.h>
 #include <cmath>
+#include <initialConditions/particleSources/PlummerSphere.h>
 
 #include "initialConditions/InitGenerator.h"
 #include "initialConditions/particleSources/UniformSphere.h"
@@ -246,7 +247,7 @@ int main()
 #if defined(READ_FROM_FILE)
     generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel) );
+    generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel) );
 #endif
 
     auto hpb = generator.generate();
