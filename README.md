@@ -68,6 +68,7 @@ The following additional cmake options are available:
 - `FORCE_NEW_VERSION` if enabled a instead of using the version number of the git commit, the version is increased by one.
                         This is mainly used during development and testing.
 - `USE_FAST_MATH` enable unsafe math optimizations in device code. Better performance, but might impact accuracy.
+- `USE_DEBUG_LOGGING` compile debug logging commands even in release builds.
 
 
 ## usage

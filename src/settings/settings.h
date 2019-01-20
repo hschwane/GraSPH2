@@ -74,7 +74,7 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 #define ROTATING_PLUMMER_SPHERE
 
 // parameter for generated initial conditions
-constexpr f1_t tmass = 1.0; // total mass of the sphere
+constexpr f1_t tmass = 0.5; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles
 constexpr f3_t angVel=f3_t{0,0,0.57735}; // angular velocity of the cloud omega
 

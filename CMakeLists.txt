@@ -45,6 +45,7 @@ include(CMakeDependentOption)
 # switch between different frontends
 cmake_dependent_option(OPENGL_FRONTEND "Use the opengl frontend" ON "mpUtils_OPENGL_AVAILIBLE" OFF)
 option(USE_FAST_MATH OFF "Use fast math settings for nvcc. Faster simulation, but lower accuracy.")
+option(USE_DEBUG_LOGGING OFF "Use debug logging even in release builds.")
 
 # check if that worked as we want it
 if( OPENGL_FRONTEND AND (NOT mpUtils_OPENGL_AVAILIBLE))
@@ -83,6 +84,10 @@ endif ()
 # add definitions
 set(PFSPH_PROJECT_SHADER_PATH "${CMAKE_CURRENT_LIST_DIR}/shader")
 target_compile_definitions(GraSPH2 PRIVATE PROJECT_SHADER_PATH="${PFSPH_PROJECT_SHADER_PATH}/")
+
+if (USE_DEBUG_LOGGING)
+    target_compile_definitions(GraSPH2 PRIVATE MPU_ENABLE_DEBUG_LOGGING)
+endif()
 
 # link libraries
 target_link_libraries(GraSPH2 mpUtils::mpUtils)
