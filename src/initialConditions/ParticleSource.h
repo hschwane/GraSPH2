@@ -80,11 +80,10 @@ protected:
     f3_t m_desiredCOM{0,0,0}; //!< the desired position of the center of mass
     f3_t m_desiredVelOfCOM{0,0,0}; //!< the desired velocity of the center of mass
 
-private:
-    virtual particleType
-    generateParticle(size_t id) = 0; //!< function to be overridden ny derived classes to provide particles
-
     std::vector<std::function<void(full_particle &)>> m_operations; //!< a list of modifiers that are performed on the particles after generation e.g. add velocity
+
+private:
+    virtual particleType generateParticle(size_t id) = 0; //!< function to be overridden ny derived classes to provide particles
 };
 
 // template function definitions of the ParticleSource class

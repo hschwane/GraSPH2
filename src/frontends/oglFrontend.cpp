@@ -201,7 +201,7 @@ void initializeFrontend()
 
 
     camera().setMVP(&mvp);
-    camera().setClip(0.001,10);
+    camera().setClip(0.001,20);
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }

@@ -29,6 +29,7 @@ namespace ps {
 //-------------------------------------------------------------------
 /**
  * class PlummerSphere
+ * using pseudo random point picking to generate particles in sphere with e density profile according to the plummer model
  *
  * usage:
  *
@@ -38,6 +39,9 @@ class PlummerSphere : public ParticleSource<Particle<POS, MASS, DENSITY>, Plumme
 public:
     PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t totalMass, f1_t materialDensity);
     ~PlummerSphere() override = default;
+
+    PlummerSphere &addRandomPlummerVelocity(f1_t G = 1); //! add random velocity according to plummer distribution to each particle but make sure it is smaller then escape velocity
+    PlummerSphere &addAngularPlummerVelocity(f3_t axis, f1_t G = 1); //! add rotational velocity according to plummer distribution to each particle but make sure it is smaller then escape velocity
 
 private:
     Particle<POS, MASS, DENSITY> generateParticle(size_t id) override;

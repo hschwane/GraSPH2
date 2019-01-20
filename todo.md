@@ -6,7 +6,7 @@
 - fix xsph
 
 ### particle creation
-- generate velocities in dynamical equilibrium
+- better rng seeds
 
 ### boundary conditions
 - support boundary conditions
@@ -24,8 +24,6 @@
 
 ### particle creation
 - add 2d image source from the other branch
-- add modifieres
-- add constructors for uniform sphere
 
 ### usability
 - more runtime options vs compiletime options
@@ -83,6 +81,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add option for random velocity to the plummer model
 - allow normalization of center of mass and velocity at center of mass
 - add plummer model as a particle source
 - reading from file can now be done for all combinations of particle attributes
