@@ -44,8 +44,8 @@ include(CMakeDependentOption)
 
 # switch between different frontends
 cmake_dependent_option(OPENGL_FRONTEND "Use the opengl frontend" ON "mpUtils_OPENGL_AVAILIBLE" OFF)
-option(USE_FAST_MATH OFF "Use fast math settings for nvcc. Faster simulation, but lower accuracy.")
-option(USE_DEBUG_LOGGING OFF "Use debug logging even in release builds.")
+option(USE_FAST_MATH "Use fast math settings for nvcc. Faster simulation, but lower accuracy." OFF)
+option(USE_DEBUG_LOGGING "Use debug logging even in release builds." OFF)
 
 # check if that worked as we want it
 if( OPENGL_FRONTEND AND (NOT mpUtils_OPENGL_AVAILIBLE))
