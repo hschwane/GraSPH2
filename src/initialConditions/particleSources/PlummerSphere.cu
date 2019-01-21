@@ -78,38 +78,6 @@ PlummerSphere &PlummerSphere::addRandomPlummerVelocity(f1_t G)
 
                                f3_t v;
                                mpu::randSphereShell(dist01(rng),  dist01(rng), v.x, v.y, v.z);
-//                               v *= x * std::sqrt(2.0) * std::pow( 1.0 + r*r,-0.25);
-                               v *= x * std::sqrt( 2 * G * M / std::sqrt(r*r + a*a));
-
-                               p.vel += v;
-                           });
-    return *this;
-}
-
-PlummerSphere &PlummerSphere::addAngularPlummerVelocity(f3_t axis, f1_t G)
-{
-    f1_t M = m_totalMass;
-    f1_t a = m_plummerRadius;
-    axis = normalize(axis);
-    m_operations.push_back([G,M,a,axis](full_particle &p)
-                           {
-                               static std::default_random_engine rng;
-                               static std::uniform_real_distribution<f1_t> dist01(0,1);
-                               static std::uniform_real_distribution<f1_t> dist001(0,0.1);
-
-                               f1_t r = length(p.pos);
-
-                               f1_t x = 0;
-                               f1_t y = 0.1;
-
-                               while ( y > x*x * std::pow( 1- x*x, 3.5) )
-                               {
-                                   x = dist01(rng);
-                                   y = dist001(rng);
-                               }
-
-                               f3_t v = cross(axis,p.pos);
-//                               v *= x * std::sqrt(2.0) * std::pow( 1.0 + r*r,-0.25);
                                v *= x * std::sqrt( 2 * G * M / std::sqrt(r*r + a*a));
 
                                p.vel += v;

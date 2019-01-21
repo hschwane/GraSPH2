@@ -81,9 +81,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
-- add option for random velocity to the plummer model
 - allow normalization of center of mass and velocity at center of mass
-- add plummer model as a particle source
+- add plummer model as a particle source including option for velocities in equilibrium
 - reading from file can now be done for all combinations of particle attributes
 - add new modifiers for the initial conditions
 - rework initial condition generation to work better with the new particle storage system

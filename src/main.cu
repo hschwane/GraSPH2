@@ -249,7 +249,7 @@ int main()
 #elif defined(ROTATING_UNIFORM_SPHERE)
     generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
-    generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0).addRandomPlummerVelocity(), true, true);
+    generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel), true, true);
 #endif
 
     auto hpb = generator.generate();

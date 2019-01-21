@@ -32,7 +32,7 @@ namespace ps {
  * using pseudo-random point picking to generate particles in a sphere with uniform density
  *
  * usage:
- *
+ * Construct a UniformSphere, apply modifiers and pass it to an InitGenerator.
  *
  */
 class UniformSphere : public ParticleSource<Particle<POS,MASS,DENSITY>,UniformSphere>
