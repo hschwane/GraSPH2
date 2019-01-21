@@ -38,7 +38,7 @@ namespace ps {
 class UniformSphere : public ParticleSource<Particle<POS,MASS,DENSITY>,UniformSphere>
 {
 public:
-    UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity);
+    UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity, unsigned int seed = mpu::getRanndomSeed());
     ~UniformSphere() override = default;
 
 private:
@@ -47,7 +47,7 @@ private:
     f1_t m_radius;
     f1_t m_matDensity;
     f1_t m_particleMass;
-    std::default_random_engine m_rng{};
+    std::default_random_engine m_rng;
     std::uniform_real_distribution<f1_t> m_dist{0.0,1.0};
 };
 

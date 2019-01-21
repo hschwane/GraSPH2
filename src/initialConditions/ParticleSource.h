@@ -63,11 +63,11 @@ public:
     template<typename vecType>
     Derived &move(vecType position); //!< move the generated particles to a position
     Derived &rotate(f3_t axis, f1_t angle); //!< rotate object and velocities around axis by angle
-    Derived &addPositionalNoise(f1_t strength, int seed = 10258); //!< add a values from a uniform random distribution to each position
+    Derived &addPositionalNoise(f1_t strength, unsigned int seed = mpu::getRanndomSeed()); //!< add a values from a uniform random distribution to each position
 
     Derived &addAngularVelocity(f3_t omega); //!< add angular velocity around axis omega with strength length(omega)
     Derived &addLinearVelocity(f3_t v); //!< add linear velocity to particles
-    Derived &addRandomVelocity(f1_t strength, int seed = 4568); //!< adds a value from a uniform random distribution to the velocity
+    Derived &addRandomVelocity(f1_t strength, unsigned int seed = mpu::getRanndomSeed()); //!< adds a value from a uniform random distribution to the velocity
 
     template <typename Attrib>
     Derived &setConstant(typename Attrib::type v); //!< set the attribute "Attrib" of all particles to the value v
@@ -163,7 +163,7 @@ Derived &ParticleSource<particleType, Derived>::setConstant(typename Attrib::typ
 }
 
 template<typename particleType, typename Derived>
-Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength, int seed)
+Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength, unsigned int seed)
 {
     m_operations.push_back([strength,seed](full_particle &p)
                            {
@@ -175,7 +175,7 @@ Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength
 }
 
 template<typename particleType, typename Derived>
-Derived &ParticleSource<particleType, Derived>::addRandomVelocity(f1_t strength, int seed)
+Derived &ParticleSource<particleType, Derived>::addRandomVelocity(f1_t strength, unsigned int seed)
 {
     m_operations.push_back([strength,seed](full_particle &p)
                            {

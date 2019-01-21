@@ -5,9 +5,6 @@
 ### bugfix / simulation management
 - fix xsph
 
-### particle creation
-- better rng seeds
-
 ### boundary conditions
 - support boundary conditions
 - have boundary condition for being in orbit around something
@@ -81,6 +78,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add proper rng seeds for the initial conditions
 - allow normalization of center of mass and velocity at center of mass
 - add plummer model as a particle source including option for velocities in equilibrium
 - reading from file can now be done for all combinations of particle attributes

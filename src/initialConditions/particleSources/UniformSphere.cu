@@ -25,8 +25,8 @@ namespace ps {
 // function definitions of the UniformSphere class
 //-------------------------------------------------------------------
 
-UniformSphere::UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity)
-    : m_radius(radius), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity)
+UniformSphere::UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity, unsigned int seed)
+    : m_radius(radius), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed)
 {
     m_numberOfParticles = particleCount;
 }

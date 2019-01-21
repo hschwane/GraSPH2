@@ -24,8 +24,8 @@ namespace ps {
 // function definitions of the PlummerSphere class
 //-------------------------------------------------------------------
 
-PlummerSphere::PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t totalMass, f1_t materialDensity)
-        : m_plummerRadius(plummerRadius), m_totalMass(totalMass), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity)
+PlummerSphere::PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t totalMass, f1_t materialDensity, unsigned int seed)
+        : m_plummerRadius(plummerRadius), m_totalMass(totalMass), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed)
 {
     m_numberOfParticles = particleCount;
 }
@@ -55,13 +55,13 @@ Particle<POS, MASS, DENSITY> PlummerSphere::generateParticle(size_t id)
     return p;
 }
 
-PlummerSphere &PlummerSphere::addRandomPlummerVelocity(f1_t G)
+PlummerSphere &PlummerSphere::addRandomPlummerVelocity(f1_t G, unsigned int seed)
 {
     f1_t M = m_totalMass;
     f1_t a = m_plummerRadius;
-    m_operations.push_back([G,M,a](full_particle &p)
+    m_operations.push_back([G,M,a,seed](full_particle &p)
                            {
-                               static std::default_random_engine rng;
+                               static std::default_random_engine rng(seed);
                                static std::uniform_real_distribution<f1_t> dist01(0,1);
                                static std::uniform_real_distribution<f1_t> dist001(0,0.1);
 
