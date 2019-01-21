@@ -5,10 +5,6 @@
 ### bugfix / simulation management
 - fix xsph
 
-### boundary conditions
-- support boundary conditions
-- have boundary condition for being in orbit around something
-
 ### simulation feature
 - add (some) functionality from the other branch
 - balsara switch
@@ -27,6 +23,7 @@
 
 ### simulation management
 - make the compute derivatives function more organized
+- use some system to manage boundary conditions
 - find better solution for 2D simulation
 
 ### integration
@@ -78,6 +75,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add the Clohessy-Wiltshire model
 - add proper rng seeds for the initial conditions
 - allow normalization of center of mass and velocity at center of mass
 - add plummer model as a particle source including option for velocities in equilibrium

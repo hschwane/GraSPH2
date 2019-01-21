@@ -161,9 +161,16 @@ struct computeDerivatives
         // deviatoric stress time derivative
         pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
 #endif
+
+#if defined(CLOHESSY_WILTSHIRE)
+        pi.acc.x += 3*cw_n*cw_n * pi.pos.x + 2*cw_n* pi.vel.y;
+        pi.acc.y += -2*cw_n * pi.vel.x;
+        pi.acc.z += -cw_n*cw_n * pi.pos.z;
+#endif
         return pi;
     }
 };
+
 
 /**
  * @brief perform leapfrog integration on the particles also performs the plasticity calculations
@@ -247,9 +254,9 @@ int main()
 #if defined(READ_FROM_FILE)
     generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel), true,true );
+    generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0,161214).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
-    generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0).addAngularVelocity(angVel), true, true);
+    generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0,161214).addAngularVelocity(angVel), true, true);
 #endif
 
     auto hpb = generator.generate();
@@ -266,7 +273,7 @@ int main()
     // upload particles
     pb = hpb;
 
-    // calculate sound speed and tangents of friction angle
+    // calculate sound speed, tangents of friction angle, and n of the CW model
     const f1_t SOUNDSPEED = sqrt(BULK / rho0);
     const f1_t tanfr = tan(friction_angle);
 
