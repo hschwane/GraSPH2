@@ -188,6 +188,49 @@ __global__ void generate2DHydroNBSystem(DeviceParticlesType particles)
               });
 }
 
+int generateFromImage(std::string filename, DeviceParticlesType& dpart)
+{
+    float particleMass = 0.0001125;
+
+    Particles<HOST_POSM> pb(PARTICLES);
+
+    int Xres,Yres,n;
+    unsigned char *data = stbi_load(filename.c_str(), &Xres, &Yres, &n, 3);
+    if(!data) throw std::runtime_error("unable to open file " + filename);
+    int particleCount=0;
+
+    float spacing = 2.0/Xres;
+    for(int y = 0; y < Yres; ++y)
+        for(int x = 0; x < Xres; ++x)
+        {
+            float3 c{float(data[3*Xres*y+3*x+0])/255,float(data[3*Xres*y+3*x+1])/255,float(data[3*Xres*y+3*x+2])/255};
+            if(length(c) > 0.8 && particleCount < pb.size())
+            {
+                Particle<POS,MASS> p;
+                p.mass = particleMass;
+                p.pos.x = -1 + x*spacing;
+                p.pos.y = 1 - y*spacing;
+                pb.storeParticle(particleCount,p);
+                particleCount++;
+            }
+        }
+
+    int used = particleCount;
+    while(particleCount<pb.size())
+    {
+        Particle<POS,MASS> p;
+        p.mass = 0;
+        p.pos.x = 3;
+        p.pos.y = 3;
+        pb.storeParticle(particleCount,p);
+        particleCount++;
+    }
+
+    stbi_image_free(data);
+    dpart=pb;
+    return used;
+}
+
 __global__ void computeDensity(DeviceParticlesType particles)
 {
     DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM),
@@ -205,6 +248,113 @@ __global__ void computeDensity(DeviceParticlesType particles)
                                  }
                          },
                          {})
+}
+
+__global__ void computeDensity(DeviceParticlesType particles)
+{
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM),
+                         MPU_COMMA_LIST(POS,MASS,DENSITY),
+                         MPU_COMMA_LIST(POS,MASS), MPU_COMMA_LIST(DENSITY),
+                         MPU_COMMA_LIST(POS,MASS),
+                         float prefactor;
+    {
+        prefactor = kernel::detail::splinePrefactor<Dim::two>(H);
+    },
+    {
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        f1_t r = sqrt(r2);
+        if(r<=H)
+        {
+            pi.density += pj.mass * kernel::Wspline(r,H,prefactor);
+        }
+    },
+    {})
+}
+
+__global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound, f2_t extForces)
+{
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY),
+                         MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY),
+                         MPU_COMMA_LIST(POS,MASS,VEL,DENSITY), MPU_COMMA_LIST(ACC),
+                         MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
+
+                         int numPartners=0;
+    float prefactor;
+    f1_t pOverRho_i; // pressure over density square used for acceleration
+//    f1_t apres_i=0;
+    {
+        f1_t pres_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound);
+        pOverRho_i =  pres_i / (pi.density * pi.density);
+        prefactor = kernel::detail::dspikyPrefactor<Dim::two>(H);
+
+//        apres_i = (pres_i > 0) ? mateps * (pres_i)/(pi.density * pi.density) : 0;
+    }
+    ,
+    {
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        f1_t r = sqrt(r2);
+        if(r>0 && r <= H)
+        {
+            numPartners++;
+            // get the kernel gradient
+            const f1_t dw = kernel::dWspiky(r,H,prefactor);
+            const f3_t gradw = (dw/r) * rij;
+
+            // artificial viscosity
+            const f3_t vij = pi.vel-pj.vel;
+            f1_t II = artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound);
+
+            // pressure
+            f1_t pres_j = eos::liquid( pj.density, rho0, speedOfSound*speedOfSound);
+            f1_t pOverRho_j = pres_j / (pj.density * pj.density);
+
+            // artificial pressure
+//            f1_t apres_j = 0;
+//            apres_j = (pres_j > 0)? mateps * (pres_j)/(pj.density * pj.density) : 0;
+//
+//            f1_t apres=apres_i+apres_j;
+//            f1_t f= pow(kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(H/2.5f,H),matexp);
+
+            // acc
+            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II /* + f*apres*/) * gradw;
+        }
+    },
+    {
+//        printf("%i\n",numPartners);
+        pi.acc.x += extForces.x;
+        pi.acc.y += extForces.y;
+    })
+}
+
+__global__ void window2DBound(DeviceParticlesType particles)
+{
+    DO_FOR_EACH(particles, MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+                MPU_COMMA_LIST(POS,VEL),
+                {
+                        if(pi.pos.x > 1)
+                        {
+                            pi.pos.x=1;
+                            pi.vel.x -= 1.5*pi.vel.x;
+                        }
+                        else if(pi.pos.x < -1)
+                        {
+                            pi.pos.x=-1;
+                            pi.vel.x -= 1.5*pi.vel.x;
+                        }
+                        if(pi.pos.y > 1)
+                        {
+                            pi.pos.y=1;
+                            pi.vel.y -= 1.5*pi.vel.y;
+                        }
+                        else if(pi.pos.y < -1)
+                        {
+                            pi.pos.y=-1;
+                            pi.vel.y -= 1.5*pi.vel.y;
+                        }
+                })
 }
 
 __global__ void window2DBound(DeviceParticlesType particles)
@@ -294,6 +444,61 @@ __global__ void nbodyForces(DeviceParticlesType particles, f1_t eps2)
                          })
 }
 
+__global__ void computeDerivatives(DeviceParticlesType particles, f1_t speedOfSound, f2_t extForces) // liquid simulation
+{
+    DO_FOR_EACH_PAIR_SM( BLOCK_SIZE, particles, MPU_COMMA_LIST(SHARED_POSM,SHARED_VEL,SHARED_DENSITY),
+                         MPU_COMMA_LIST(POS,MASS,VEL,ACC,DENSITY),
+                         MPU_COMMA_LIST(POS,MASS,VEL,DENSITY), MPU_COMMA_LIST(ACC),
+                         MPU_COMMA_LIST(POS,MASS,VEL,DENSITY),
+
+                         int numPartners=0;
+    float prefactor;
+    f1_t pOverRho_i; // pressure over density square used for acceleration
+//    f1_t apres_i=0;
+    {
+        f1_t pres_i = eos::liquid( pi.density, rho0, speedOfSound*speedOfSound);
+        pOverRho_i =  pres_i / (pi.density * pi.density);
+        prefactor = kernel::detail::dspikyPrefactor<Dim::two>(H);
+
+//        apres_i = (pres_i > 0) ? mateps * (pres_i)/(pi.density * pi.density) : 0;
+    }
+    ,
+    {
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        f1_t r = sqrt(r2);
+        if(r>0 && r <= H)
+        {
+            numPartners++;
+            // get the kernel gradient
+            const f1_t dw = kernel::dWspiky(r,H,prefactor);
+            const f3_t gradw = (dw/r) * rij;
+
+            // artificial viscosity
+            const f3_t vij = pi.vel-pj.vel;
+            f1_t II = artificialViscosity(alpha,pi.density,pj.density,vij,rij,r,speedOfSound,speedOfSound);
+
+            // pressure
+            f1_t pres_j = eos::liquid( pj.density, rho0, speedOfSound*speedOfSound);
+            f1_t pOverRho_j = pres_j / (pj.density * pj.density);
+
+            // artificial pressure
+//            f1_t apres_j = 0;
+//            apres_j = (pres_j > 0)? mateps * (pres_j)/(pj.density * pj.density) : 0;
+//
+//            f1_t apres=apres_i+apres_j;
+//            f1_t f= pow(kernel::Wspline<Dim::two>(r,H) / kernel::Wspline<Dim::two>(H/2.5f,H),matexp);
+
+            // acc
+            pi.acc -= pj.mass * (pOverRho_i + pOverRho_j + II /* + f*apres*/) * gradw;
+        }
+    },
+    {
+//        printf("%i\n",numPartners);
+        pi.acc.x += extForces.x;
+        pi.acc.y += extForces.y;
+    })
+}
 
 //-------------------------------------------------------------------
 // create HostParticleBuffer in a save way

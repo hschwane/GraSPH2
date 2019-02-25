@@ -5,12 +5,22 @@
 ### bugfix / simulation management
 - fix xsph
 
+### usability
+- print the settings used
+- add compiletime math library for options
+
+### performance
+- use kernel prefactors
+
 ### simulation feature
-- add (some) functionality from the other branch
 - balsara switch
-- linear consistency fix
-- investigate angular momentum (not)conservation
-- huberts new gas particle model
+- linear consistency fix and investigate angular momentum (not)conservation
+- variable timestep
+
+### testing / simulating
+- find material properties
+- find values for initial conditions
+- run simulations?
 
 
 ## medium priority
@@ -68,7 +78,7 @@
 
 ### output data handling
 - provide binary data format
-- provide python script to generate (3d html) plots
+- provide python script to generate (3d html) plots USE: ipyvolume
 
 
 

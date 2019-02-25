@@ -30,7 +30,7 @@
 constexpr Dim dimension=Dim::three;
 
 // the integration timestep for the constant timestep leapfrog integrator
-constexpr f1_t timestep=0.0004;
+constexpr f1_t timestep=0.0003;
 
 // storing results as file
 #define STORE_RESULTS
@@ -67,17 +67,17 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 
 // generate a rotating sphere with uniform density
 // only use this with 3D simulations
-//#define ROTATING_UNIFORM_SPHERE
+#define ROTATING_UNIFORM_SPHERE
 
 // generate a rotating sphere with density distribution according to plummers law
 // only use this with 3D simulations
-#define ROTATING_PLUMMER_SPHERE
+//#define ROTATING_PLUMMER_SPHERE
 // notes on plummer: mass contained inside the sphere radius 1 will be = tmass * 2^(-3/2)
 
 // parameter for generated initial conditions
 constexpr f1_t tmass = 0.5; // total mass of the sphere
 constexpr f1_t particle_count=1<<14; // number of particles
-constexpr f3_t angVel=f3_t{0,0,0.4}; // angular velocity of the cloud omega
+constexpr f3_t angVel=f3_t{0,0,0.3}; // angular velocity of the cloud omega
 
 
 // --------------------
@@ -106,15 +106,15 @@ constexpr f1_t cohesion = 0.8; // the materials cohesion
 // --------------------
 // Boundary / Environment settings
 
-// Use the Clohessy-Wiltshire model to put the entire simulation into a circular orbit around a central body.
-// And simulate the resulting tidal forces. Keep in mind this is a simple model / approximation.
+// Use the Clohessy-Wiltshire model to put the entire simulation into a circular orbit around a central body
+// and simulate the resulting tidal forces. Keep in mind this is a simple model / approximation.
 // Also momentum is no longer conserved.
 // The central body is along negative x axis, y axis points along the movement direction of the cloud along the orbit.
 // The strength of the tidal forces is controlled by the parameter n = sqrt( M / (a*a*a)).
 // where M is the mass of the central body and a the semi-major axis of the orbit
 // You can also define it in terms of the hill radius as n = sqrt( m / (3*r_hill^3)) with m beeing the mass contained within r_hill.
 #define CLOHESSY_WILTSHIRE
-constexpr f1_t cw_n = 0.3;
+constexpr f1_t cw_n = 0.381;
 
 //--------------------
 // artificial correction
