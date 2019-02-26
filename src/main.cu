@@ -57,6 +57,8 @@ struct computeDerivatives
     m3_t edot{0}; // strain rate tensor (edot)
     m3_t rdot{0}; // rotation rate tensor
     f1_t vdiv{0}; // velocity divergence
+    static constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H);
+    static constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H);
     #if defined(ARTIFICIAL_STRESS)
         m3_t arts_i; // artificial stress from i
     #endif
@@ -105,7 +107,7 @@ struct computeDerivatives
             {
                 // get the kernel gradient
                 f1_t r = sqrt(r2);
-                const f1_t dw = kernel::dWspline<dimension>(r, H);
+                const f1_t dw = kernel::dWspline(r, H, dW_prefactor);
                 const f3_t gradw = (dw / r) * rij;
 
                 // stress and pressure of j
@@ -130,7 +132,7 @@ struct computeDerivatives
 
     #if defined(ARTIFICIAL_STRESS)
                 // artificial stress
-                const f1_t f = pow(kernel::Wspline<dimension>(r, H) / kernel::Wspline<dimension>(normalsep, H) , matexp;
+                const f1_t f = pow(kernel::Wspline(r, H, W_prefactor) / kernel::Wspline(normalsep, H, W_prefactor) , matexp;
                 stress += f*(arts_i + artificialStress(mateps, sigOverRho_j));
     #endif
 

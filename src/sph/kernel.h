@@ -42,19 +42,19 @@ template<Dim dimension>
 CUDAHOSTDEV f1_t splinePrefactor(f1_t h) {throw std::logic_error("illegal dimension for this kernel");}
 
 template<>
-CUDAHOSTDEV f1_t splinePrefactor<Dim::one>(f1_t h)
+CUDAHOSTDEV constexpr f1_t splinePrefactor<Dim::one>(f1_t h)
 {
     return 4.0 / (3.0 * h);
 }
 
 template<>
-CUDAHOSTDEV f1_t splinePrefactor<Dim::two>(f1_t h)
+CUDAHOSTDEV constexpr f1_t splinePrefactor<Dim::two>(f1_t h)
 {
     return 40.0 / (7.0 * M_PI * h * h);
 }
 
 template<>
-CUDAHOSTDEV f1_t splinePrefactor<Dim::three>(f1_t h)
+CUDAHOSTDEV constexpr f1_t splinePrefactor<Dim::three>(f1_t h)
 {
     return 8.0 / (M_PI * h * h * h);
 }
@@ -66,22 +66,22 @@ CUDAHOSTDEV f1_t splinePrefactor<Dim::three>(f1_t h)
 * @return the dimension dependent prefactor of the spline functions
 */
 template<Dim dimension>
-CUDAHOSTDEV f1_t dsplinePrefactor(f1_t h) {} // {throw std::logic_error("illegal dimension for this kernel");}
+CUDAHOSTDEV f1_t dsplinePrefactor(const f1_t h) {} // {throw std::logic_error("illegal dimension for this kernel");}
 
 template<>
-CUDAHOSTDEV f1_t dsplinePrefactor<Dim::one>(f1_t h)
+CUDAHOSTDEV constexpr f1_t dsplinePrefactor<Dim::one>(const f1_t h)
 {
     return 24.0 / (3.0 * h * h);
 }
 
 template<>
-CUDAHOSTDEV f1_t dsplinePrefactor<Dim::two>(f1_t h)
+CUDAHOSTDEV constexpr f1_t dsplinePrefactor<Dim::two>(const f1_t h)
 {
     return 240.0 / (7.0 * M_PI * h * h * h);
 }
 
 template<>
-CUDAHOSTDEV f1_t dsplinePrefactor<Dim::three>(f1_t h)
+CUDAHOSTDEV constexpr f1_t dsplinePrefactor<Dim::three>(const f1_t h)
 {
     return 48.0 / (M_PI * h * h * h * h);
 }
@@ -93,16 +93,16 @@ CUDAHOSTDEV f1_t dsplinePrefactor<Dim::three>(f1_t h)
 * @return the dimension dependent prefactor of the spiky kernel
 */
 template<Dim dimension>
-CUDAHOSTDEV f1_t dspikyPrefactor(f1_t h) {}// {throw std::logic_error("illegal dimension for this kernel");}
+CUDAHOSTDEV f1_t dspikyPrefactor(const f1_t h) {}// {throw std::logic_error("illegal dimension for this kernel");}
 
 template<>
-CUDAHOSTDEV f1_t dspikyPrefactor<Dim::two>(f1_t h)
+CUDAHOSTDEV constexpr f1_t dspikyPrefactor<Dim::two>(const f1_t h)
 {
     return -30.0 / (M_PI * h*h*h*h*h);
 }
 
 template<>
-CUDAHOSTDEV f1_t dspikyPrefactor<Dim::three>(f1_t h)
+CUDAHOSTDEV constexpr f1_t dspikyPrefactor<Dim::three>(const f1_t h)
 {
     return -45.0 / (M_PI * h*h*h*h*h*h);
 }

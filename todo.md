@@ -9,9 +9,6 @@
 - print the settings used
 - add compiletime math library for options
 
-### performance
-- use kernel prefactors
-
 ### simulation feature
 - balsara switch
 - linear consistency fix and investigate angular momentum (not)conservation
@@ -24,9 +21,6 @@
 
 
 ## medium priority
-
-### particle creation
-- add 2d image source from the other branch
 
 ### usability
 - more runtime options vs compiletime options
@@ -42,9 +36,6 @@
 ### performance
 - somehow automatically adjust particle attributes based on options
 - optimize the functions in models.h
-
-### simulation features
-- add functionality from the other branch
 
 
 ## low priority / ideas / long term projects
@@ -85,6 +76,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- use precomputed constants for kernel calls
 - add the Clohessy-Wiltshire model
 - add proper rng seeds for the initial conditions
 - allow normalization of center of mass and velocity at center of mass
