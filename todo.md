@@ -75,6 +75,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add custom literal for floating point variables
 - calculate some global constants at compile time
 - use precomputed constants for kernel calls
 - add the Clohessy-Wiltshire model

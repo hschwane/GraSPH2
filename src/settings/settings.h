@@ -51,8 +51,8 @@ constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, be
 
 // set a value for the smoothing length H
 // you can also define a radius for a single particle
-constexpr f1_t pradius = 0.1 / 25.4; // "radius" of a particle
-constexpr f1_t H = pradius*2.5; // the smoothing length H of a particle
+constexpr f1_t pradius = 0.1_ft / 25.4_ft; // "radius" of a particle
+constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
 
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
@@ -75,8 +75,8 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 // notes on plummer: mass contained inside the sphere radius 1 will be = tmass * 2^(-3/2)
 
 // parameter for generated initial conditions
-constexpr f1_t tmass = 0.5; // total mass of the sphere
-constexpr f1_t particle_count=1<<14; // number of particles
+constexpr f1_t tmass = 0.5_ft; // total mass of the sphere
+constexpr size_t particle_count=1<<14; // number of particles
 constexpr f3_t angVel=f3_t{0,0,0.3}; // angular velocity of the cloud omega
 
 
@@ -84,7 +84,7 @@ constexpr f3_t angVel=f3_t{0,0,0.3}; // angular velocity of the cloud omega
 // Material settings
 
 // parameters of the equation of state
-constexpr f1_t rho0 = tmass /particle_count / (4.0/3.0 * pradius * pradius * pradius * M_PI); // the materials rest density
+constexpr f1_t rho0 = tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
 constexpr f1_t BULK = 64; // the materials bulk modulus
 constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pressure
 constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
@@ -100,9 +100,9 @@ constexpr f1_t Y =0.5;
 
 // mohr-coulomb plasticity, using friction angle and cohesion
 #define PLASTICITY_MC
-constexpr f1_t friction_angle = mpu::rad<f1_t>(55.0); // the materials internal friction angle in radians
+constexpr f1_t friction_angle = mpu::rad(55.0_ft); // the materials internal friction angle in radians
 constexpr f1_t tanfr = gcem::tan(friction_angle); // tangents of the friction angle
-constexpr f1_t cohesion = 0.8; // the materials cohesion
+constexpr f1_t cohesion = 0.8_ft; // the materials cohesion
 
 
 // --------------------
@@ -116,25 +116,25 @@ constexpr f1_t cohesion = 0.8; // the materials cohesion
 // where M is the mass of the central body and a the semi-major axis of the orbit
 // You can also define it in terms of the hill radius as n = sqrt( m / (3*r_hill^3)) with m beeing the mass contained within r_hill.
 #define CLOHESSY_WILTSHIRE
-constexpr f1_t cw_n = 0.381;
+constexpr f1_t cw_n = 0.381_ft;
 
 //--------------------
 // artificial correction
 
 // use artificial viscosity
 #define ARTIFICIAL_VISCOSITY
-constexpr f1_t alpha = 1; // strength of artificial viscosity
+constexpr f1_t alpha = 1.0_ft; // strength of artificial viscosity
 
 // artificial stress to prevent particle clumps
 // not needed for most simulations
 //#define ARTIFICIAL_STRESS
-constexpr f1_t mateps = 0.4;
-constexpr f1_t matexp = 4;
-constexpr f1_t normalsep = H*0.3;
+constexpr f1_t mateps = 0.4_ft;
+constexpr f1_t matexp = 4.0_ft;
+constexpr f1_t normalsep = H*0.3_ft;
 
 // enable XSPH, a technique to smooth the velocity field
 //#define XSPH
-constexpr f1_t xsph_factor = 0.5;
+constexpr f1_t xsph_factor = 0.5_ft;
 
 
 //--------------------

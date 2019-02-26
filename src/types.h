@@ -37,6 +37,10 @@ enum class Dim
     using m2_t=mpu::Mat<double,2,2>;
     using m3_t=mpu::Mat<double,3,3>;
     using m4_t=mpu::Mat<double,4,4>;
+    constexpr double operator ""_ft(long double d) noexcept
+    {
+        return double(d);
+    }
 #else
     using f1_t=float;
     using f2_t=float2;
@@ -45,6 +49,10 @@ enum class Dim
     using m2_t=mpu::Mat<float,2,2>;
     using m3_t=mpu::Mat<float,3,3>;
     using m4_t=mpu::Mat<float,4,4>;
+    constexpr float operator ""_ft(long double d) noexcept
+    {
+        return float(d);
+    }
 #endif
 
 

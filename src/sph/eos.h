@@ -92,7 +92,7 @@ CUDAHOSTDEV f1_t liquid(f1_t rho, f1_t rho0, f1_t c2)
 
 CUDAHOSTDEV f1_t murnaghan(f1_t rho, f1_t rho0, f1_t K0, f1_t dK0)
 {
-    return K0/dK0 * (pow(rho/rho0,dK0)-1);
+    return K0/dK0 * (pow(rho/rho0,dK0)-1.0_ft);
 }
 
 }

@@ -190,12 +190,12 @@ struct integrateLeapfrog
     CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, f1_t dt, bool not_first_step)
     {
         //   calculate velocity a_t
-        p.vel = p.vel + p.acc * (dt * 0.5f);
+        p.vel = p.vel + p.acc * (dt * 0.5_ft);
 
         // we could now change delta t here
 
         // calculate velocity a_t+1/2
-        p.vel = p.vel + p.acc * (dt * 0.5f) * not_first_step;
+        p.vel = p.vel + p.acc * (dt * 0.5_ft) * not_first_step;
 
         // calculate position r_t+1
 #if defined(XSPH) && defined(ENABLE_SPH)
@@ -207,8 +207,8 @@ struct integrateLeapfrog
 #if defined(ENABLE_SPH)
         // density
         p.density = p.density + p.density_dt * dt;
-        if(p.density < 0.0f)
-            p.density = 0.0f;
+        if(p.density < 0.0_ft)
+            p.density = 0.0_ft;
 
         // deviatoric stress
         p.dstress += p.dstress_dt * dt;
@@ -254,7 +254,7 @@ int main()
 #if defined(READ_FROM_FILE)
     generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    generator.addParticles( ps::UniformSphere(particle_count,1.0,tmass,rho0,161214).addAngularVelocity(angVel), true,true );
+    generator.addParticles( ps::UniformSphere(particle_count,1.0_ft,tmass,rho0,161214).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
     generator.addParticles( ps::PlummerSphere(particle_count,1.0,tmass,rho0,161214).addAngularVelocity(angVel), true, true);
 #endif
