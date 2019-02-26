@@ -32,7 +32,8 @@
 
 
 constexpr f1_t H2 = H*H; //!< square of the smoothing length
-
+constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
+constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
 
 /**
  * @brief computes derivatives of particle attributes
@@ -47,8 +48,7 @@ struct computeDerivatives
     using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
     using pj_type = Particle<POS,MASS,VEL,DENSITY,DSTRESS>; //!< the particle attributes to load from main memory of all the interaction partners j
     //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
-    template<size_t n>
-    using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS>;
+    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS>;
 
     // setup some variables we need before during and after the pair interactions
 #if defined(ENABLE_SPH)
@@ -57,15 +57,13 @@ struct computeDerivatives
     m3_t edot{0}; // strain rate tensor (edot)
     m3_t rdot{0}; // rotation rate tensor
     f1_t vdiv{0}; // velocity divergence
-    static constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H);
-    static constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H);
     #if defined(ARTIFICIAL_STRESS)
         m3_t arts_i; // artificial stress from i
     #endif
 #endif
 
     //!< This function is executed for each particle before the interactions are computed.
-    CUDAHOSTDEV void do_before(pi_type& pi, size_t id, f1_t speedOfSound)
+    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
     {
 #if defined(ENABLE_SPH)
         // build stress tensor for particle i using deviatoric stress and pressure
@@ -85,7 +83,7 @@ struct computeDerivatives
     }
 
     //!< This function will be called for each pair of particles.
-    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj, f1_t speedOfSound)
+    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
     {
         // code run for each pair of particles
 
@@ -126,7 +124,7 @@ struct computeDerivatives
     #if defined(ARTIFICIAL_VISCOSITY)
                 // acceleration from artificial viscosity
                 pi.acc -= pj.mass *
-                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, speedOfSound, speedOfSound) *
+                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED) *
                           gradw;
     #endif
 
@@ -155,7 +153,7 @@ struct computeDerivatives
     }
 
     //!< This function will be called for particle i after the interactions with the other particles are computed.
-    CUDAHOSTDEV store_type do_after(pi_type& pi, f1_t speedOfSound)
+    CUDAHOSTDEV store_type do_after(pi_type& pi)
     {
 #if defined(ENABLE_SPH)
         // density time derivative
@@ -189,7 +187,7 @@ struct integrateLeapfrog
 
     //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
     //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
-    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, f1_t dt, bool not_first_step, f1_t tanfr)
+    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, f1_t dt, bool not_first_step)
     {
         //   calculate velocity a_t
         p.vel = p.vel + p.acc * (dt * 0.5f);
@@ -275,10 +273,6 @@ int main()
     // upload particles
     pb = hpb;
 
-    // calculate sound speed, tangents of friction angle, and n of the CW model
-    const f1_t SOUNDSPEED = sqrt(BULK / rho0);
-    const f1_t tanfr = tan(friction_angle);
-
 #if defined(STORE_RESULTS)
     // set up file saving engine
     ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
@@ -287,8 +281,8 @@ int main()
 #endif
 
     // start simulating
-    do_for_each_pair_fast<computeDerivatives>(pb,SOUNDSPEED);
-    do_for_each<integrateLeapfrog>(pb,timestep,false,tanfr);
+    do_for_each_pair_fast<computeDerivatives>(pb);
+    do_for_each<integrateLeapfrog>(pb,timestep,false);
 
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
@@ -303,8 +297,8 @@ int main()
             pb.mapGraphicsResource(); // used for frontend stuff
 
             // run simulation
-            do_for_each_pair_fast<computeDerivatives>(pb,SOUNDSPEED);
-            do_for_each<integrateLeapfrog>(pb,timestep,true,tanfr);
+            do_for_each_pair_fast<computeDerivatives>(pb);
+            do_for_each<integrateLeapfrog>(pb,timestep,true);
 
             simulatedTime += timestep;
 

@@ -87,6 +87,7 @@ constexpr f3_t angVel=f3_t{0,0,0.3}; // angular velocity of the cloud omega
 constexpr f1_t rho0 = tmass /particle_count / (4.0/3.0 * pradius * pradius * pradius * M_PI); // the materials rest density
 constexpr f1_t BULK = 64; // the materials bulk modulus
 constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pressure
+constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
 
 // parameters for solid bodys
 constexpr f1_t shear = 92; // the materials shear modulus
@@ -99,7 +100,8 @@ constexpr f1_t Y =0.5;
 
 // mohr-coulomb plasticity, using friction angle and cohesion
 #define PLASTICITY_MC
-constexpr f1_t friction_angle = 55.0f * (M_PI/180.0f); // the materials internal friction angle in radians
+constexpr f1_t friction_angle = mpu::rad<f1_t>(55.0); // the materials internal friction angle in radians
+constexpr f1_t tanfr = gcem::tan(friction_angle); // tangents of the friction angle
 constexpr f1_t cohesion = 0.8; // the materials cohesion
 
 

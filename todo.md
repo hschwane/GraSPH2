@@ -7,7 +7,6 @@
 
 ### usability
 - print the settings used
-- add compiletime math library for options
 
 ### simulation feature
 - balsara switch
@@ -76,6 +75,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- calculate some global constants at compile time
 - use precomputed constants for kernel calls
 - add the Clohessy-Wiltshire model
 - add proper rng seeds for the initial conditions
