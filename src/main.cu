@@ -138,7 +138,7 @@ struct computeDerivatives
                 pi.acc += pj.mass * (stress * gradw);
 
                 // strain rate tensor (edot) and rotation rate tensor (rdot)
-                addStrainRateAndRotationRate(edot,rdot,pj.mass,pi.mass,vij,gradw);
+                addStrainRateAndRotationRate(edot,rdot,pj.mass,pj.density,vij,gradw);
 
                 // density time derivative
                 vdiv += (pj.mass / pj.density) * dot(vij, gradw);

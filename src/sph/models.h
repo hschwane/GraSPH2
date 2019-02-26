@@ -94,7 +94,7 @@ CUDAHOSTDEV inline m3_t artificialStress(f1_t mateps, const m3_t& sigOverRho);
  * @param gradw the kernel gradient
  */
 CUDAHOSTDEV inline void addStrainRateAndRotationRate(m3_t& edot, m3_t& rdot,
-                                               f1_t mass_j, f1_t density_i,
+                                               f1_t mass_j, f1_t density_j,
                                                const f3_t& vij, const f3_t& gradw);
 
 /**
@@ -151,10 +151,10 @@ m3_t artificialStress(const f1_t mateps, const m3_t &sigOverRho)
     return arts;
 }
 
-void addStrainRateAndRotationRate(m3_t &edot, m3_t &rdot, const f1_t mass_j, const f1_t density_i, const f3_t &vij,
+void addStrainRateAndRotationRate(m3_t &edot, m3_t &rdot, const f1_t mass_j, const f1_t density_j, const f3_t &vij,
                                   const f3_t &gradw)
 {
-    f1_t tmp = -0.5_ft * mass_j / density_i;
+    f1_t tmp = -0.5_ft * mass_j / density_j;
     edot[0][0] += tmp * (vij.x * gradw.x + vij.x * gradw.x);
     edot[0][1] += tmp * (vij.x * gradw.y + vij.y * gradw.x);
     edot[0][2] += tmp * (vij.x * gradw.z + vij.z * gradw.x);
@@ -178,7 +178,7 @@ void addStrainRateAndRotationRate(m3_t &edot, m3_t &rdot, const f1_t mass_j, con
 
 m3_t dstress_dt(const m3_t &edot, const m3_t &rdot, const m3_t &dstress, const f1_t shear)
 {
-    m3_t dstress_dt;
+    m3_t dstress_dt(0);
     for(int d = 0; d < 3; ++d)
         for(int e = 0; e < 3; ++e)
         {
