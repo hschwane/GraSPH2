@@ -9,7 +9,6 @@
 - print the settings used
 
 ### simulation feature
-- balsara switch
 - linear consistency fix and investigate angular momentum (not)conservation
 - variable timestep
 
@@ -75,6 +74,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add balsara switch
 - fix bug in edot and rdot calculation
 - add custom literal for floating point variables
 - calculate some global constants at compile time

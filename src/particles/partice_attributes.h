@@ -90,6 +90,7 @@ MAKE_PARTICLE_ATTRIB(POS,pos,f3_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(MASS,mass,f1_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(VEL,vel,f3_t, POS);
 MAKE_PARTICLE_ATTRIB(ACC,acc,f3_t, VEL);
+MAKE_PARTICLE_ATTRIB(BALSARA,balsara,f1_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(XVEL,xvel,f3_t, POS);
 MAKE_PARTICLE_ATTRIB(DENSITY,density,f1_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(DENSITY_DT,density_dt,f1_t, DENSITY);
@@ -99,6 +100,6 @@ MAKE_PARTICLE_ATTRIB(DSTRESS_DT,dstress_dt,m3_t, DSTRESS);
 // add a new call to make_particle_attrib here to add new particle attributes
 // then also add the attribute to the list below to define the desired order of particle attributes
 
-using particle_base_order = std::tuple<POS,MASS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
+using particle_base_order = std::tuple<POS,MASS,VEL,ACC,BALSARA,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
 
 #endif //GRASPH2_PARTICE_ATTRIBUTES_H

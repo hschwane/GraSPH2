@@ -31,7 +31,7 @@
 
 /**
  * @brief calculates II, the viscosity factor for artificial viscosity after Monaghan 1997.
- *          Viscosity vanishes if particles move away from each other. To remove shear velocity
+ *          Viscosity vanishes if particles move away from each other. To remove shear viscosity
  *          use an additional balsara switch.
  * @param alpha the strength of the viscosity should be between 0 and 1
  * @param density_i the density of particle i
@@ -51,6 +51,16 @@ CUDAHOSTDEV inline f1_t artificialViscosity(f1_t alpha,
                                         f1_t r,
                                         f1_t ci, f1_t cj,
                                         f1_t  balsara_i=1.0f, f1_t balsara_j=1.0f);
+
+/**
+ * @brief computes the balsara switch value for a particle. (See Balsara 1995)
+ * @param divv divergence of the velocity field
+ * @param curlv curl of the velocity field
+ * @param c speed of sound
+ * @param h smoothing length
+ * @return the value of the balsara switch for this particle
+ */
+CUDAHOSTDEV inline f1_t balsaraSwitch(f1_t divv, const f3_t& curlv, f1_t c, f1_t h);
 
 /**
  * @brief limits the amount of deviatoric stress using the von miese yield criterion.
@@ -105,7 +115,7 @@ CUDAHOSTDEV inline void addStrainRateAndRotationRate(m3_t& edot, m3_t& rdot,
  * @param shear the shear modulus of the material
  * @return the time derivative of the deviatoric stress tensor
  */
- CUDAHOSTDEV inline m3_t dstress_dt(const m3_t& edot, const m3_t& rdot, const m3_t& dstress, f1_t shear);
+CUDAHOSTDEV inline m3_t dstress_dt(const m3_t& edot, const m3_t& rdot, const m3_t& dstress, f1_t shear);
 
 
 // function definitions
@@ -125,6 +135,13 @@ f1_t artificialViscosity(const f1_t alpha, const f1_t density_i, const f1_t dens
     return II;
 }
 
+f1_t balsaraSwitch(const f1_t divv, const f3_t& curlv, const f1_t c, const f1_t h)
+{
+    const f1_t absdiv = fabs(divv);
+    const f1_t abscurl = length(curlv);
+    return absdiv / (absdiv + abscurl + 0.0001_ft * c/h);
+}
+
 void plasticity(m3_t &destress, const f1_t Y)
 {
     // second invariant of deviatoric stress
@@ -133,7 +150,7 @@ void plasticity(m3_t &destress, const f1_t Y)
         J2 += destress(e) * destress(e);
     J2 *= 0.5_ft;
 
-    const f1_t miese_f = min(Y * Y / (3.0_ft * J2), 1.0_ft);
+    const f1_t miese_f = std::min(Y * Y / (3.0_ft * J2), 1.0_ft);
 
     destress *= miese_f;
 }

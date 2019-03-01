@@ -36,27 +36,84 @@ constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< splin
 constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
 
 /**
- * @brief computes derivatives of particle attributes
- * @param particles device copy of the particle Buffer
- * @param speedOfSound your materials sound speed
+ * @brief first pass of derivative computation
  */
-struct computeDerivatives
+struct cdA
 {
     // define particle attributes to use
     using load_type = Particle<POS,MASS,VEL,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
-    using store_type = Particle<ACC,XVEL,DENSITY_DT,DSTRESS_DT>; //!< particle attributes to store to main memory
+    using store_type = Particle<BALSARA,DENSITY_DT,DSTRESS_DT>; //!< particle attributes to store to main memory
     using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-    using pj_type = Particle<POS,MASS,VEL,DENSITY,DSTRESS>; //!< the particle attributes to load from main memory of all the interaction partners j
+    using pj_type = Particle<POS,MASS,VEL>; //!< the particle attributes to load from main memory of all the interaction partners j
     //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
-    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_DENSITY,SHARED_DSTRESS>;
+    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL>;
+
+    // setup some variables we need before during and after the pair interactions
+    m3_t edot{0}; // strain rate tensor (edot)
+    m3_t rdot{0}; // rotation rate tensor
+
+    //!< This function is executed for each particle before the interactions are computed.
+    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
+    {
+    }
+
+    //!< This function will be called for each pair of particles.
+    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
+    {
+        // code run for each pair of particles
+
+        const f3_t rij = pi.pos-pj.pos;
+        const f1_t r2 = dot(rij,rij);
+        if(r2 <= H2 && r2>0)
+        {
+            // get the kernel gradient
+            f1_t r = sqrt(r2);
+            const f1_t dw = kernel::dWspline(r, H, dW_prefactor);
+            const f3_t gradw = (dw / r) * rij;
+
+            // strain rate tensor (edot) and rotation rate tensor (rdot)
+            const f3_t vij = pi.vel - pj.vel;
+            addStrainRateAndRotationRate(edot,rdot,pj.mass,pi.density,vij,gradw);
+
+        }
+    }
+
+    //!< This function will be called for particle i after the interactions with the other particles are computed.
+    CUDAHOSTDEV store_type do_after(pi_type& pi)
+    {
+        // get divergence and curl from rdot and edot
+        const f1_t divv = edot[0][0] + edot[1][1] + edot[2][2];
+        const f3_t curlv = f3_t{-2*rdot[1][2], -2*rdot[2][0], -2*rdot[0][1] };
+
+        // deviatoric stress time derivative
+        pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
+
+        // density time derivative
+        pi.density_dt = -pi.density * divv;
+
+        // compute the balsara switch value
+        pi.balsara = balsaraSwitch(divv, curlv, SOUNDSPEED, H);
+
+        return pi;
+    }
+};
+
+/**
+ * @brief second pass of derivative computation
+ */
+struct cdB
+{
+    // define particle attributes to use
+    using load_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
+    using store_type = Particle<ACC,XVEL>; //!< particle attributes to store to main memory
+    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
+    using pj_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< the particle attributes to load from main memory of all the interaction partners j
+    //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
+    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_BALSARA,SHARED_DENSITY,SHARED_DSTRESS>;
 
     // setup some variables we need before during and after the pair interactions
 #if defined(ENABLE_SPH)
     m3_t sigOverRho_i; // stress over density square used for acceleration
-    m3_t sigma_i; // stress tensor
-    m3_t edot{0}; // strain rate tensor (edot)
-    m3_t rdot{0}; // rotation rate tensor
-    f1_t vdiv{0}; // velocity divergence
     #if defined(ARTIFICIAL_STRESS)
         m3_t arts_i; // artificial stress from i
     #endif
@@ -67,7 +124,7 @@ struct computeDerivatives
     {
 #if defined(ENABLE_SPH)
         // build stress tensor for particle i using deviatoric stress and pressure
-        sigma_i = pi.dstress;
+        m3_t sigma_i = pi.dstress;
         const f1_t pres_i = eos::murnaghan( pi.density, rho0, BULK, dBULKdP);
         sigma_i[0][0] -= pres_i;
         sigma_i[1][1] -= pres_i;
@@ -86,7 +143,6 @@ struct computeDerivatives
     CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
     {
         // code run for each pair of particles
-
         const f3_t rij = pi.pos-pj.pos;
         const f1_t r2 = dot(rij,rij);
         if(r2>0)
@@ -118,16 +174,9 @@ struct computeDerivatives
                 m3_t sigOverRho_j = sigma_j / (pj.density * pj.density);
 
                 // stress from the interaction
-                m3_t stress = sigOverRho_i + sigOverRho_j;
+                m3_t stress = sigOverRho_i; // + sigOverRho_j;
 
                 const f3_t vij = pi.vel - pj.vel;
-    #if defined(ARTIFICIAL_VISCOSITY)
-                // acceleration from artificial viscosity
-                pi.acc -= pj.mass *
-                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED) *
-                          gradw;
-    #endif
-
     #if defined(ARTIFICIAL_STRESS)
                 // artificial stress
                 const f1_t f = pow(kernel::Wspline(r, H, W_prefactor) / kernel::Wspline(normalsep, H, W_prefactor) , matexp;
@@ -137,11 +186,12 @@ struct computeDerivatives
                 // acceleration from stress
                 pi.acc += pj.mass * (stress * gradw);
 
-                // strain rate tensor (edot) and rotation rate tensor (rdot)
-                addStrainRateAndRotationRate(edot,rdot,pj.mass,pj.density,vij,gradw);
-
-                // density time derivative
-                vdiv += (pj.mass / pj.density) * dot(vij, gradw);
+    #if defined(ARTIFICIAL_VISCOSITY)
+                // acceleration from artificial viscosity
+                pi.acc -= pj.mass *
+                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED, pi.balsara, pj.balsara) *
+                          gradw;
+    #endif
 
     #if defined(XSPH)
                 // xsph
@@ -155,13 +205,6 @@ struct computeDerivatives
     //!< This function will be called for particle i after the interactions with the other particles are computed.
     CUDAHOSTDEV store_type do_after(pi_type& pi)
     {
-#if defined(ENABLE_SPH)
-        // density time derivative
-        pi.density_dt = pi.density * vdiv;
-        // deviatoric stress time derivative
-        pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
-#endif
-
 #if defined(CLOHESSY_WILTSHIRE)
         pi.acc.x += 3*cw_n*cw_n * pi.pos.x + 2*cw_n* pi.vel.y;
         pi.acc.y += -2*cw_n * pi.vel.x;
@@ -171,6 +214,12 @@ struct computeDerivatives
     }
 };
 
+template <typename pbT>
+void computeDerivatives(pbT particleBuffer)
+{
+    do_for_each_pair_fast<cdA>(particleBuffer);
+    do_for_each_pair_fast<cdB>(particleBuffer);
+}
 
 /**
  * @brief perform leapfrog integration on the particles also performs the plasticity calculations
@@ -281,7 +330,7 @@ int main()
 #endif
 
     // start simulating
-    do_for_each_pair_fast<computeDerivatives>(pb);
+    computeDerivatives(pb);
     do_for_each<integrateLeapfrog>(pb,timestep,false);
 
     double simulatedTime=timestep;
@@ -297,7 +346,7 @@ int main()
             pb.mapGraphicsResource(); // used for frontend stuff
 
             // run simulation
-            do_for_each_pair_fast<computeDerivatives>(pb);
+            computeDerivatives(pb);
             do_for_each<integrateLeapfrog>(pb,timestep,true);
 
             simulatedTime += timestep;

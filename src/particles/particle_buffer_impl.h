@@ -125,6 +125,22 @@ CUDAHOSTDEV inline auto acc_impl::load(const type & v) { return particleType(f3_
 template<typename T> CUDAHOSTDEV inline void acc_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void acc_impl::store<ACC>(type & v, const ACC& p) {v=type{p.acc.x,p.acc.y,p.acc.z,0.0f};}
 
+//-------------------------------------------------------------------
+// balsara switch value
+struct balsara_impl : pb_impl
+{
+    using type = f1_t;
+    static constexpr type defaultValue = {0};
+    using particleType = Particle<BALSARA>;
+
+    CUDAHOSTDEV static auto load(const type & v);
+    template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
+};
+
+CUDAHOSTDEV inline auto balsara_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void balsara_impl::store(type &v, const T &p) {}
+template<> CUDAHOSTDEV inline void balsara_impl::store<BALSARA>(type & v, const BALSARA& p) {v=p.balsara;}
+
 
 //-------------------------------------------------------------------
 // 3D smoothed velocity for xsph as f4_t
@@ -219,15 +235,16 @@ MAKE_PARTICLE_BUFFER_IMPLEMENTATION(MASS,mass_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(POSM,posm_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(VEL,vel_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(ACC,acc_impl);
+MAKE_PARTICLE_BUFFER_IMPLEMENTATION(BALSARA,balsara_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(XVEL,xvel_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DENSITY,density_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DENSITY_DT,density_dt_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DSTRESS,deviatoric_stress_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DSTRESS_DT,deviatoric_stress_dt_impl);
 
-using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT >;
-using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT >;
-using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM,DREF_VEL,DREF_ACC,DREF_XVEL,DREF_DENSITY,DREF_DENSITY_DT,DREF_DSTRESS,DREF_DSTRESS_DT >;
-using shared_base_order = std::tuple<SHARED_POS<0>,SHARED_MASS<0>,SHARED_POSM<0>,SHARED_VEL<0>,SHARED_ACC<0>,SHARED_XVEL<0>,SHARED_DENSITY<0>,SHARED_DENSITY_DT<0>,SHARED_DSTRESS<0>,SHARED_DSTRESS_DT<0> >;
+using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT >;
+using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT >;
+using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM,DREF_VEL,DREF_ACC,DREF_BALSARA,DREF_XVEL,DREF_DENSITY,DREF_DENSITY_DT,DREF_DSTRESS,DREF_DSTRESS_DT >;
+using shared_base_order = std::tuple<SHARED_POS<0>,SHARED_MASS<0>,SHARED_POSM<0>,SHARED_VEL<0>,SHARED_ACC<0>,SHARED_BALSARA<0>,SHARED_XVEL<0>,SHARED_DENSITY<0>,SHARED_DENSITY_DT<0>,SHARED_DSTRESS<0>,SHARED_DSTRESS_DT<0> >;
 
 #endif //GRASPH2_PARTICLE_BUFFER_IMPL_H
