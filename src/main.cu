@@ -60,8 +60,6 @@ struct cdA
     //!< This function will be called for each pair of particles.
     CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
     {
-        // code run for each pair of particles
-
         const f3_t rij = pi.pos-pj.pos;
         const f1_t r2 = dot(rij,rij);
         if(r2 <= H2 && r2>0)
@@ -83,7 +81,6 @@ struct cdA
     {
         // get divergence and curl from rdot and edot
         const f1_t divv = edot[0][0] + edot[1][1] + edot[2][2];
-        const f3_t curlv = f3_t{-2*rdot[1][2], -2*rdot[2][0], -2*rdot[0][1] };
 
         // deviatoric stress time derivative
         pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
@@ -91,8 +88,11 @@ struct cdA
         // density time derivative
         pi.density_dt = -pi.density * divv;
 
+#if defined(BALSARA_SWITCH)
         // compute the balsara switch value
+        const f3_t curlv = f3_t{-2*rdot[1][2], -2*rdot[2][0], -2*rdot[0][1] };
         pi.balsara = balsaraSwitch(divv, curlv, SOUNDSPEED, H);
+#endif
 
         return pi;
     }
@@ -142,7 +142,6 @@ struct cdB
     //!< This function will be called for each pair of particles.
     CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
     {
-        // code run for each pair of particles
         const f3_t rij = pi.pos-pj.pos;
         const f1_t r2 = dot(rij,rij);
         if(r2>0)
@@ -189,8 +188,11 @@ struct cdB
     #if defined(ARTIFICIAL_VISCOSITY)
                 // acceleration from artificial viscosity
                 pi.acc -= pj.mass *
-                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED, pi.balsara, pj.balsara) *
-                          gradw;
+                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED
+        #if defined(BALSARA_SWITCH)
+                                  , pi.balsara, pj.balsara
+        #endif
+                          ) * gradw;
     #endif
 
     #if defined(XSPH)
@@ -217,7 +219,9 @@ struct cdB
 template <typename pbT>
 void computeDerivatives(pbT particleBuffer)
 {
+#if defined(ENABLE_SPH)
     do_for_each_pair_fast<cdA>(particleBuffer);
+#endif
     do_for_each_pair_fast<cdB>(particleBuffer);
 }
 

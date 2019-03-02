@@ -125,6 +125,9 @@ constexpr f1_t cw_n = 0.381_ft;
 #define ARTIFICIAL_VISCOSITY
 constexpr f1_t alpha = 1.0_ft; // strength of artificial viscosity
 
+// enable / disable the balsara switch
+//#define BALSARA_SWITCH
+
 // artificial stress to prevent particle clumps
 // not needed for most simulations
 //#define ARTIFICIAL_STRESS
@@ -145,8 +148,8 @@ constexpr f1_t xsph_factor = 0.5_ft;
 constexpr size_t BLOCK_SIZE = 256;
 
 // types for particle buffer. you can remove things you don't need to save memory
-using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
-using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
+using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
+using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
 
 
 // DO NOT MODIFY BELOW HERE
