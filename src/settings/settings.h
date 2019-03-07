@@ -126,7 +126,7 @@ constexpr f1_t cw_n = 0.381_ft;
 constexpr f1_t alpha = 1.0_ft; // strength of artificial viscosity
 
 // enable / disable the balsara switch
-//#define BALSARA_SWITCH
+#define BALSARA_SWITCH
 
 // artificial stress to prevent particle clumps
 // not needed for most simulations

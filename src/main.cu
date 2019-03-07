@@ -44,13 +44,14 @@ struct cdA
     using load_type = Particle<POS,MASS,VEL,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
     using store_type = Particle<BALSARA,DENSITY_DT,DSTRESS_DT>; //!< particle attributes to store to main memory
     using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-    using pj_type = Particle<POS,MASS,VEL>; //!< the particle attributes to load from main memory of all the interaction partners j
+    using pj_type = Particle<POS,MASS,VEL,DENSITY>; //!< the particle attributes to load from main memory of all the interaction partners j
     //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
-    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL>;
+    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_DENSITY>;
 
     // setup some variables we need before during and after the pair interactions
     m3_t edot{0}; // strain rate tensor (edot)
     m3_t rdot{0}; // rotation rate tensor
+    f1_t divv{0}; // velocity divergence
 
     //!< This function is executed for each particle before the interactions are computed.
     CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
@@ -71,17 +72,14 @@ struct cdA
 
             // strain rate tensor (edot) and rotation rate tensor (rdot)
             const f3_t vij = pi.vel - pj.vel;
-            addStrainRateAndRotationRate(edot,rdot,pj.mass,pi.density,vij,gradw);
-
+            addStrainRateAndRotationRate(edot,rdot,pj.mass,pj.density,vij,gradw);
+            divv -= (pj.mass / pj.density) * dot(vij, gradw);
         }
     }
 
     //!< This function will be called for particle i after the interactions with the other particles are computed.
     CUDAHOSTDEV store_type do_after(pi_type& pi)
     {
-        // get divergence and curl from rdot and edot
-        const f1_t divv = edot[0][0] + edot[1][1] + edot[2][2];
-
         // deviatoric stress time derivative
         pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
 
@@ -89,7 +87,7 @@ struct cdA
         pi.density_dt = -pi.density * divv;
 
 #if defined(BALSARA_SWITCH)
-        // compute the balsara switch value
+        // get curl from edot and compute the balsara switch value
         const f3_t curlv = f3_t{-2*rdot[1][2], -2*rdot[2][0], -2*rdot[0][1] };
         pi.balsara = balsaraSwitch(divv, curlv, SOUNDSPEED, H);
 #endif
@@ -173,7 +171,7 @@ struct cdB
                 m3_t sigOverRho_j = sigma_j / (pj.density * pj.density);
 
                 // stress from the interaction
-                m3_t stress = sigOverRho_i; // + sigOverRho_j;
+                m3_t stress = sigOverRho_i + sigOverRho_j;
 
                 const f3_t vij = pi.vel - pj.vel;
     #if defined(ARTIFICIAL_STRESS)
@@ -217,7 +215,7 @@ struct cdB
 };
 
 template <typename pbT>
-void computeDerivatives(pbT particleBuffer)
+void computeDerivatives(pbT& particleBuffer)
 {
 #if defined(ENABLE_SPH)
     do_for_each_pair_fast<cdA>(particleBuffer);
