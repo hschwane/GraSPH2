@@ -136,6 +136,7 @@ constexpr f1_t matexp = 4.0_ft;
 constexpr f1_t normalsep = H*0.3_ft;
 
 // enable XSPH, a technique to smooth the velocity field
+// currently broken (can be used but not recommended)
 //#define XSPH
 constexpr f1_t xsph_factor = 0.5_ft;
 

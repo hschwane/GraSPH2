@@ -2,9 +2,6 @@
 
 ## high priority
 
-### bugfix / simulation management
-- fix xsph
-
 ### usability
 - print the settings used
 
@@ -24,6 +21,7 @@
 - more runtime options vs compiletime options
 
 ### simulation management
+- fix xsph
 - make the compute derivatives function more organized
 - use some system to manage boundary conditions
 - find better solution for 2D simulation
