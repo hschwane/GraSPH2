@@ -290,6 +290,13 @@ int main()
     buildType = "Debug";
 #endif
 
+#if defined(STORE_RESULTS)
+    // set up file saving engine
+    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
+    // setup log output file
+    myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
+#endif
+
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
@@ -325,8 +332,7 @@ int main()
     pb = hpb;
 
 #if defined(STORE_RESULTS)
-    // set up file saving engine
-    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
+    // print timestep 0
     storage.printToFile(pb,0);
     f1_t timeSinceStore=timestep;
 #endif

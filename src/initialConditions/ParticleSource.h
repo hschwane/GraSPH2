@@ -20,6 +20,7 @@
 #include <types.h>
 #include <random>
 #include <particles/Particles.h>
+#include <mpUtils/mpUtils.h>
 //--------------------
 
 // namespace
@@ -165,6 +166,7 @@ Derived &ParticleSource<particleType, Derived>::setConstant(typename Attrib::typ
 template<typename particleType, typename Derived>
 Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength, unsigned int seed)
 {
+    logINFO("InitialConditions") << "ParticleSource " << typeid(Derived).name() << " addPositionalNoise with random seed: " << seed;
     m_operations.push_back([strength,seed](full_particle &p)
                            {
                                 static std::default_random_engine rng(seed);
@@ -177,6 +179,7 @@ Derived &ParticleSource<particleType, Derived>::addPositionalNoise(f1_t strength
 template<typename particleType, typename Derived>
 Derived &ParticleSource<particleType, Derived>::addRandomVelocity(f1_t strength, unsigned int seed)
 {
+    logINFO("InitialConditions") << "ParticleSource " << typeid(Derived).name() << " addRandomVelocity with random seed: " << seed;
     m_operations.push_back([strength,seed](full_particle &p)
                            {
                                static std::default_random_engine rng(seed);

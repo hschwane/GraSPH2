@@ -27,6 +27,7 @@ namespace ps {
 PlummerSphere::PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t totalMass, f1_t materialDensity, unsigned int seed)
         : m_plummerRadius(plummerRadius), m_totalMass(totalMass), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed)
 {
+    logINFO("InitialConditions") << "PlummerSphere using random seed: " << seed;
     m_numberOfParticles = particleCount;
 }
 
@@ -46,7 +47,7 @@ Particle<POS, MASS, DENSITY> PlummerSphere::generateParticle(size_t id)
     // now find radius within reasonable bounds
     f1_t radius = m_plummerRadius * 11;
     while(radius > m_plummerRadius * 10)
-        radius = m_plummerRadius / std::sqrt( std::pow(  m_dist(m_rng), -2.0/3.0) -1 );
+        radius = m_plummerRadius / std::sqrt( std::pow(  m_dist(m_rng), -2.0_ft/3.0_ft) -1 );
 
     p.pos *= radius;
     p.mass = m_particleMass;

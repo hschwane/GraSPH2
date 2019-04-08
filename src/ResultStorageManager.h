@@ -55,6 +55,8 @@ public:
     template<typename hostParticleType, std::enable_if_t< mpu::is_instantiation_of<HostParticleBuffer,hostParticleType>::value,int> =0>
     void printToFile(hostParticleType particles, f1_t time); //!< add a simulation snapshot from the host to the storage queue
 
+    std::string getStartTime() const {return m_startTime;} //!< get the timestep when the simulation was started
+
 private:
 
     const std::string m_directory; //!< the directory where all the snapshots are saved

@@ -150,12 +150,14 @@ ResultStorageManager::attributePrinter::~attributePrinter()
 
 void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
 {
-    std::string filename = m_directory + m_prefix + m_startTime + "_" + mpu::toString(time)+".tsv";
-    std::ofstream file(filename);
+    std::ostringstream filename;
+    filename << m_directory << m_prefix << m_startTime << "_" << std::fixed << std::setprecision(std::numeric_limits<f1_t>::digits10 + 1) << time << ".tsv";
+    std::ofstream file(filename.str());
+    file << std::fixed << std::setprecision(std::numeric_limits<f1_t>::digits10 + 1);
 
     if(!file.is_open())
     {
-        logERROR("ResultStorageManager") << "Could not open output file: " << filename << " Make sure the path actually exists.";
+        logERROR("ResultStorageManager") << "Could not open output file: " << filename.str() << " Make sure the path actually exists.";
         logFlush();
         throw std::runtime_error("Could not open output file.");
     }
@@ -168,7 +170,7 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
 
     if(file.fail())
     {
-        logERROR("ResultStorageManager") << "Error writing output file: " << filename;
+        logERROR("ResultStorageManager") << "Error writing output file: " << filename.str();
         logFlush();
         throw std::runtime_error("Could not write to output file.");
     }

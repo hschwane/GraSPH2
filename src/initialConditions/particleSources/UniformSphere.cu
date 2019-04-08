@@ -28,6 +28,7 @@ namespace ps {
 UniformSphere::UniformSphere(size_t particleCount, f1_t radius, f1_t totalMass, f1_t materialDensity, unsigned int seed)
     : m_radius(radius), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed)
 {
+    logINFO("InitialConditions") << "UniformSphere using random seed: " << seed;
     m_numberOfParticles = particleCount;
 }
 
