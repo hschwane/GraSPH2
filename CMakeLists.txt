@@ -56,6 +56,11 @@ if(NOT mpUtils_CUDA_AVAILIBLE)
     message(SEND_ERROR "The mpUtils instalation was compiled without cuda support, however cuda support is needed.")
 endif()
 
+# -------------------------------------------------------------
+# compile resources
+# -------------------------------------------------------------
+include(addResources)
+ADD_RESOURCES(settingFiles src/settings/headlessSettings.h src/settings/precisionSettings.h src/settings/settings.h)
 
 # -------------------------------------------------------------
 # create target
@@ -70,6 +75,7 @@ target_sources(GraSPH2 PRIVATE
                 "src/ResultStorageManager.cu"
                 "src/initialConditions/particleSources/UniformSphere.cu"
                 "src/initialConditions/particleSources/PlummerSphere.cu"
+                ${settingFiles}
             )
 
 # add frontend dependend source files

@@ -2,9 +2,6 @@
 
 ## high priority
 
-### usability
-- print the settings used
-
 ### simulation feature
 - linear consistency fix and investigate angular momentum (not)conservation
 - variable timestep
@@ -71,6 +68,8 @@
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
+
+- print the settings used to a output file
 - add logfile to output files
 - better naming of output files
 - add balsara switch

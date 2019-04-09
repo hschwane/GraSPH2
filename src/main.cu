@@ -295,6 +295,19 @@ int main()
     ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
     // setup log output file
     myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
+    // collect all settings and print them into a file
+    {
+        mpu::Resource headlessSettings = LOAD_RESOURCE(src_settings_headlessSettings_h);
+        mpu::Resource precisionSettings = LOAD_RESOURCE(src_settings_precisionSettings_h);
+        mpu::Resource settings = LOAD_RESOURCE(src_settings_settings_h);
+        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
+        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
+                        << std::string(headlessSettings.data(), headlessSettings.size())
+                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
+                        << std::string(precisionSettings.data(), precisionSettings.size())
+                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
+                        << std::string(settings.data(), settings.size());
+    }
 #endif
 
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
