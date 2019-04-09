@@ -150,9 +150,9 @@ void plasticity(m3_t &destress, const f1_t Y)
         J2 += destress(e) * destress(e);
     J2 *= 0.5_ft;
 
-    const f1_t miese_f = std::min(Y * Y / (3.0_ft * J2), 1.0_ft);
-
-    destress *= miese_f;
+    const f1_t miese_f = Y*Y / (3.0_ft * J2);
+    if(miese_f < 1)
+        destress *= miese_f;
 }
 
 f1_t mohrCoulombYieldStress(const f1_t tanFrictionAngle, const f1_t pressure, const f1_t cohesion)
