@@ -24,8 +24,9 @@ namespace ps {
 // function definitions of the PlummerSphere class
 //-------------------------------------------------------------------
 
-PlummerSphere::PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t totalMass, f1_t materialDensity, unsigned int seed)
-        : m_plummerRadius(plummerRadius), m_totalMass(totalMass), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed)
+PlummerSphere::PlummerSphere(size_t particleCount, f1_t plummerRadius, f1_t cutoffRadius, f1_t totalMass,
+                             f1_t materialDensity, unsigned int seed)
+        : m_plummerRadius(plummerRadius), m_totalMass(totalMass), m_particleMass(totalMass/particleCount), m_matDensity(materialDensity), m_rng(seed), m_cutoffRadius(cutoffRadius)
 {
     logINFO("InitialConditions") << "PlummerSphere using random seed: " << seed;
     m_numberOfParticles = particleCount;
@@ -45,8 +46,8 @@ Particle<POS, MASS, DENSITY> PlummerSphere::generateParticle(size_t id)
     // choosing a random value for m in range [0,M] <=> choosing random value for m/M in range [0,1]
 
     // now find radius within reasonable bounds
-    f1_t radius = m_plummerRadius * 11;
-    while(radius > m_plummerRadius * 10)
+    f1_t radius = m_cutoffRadius+1;
+    while(radius > m_cutoffRadius)
         radius = m_plummerRadius / std::sqrt( std::pow(  m_dist(m_rng), -2.0_ft/3.0_ft) -1 );
 
     p.pos *= radius;

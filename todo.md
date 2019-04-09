@@ -69,6 +69,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add variable cutoff to plummer distribution
 - print the settings used to a output file
 - add logfile to output files
 - better naming of output files

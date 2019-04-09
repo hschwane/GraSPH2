@@ -39,7 +39,7 @@ constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 
-// enable / disable self gravity
+// enable / disable self gravity (gravitational constant is 1)
 #define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
@@ -65,14 +65,14 @@ constexpr char FILENAME[] = "/home/hendrik/inputData.tsv";
 constexpr char SEPERATOR='\t';
 constexpr double startTime = 0; // if you continue a old simulation you can set the start time to match displayed simulation times
 
-// generate a rotating sphere with uniform density
+// generate a rotating sphere of radius 1 with uniform density
 // only use this with 3D simulations
-#define ROTATING_UNIFORM_SPHERE
+//#define ROTATING_UNIFORM_SPHERE
 
-// generate a rotating sphere with density distribution according to plummers law
+// generate a rotating sphere with density distribution according to plummers law with core radius 1
 // only use this with 3D simulations
-//#define ROTATING_PLUMMER_SPHERE
-// notes on plummer: mass contained inside the sphere radius 1 will be = tmass * 2^(-3/2)
+#define ROTATING_PLUMMER_SPHERE
+constexpr f1_t plummerCutoff = 10.0_ft; // all particles outside the cutoff will be repicked until they fall inside the radius
 
 // parameter for generated initial conditions
 constexpr f1_t tmass = 0.5_ft; // total mass of the sphere
@@ -112,7 +112,7 @@ constexpr f1_t cohesion = 0.8_ft; // the materials cohesion
 // and simulate the resulting tidal forces. Keep in mind this is a simple model / approximation.
 // Also momentum is no longer conserved.
 // The central body is along negative x axis, y axis points along the movement direction of the cloud along the orbit.
-// The strength of the tidal forces is controlled by the parameter n = sqrt( M / (a*a*a)).
+// The strength of the tidal forces is controlled by the parameter n = sqrt( M / (a*a*a)) (for G=1).
 // where M is the mass of the central body and a the semi-major axis of the orbit
 // You can also define it in terms of the hill radius as n = sqrt( m / (3*r_hill^3)) with m beeing the mass contained within r_hill.
 #define CLOHESSY_WILTSHIRE
