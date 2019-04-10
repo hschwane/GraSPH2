@@ -314,6 +314,11 @@ int main()
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
     assert_cuda(cudaSetDevice(0));
 
+    logINFO("Settings") << "speed of sound: " << SOUNDSPEED << "\n"
+                        << "pradius: " << pradius << "\n"
+                        << "H sqared: " << H2 << "\n"
+                        ;
+
     // set up frontend
     fnd::initializeFrontend();
     bool simShouldRun = false;
@@ -335,6 +340,7 @@ int main()
     // create cuda buffer
     DeviceParticlesType pb(hpb.size());
 #if defined(FRONTEND_OPENGL)
+    fnd::setParticleSize(pradius);
     pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
     pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
     pb.registerGLGraphicsResource<DEV_DENSITY>(fnd::getDensityBuffer(pb.size()));

@@ -50,7 +50,7 @@ const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
 const bool enableVsync    = false;
 
-float particleRenderSize    = 0.004f;
+float particleRenderSize    = 0.0004f;
 float particleBrightness    = 1.0f;
 Falloff falloffStyle        = Falloff::LINEAR;
 bool perspectiveSize        = true;
@@ -403,6 +403,13 @@ bool handleFrontend(double t)
 
 
     return window().update();
+}
+
+void setParticleSize(float pradius)
+{
+    using namespace oglFronted;
+    particleRenderSize = pradius;
+    shader.uniform1f("render_size",particleRenderSize);
 }
 
 }

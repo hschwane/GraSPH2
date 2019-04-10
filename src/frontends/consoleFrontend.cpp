@@ -35,16 +35,6 @@ void initializeFrontend()
     logINFO("Console Frontend") << "I will keep you updated on the console.";
 }
 
-uint32_t getPositionBuffer(size_t n)
-{
-    return 0;
-}
-
-uint32_t getVelocityBuffer(size_t n)
-{
-    return 0;
-}
-
 void setPauseHandler(std::function<void(bool)> f)
 {
     f(false); // unpause simulation
