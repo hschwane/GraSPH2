@@ -12,6 +12,7 @@
 // includes
 //--------------------
 #include "frontendInterface.h"
+#include "../settings/precisionSettings.h"
 #include <mpUtils/mpUtils.h>
 #include <mpUtils/mpGraphics.h>
 //--------------------
@@ -62,7 +63,15 @@ float lowerBound = 0.001;   // lower bound of density / velocity transfer functi
 glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
 double printIntervall       = 4.0;
 
-using vecType=glm::vec4;
+#if defined(DOUBLE_PRECISION)
+    using vecType=glm::dvec4;
+    using fType=double;
+    GLenum glType=GL_DOUBLE;
+#elif defined(SINGLE_PRECISION)
+    using vecType=glm::vec4;
+    using fType=float;
+    GLenum glType=GL_FLOAT;
+#endif
 
 constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
 constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
@@ -220,7 +229,7 @@ uint32_t getPositionBuffer(size_t n)
 
     positionBuffer.recreate();
     positionBuffer.allocate<vecType>(n);
-    vao.addAttributeBufferArray(POS_BUFFER_BINDING,positionBuffer,0, sizeof(vecType),4,0);
+    vao.addAttributeBufferArray(POS_BUFFER_BINDING,positionBuffer,0, sizeof(vecType),4,0,glType);
 
     return positionBuffer;
 }
@@ -240,7 +249,7 @@ uint32_t getVelocityBuffer(size_t n)
 
     velocityBuffer.recreate();
     velocityBuffer.allocate<vecType>(particleCount);
-    vao.addAttributeBufferArray(VEL_BUFFER_BINDING,velocityBuffer,0, sizeof(vecType),4,0);
+    vao.addAttributeBufferArray(VEL_BUFFER_BINDING,velocityBuffer,0, sizeof(vecType),4,0,glType);
 
     return velocityBuffer;
 }
@@ -259,8 +268,8 @@ uint32_t getDensityBuffer(size_t n)
 
 
     densityBuffer.recreate();
-    densityBuffer.allocate<float>(particleCount);
-    vao.addAttributeBufferArray(DENSITY_BUFFER_BINDING,densityBuffer,0, sizeof(float),4,0);
+    densityBuffer.allocate<fType>(particleCount);
+    vao.addAttributeBufferArray(DENSITY_BUFFER_BINDING,densityBuffer,0, sizeof(fType),4,0,glType);
 
     return densityBuffer;
 }
