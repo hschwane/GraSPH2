@@ -130,6 +130,7 @@ target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--default-stre
 target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 if (USE_FAST_MATH)
     target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+    target_compile_definitions(GraSPH2 PRIVATE "USING_CUDA_FAST_MATH")
 endif ()
 
 # force c++17 if using opengl

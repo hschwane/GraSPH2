@@ -6,11 +6,6 @@
 - linear consistency fix and investigate angular momentum (not)conservation
 - variable timestep
 
-### testing / simulating
-- find material properties
-- find values for initial conditions
-- run simulations?
-
 
 ## medium priority
 

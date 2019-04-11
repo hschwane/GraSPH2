@@ -312,11 +312,46 @@ int main()
 
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
+#if defined(SINGLE_PRECISION)
+    logINFO("GraSPH2") << "Running in single precision mode.";
+#elif defined(DOUBLE_PRECISION)
+    logINFO("GraSPH2") << "Running in double precision mode.";
+#endif
+#if defined(USING_CUDA_FAST_MATH)
+    logWARNING("GraSPH2") << "Unsafe math optimizations enabled in CUDA code.";
+#endif
     assert_cuda(cudaSetDevice(0));
 
-    logINFO("Settings") << "speed of sound: " << SOUNDSPEED << "\n"
-                        << "pradius: " << pradius << "\n"
-                        << "H sqared: " << H2 << "\n"
+    // print some important settings to the console
+    myLog.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
+                        << "Initial Conditions:\n"
+                #if defined(READ_FROM_FILE)
+                        << "Data is read from: " << FILENAME << "\n"
+                #elif defined(ROTATING_UNIFORM_SPHERE)
+                        << "Using a random uniform sphere with radius " << spawn_radius << "\n"
+                        << "Total mass: " << tmass << "\n"
+                        << "Number of particles: " << particle_count << "\n"
+                        << "additional angular velocity: " << angVel << "\n"
+                #elif defined(ROTATING_PLUMMER_SPHERE)
+                        << "Using a Plummer distribution with core radius " << plummer_radius << " and cutoff " << plummer_cutoff << "\n"
+                        << "Total mass: " << tmass << "\n"
+                        << "Number of particles: " << particle_count << "\n"
+                        << "additional angular velocity: " << angVel << "\n"
+                #endif
+                        << "Compressed radius set to " << compressesd_radius << "\n"
+                        << "resulting in particle radius of " << pradius << "\n"
+                        << "and smoothing length " << H << "\n"
+                        << "Material Settings:\n"
+                        << "material density: " << rho0 << "\n"
+                        << "speed of sound: " << SOUNDSPEED << "\n"
+                        << "bulk-modulus: " << BULK << "\n"
+                        << "shear-modulus: " << shear << "\n"
+                        << "Environment Settings:\n"
+                #if defined(CLOHESSY_WILTSHIRE)
+                        << "Clohessy-Wiltshire enabled with n = " << cw_n << "\n";
+                #else
+                        << "Clohessy-Wiltshire disabled" << "\n"
+                #endif
                         ;
 
     // set up frontend
@@ -330,9 +365,9 @@ int main()
 #if defined(READ_FROM_FILE)
     generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    generator.addParticles( ps::UniformSphere(particle_count,1.0_ft,tmass,rho0,161214).addAngularVelocity(angVel), true,true );
+    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
-    generator.addParticles( ps::PlummerSphere(particle_count,1.0,plummerCutoff,tmass,rho0,161214).addAngularVelocity(angVel), true, true);
+    generator.addParticles( ps::PlummerSphere(particle_count,plummer_radius,plummer_cutoff,tmass,rho0).addAngularVelocity(angVel), true, true);
 #endif
 
     auto hpb = generator.generate();

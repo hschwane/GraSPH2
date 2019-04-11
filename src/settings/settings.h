@@ -30,7 +30,7 @@
 constexpr Dim dimension=Dim::three;
 
 // the integration timestep for the constant timestep leapfrog integrator
-constexpr f1_t timestep=0.0003;
+constexpr f1_t timestep=0.0001;
 
 // storing results as file
 #define STORE_RESULTS
@@ -49,11 +49,6 @@ constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, be
 //--------------------
 // initial conditions
 
-// set a value for the smoothing length H
-// you can also define a radius for a single particle
-constexpr f1_t pradius = 0.1_ft / 25.4_ft; // "radius" of a particle
-constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
-
 // read data from a file
 // one line in the file is one particle, column are seperated using the SEPERATOR character and
 // represent the different particle attributes
@@ -67,30 +62,37 @@ constexpr double startTime = 0; // if you continue a old simulation you can set 
 
 // generate a rotating sphere of radius 1 with uniform density
 // only use this with 3D simulations
-//#define ROTATING_UNIFORM_SPHERE
+#define ROTATING_UNIFORM_SPHERE
+constexpr f1_t spawn_radius = 1.0_ft; // the radius radius particles are spawned in
 
-// generate a rotating sphere with density distribution according to plummers law with core radius 1
+// generate a rotating sphere with density distribution according to plummers law
 // only use this with 3D simulations
-#define ROTATING_PLUMMER_SPHERE
-constexpr f1_t plummerCutoff = 10.0_ft; // all particles outside the cutoff will be repicked until they fall inside the radius
+//#define ROTATING_PLUMMER_SPHERE
+constexpr f1_t plummer_cutoff = 1.0_ft; // all particles outside the cutoff will be repicked until they fall inside the radius
+constexpr f1_t plummer_radius = 1.0_ft; // plummer core radius
 
 // parameter for generated initial conditions
-constexpr f1_t tmass = 0.5_ft; // total mass of the sphere
+constexpr f1_t tmass = 1.0_ft; // total mass of the sphere
 constexpr size_t particle_count=1<<14; // number of particles
-constexpr f3_t angVel=f3_t{0,0,0.3}; // angular velocity of the cloud omega
+constexpr f3_t angVel=f3_t{0,0,0}; // angular velocity of the cloud omega
 
+// set a value for the smoothing length H
+// you can also define a radius for a single particle
+constexpr f1_t compressesd_radius = 0.1_ft;// all mass of your simulation compressed into a sphere, radius of that sphere
+constexpr f1_t pradius = compressesd_radius * gcem::pow(particle_count,-1.0_ft/3.0_ft); // "radius" of a particle
+constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
 
 // --------------------
 // Material settings
 
 // parameters of the equation of state
 constexpr f1_t rho0 = tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
-constexpr f1_t BULK = 64; // the materials bulk modulus
+constexpr f1_t BULK = 92; // the materials bulk modulus
 constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pressure
 constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
 
 // parameters for solid bodys
-constexpr f1_t shear = 92; // the materials shear modulus
+constexpr f1_t shear = 128; // the materials shear modulus
 
 // choose one of the plasticity models, if you disable both the material is purely elastic
 
@@ -100,9 +102,9 @@ constexpr f1_t Y =0.5;
 
 // mohr-coulomb plasticity, using friction angle and cohesion
 #define PLASTICITY_MC
-constexpr f1_t friction_angle = mpu::rad(55.0_ft); // the materials internal friction angle in radians
+constexpr f1_t friction_angle = mpu::rad(45.0_ft); // the materials internal friction angle in radians
 constexpr f1_t tanfr = gcem::tan(friction_angle); // tangents of the friction angle
-constexpr f1_t cohesion = 0.8_ft; // the materials cohesion
+constexpr f1_t cohesion = 0.0_ft; // the materials cohesion
 
 
 // --------------------
@@ -116,7 +118,7 @@ constexpr f1_t cohesion = 0.8_ft; // the materials cohesion
 // where M is the mass of the central body and a the semi-major axis of the orbit
 // You can also define it in terms of the hill radius as n = sqrt( m / (3*r_hill^3)) with m beeing the mass contained within r_hill.
 #define CLOHESSY_WILTSHIRE
-constexpr f1_t cw_n = 0.381_ft;
+constexpr f1_t cw_n = gcem::sqrt( 1.0_ft / 3.0_ft);
 
 //--------------------
 // artificial correction
