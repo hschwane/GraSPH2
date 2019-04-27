@@ -57,11 +57,6 @@ if(NOT mpUtils_CUDA_AVAILIBLE)
     message(SEND_ERROR "The mpUtils instalation was compiled without cuda support, however cuda support is needed.")
 endif()
 
-# -------------------------------------------------------------
-# compile resources
-# -------------------------------------------------------------
-#include(addResources)
-#ADD_RESOURCES(settingFiles src/settings/headlessSettings.h src/settings/precisionSettings.h src/settings/settings.h)
 
 # -------------------------------------------------------------
 # create target
@@ -151,5 +146,13 @@ endif ()
 if(OPENGL_FRONTEND)
     set_target_properties(GraSPH2 PROPERTIES CXX_STANDARD 17)
 endif()
+
+# set -Wa,-I for resources search path
+if(CUSTOM_SETTING_PATH)
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wa,-I${CMAKE_SOURCE_DIR},-I${CUSTOM_SETTING_PATH}>)
+else()
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wa,-I${CMAKE_SOURCE_DIR},-I${CMAKE_SOURCE_DIR}/settings>)
+endif()
+
 
 set_target_properties( GraSPH2 PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

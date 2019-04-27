@@ -30,6 +30,10 @@
 #include "ResultStorageManager.h"
 #include "settings.h"
 
+// compile setting files into resources
+ADD_RESOURCE(Settings,"settings.h");
+ADD_RESOURCE(HeadlessSettings,"headlessSettings.h");
+ADD_RESOURCE(PrecisionSettings,"precisionSettings.h");
 
 constexpr f1_t H2 = H*H; //!< square of the smoothing length
 constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
@@ -296,18 +300,18 @@ int main()
     // setup log output file
     myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
     // collect all settings and print them into a file
-//    {
-//        mpu::Resource headlessSettings = LOAD_RESOURCE(src_settings_headlessSettings_h);
-//        mpu::Resource precisionSettings = LOAD_RESOURCE(src_settings_precisionSettings_h);
-//        mpu::Resource settings = LOAD_RESOURCE(src_settings_settings_h);
-//        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
-//        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
-//                        << std::string(headlessSettings.data(), headlessSettings.size())
-//                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
-//                        << std::string(precisionSettings.data(), precisionSettings.size())
-//                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
-//                        << std::string(settings.data(), settings.size());
-//    }
+    {
+        mpu::Resource headlessSettings = LOAD_RESOURCE(HeadlessSettings);
+        mpu::Resource precisionSettings = LOAD_RESOURCE(PrecisionSettings);
+        mpu::Resource settings = LOAD_RESOURCE(Settings);
+        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
+        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
+                        << std::string(headlessSettings.data(), headlessSettings.size())
+                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
+                        << std::string(precisionSettings.data(), precisionSettings.size())
+                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
+                        << std::string(settings.data(), settings.size());
+    }
 #endif
 
     myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
@@ -324,6 +328,9 @@ int main()
 
     // print some important settings to the console
     myLog.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
+                        << "Integration:"
+                        << "Leapfrog"
+                        << "Timestep: constant, " << timestep << "\n"
                         << "Initial Conditions:\n"
                 #if defined(READ_FROM_FILE)
                         << "Data is read from: " << FILENAME << "\n"
