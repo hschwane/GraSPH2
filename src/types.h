@@ -14,7 +14,7 @@
 // includes
 //--------------------
 #include <mpUtils/mpCuda.h>
-#include "settings/precisionSettings.h"
+#include "precisionSettings.h"
 //--------------------
 
 /**

@@ -10,7 +10,7 @@
  */
 
 #include "frontendInterface.h"
-#include "settings/headlessSettings.h"
+#include "headlessSettings.h"
 #include <mpUtils/mpUtils.h>
 #include <iostream>
 

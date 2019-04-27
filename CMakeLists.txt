@@ -46,6 +46,7 @@ include(CMakeDependentOption)
 cmake_dependent_option(OPENGL_FRONTEND "Use the opengl frontend" ON "mpUtils_OPENGL_AVAILIBLE" OFF)
 option(USE_FAST_MATH "Use fast math settings for nvcc. Faster simulation, but lower accuracy." OFF)
 option(USE_DEBUG_LOGGING "Use debug logging even in release builds." OFF)
+set(CUSTOM_SETTING_PATH "" CACHE STRING "Specify a path to a folder that contains a 'setttigns' subfolder. Configuration filles are then used from that folder instead.")
 
 # check if that worked as we want it
 if( OPENGL_FRONTEND AND (NOT mpUtils_OPENGL_AVAILIBLE))
@@ -59,8 +60,8 @@ endif()
 # -------------------------------------------------------------
 # compile resources
 # -------------------------------------------------------------
-include(addResources)
-ADD_RESOURCES(settingFiles src/settings/headlessSettings.h src/settings/precisionSettings.h src/settings/settings.h)
+#include(addResources)
+#ADD_RESOURCES(settingFiles src/settings/headlessSettings.h src/settings/precisionSettings.h src/settings/settings.h)
 
 # -------------------------------------------------------------
 # create target
@@ -105,10 +106,23 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${mpUtils_CUDA_ARCH_FLAGS}")
 # -------------------------------------------------------------
 # set includes
 # -------------------------------------------------------------
+
 target_include_directories(GraSPH2
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
+
+if(CUSTOM_SETTING_PATH)
+    target_include_directories(GraSPH2
+            PRIVATE
+                ${CUSTOM_SETTING_PATH}
+            )
+else()
+    target_include_directories(GraSPH2
+            PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/settings
+        )
+endif()
 
 
 # -------------------------------------------------------------

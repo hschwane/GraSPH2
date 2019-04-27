@@ -2,18 +2,17 @@
 
 ## high priority
 
+
+## medium priority
+
+### bugfixes
+- fix xsph
+
 ### simulation feature
 - linear consistency fix and investigate angular momentum (not)conservation
 - variable timestep
 
-
-## medium priority
-
-### usability
-- more runtime options vs compiletime options
-
 ### simulation management
-- fix xsph
 - make the compute derivatives function more organized
 - use some system to manage boundary conditions
 - find better solution for 2D simulation
@@ -27,6 +26,9 @@
 
 
 ## low priority / ideas / long term projects
+
+### usability
+- more runtime options vs compiletime options
 
 ### particle creation
 - add python script support to generate initials
@@ -64,6 +66,9 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.4.0 --- 27.04.2018
+- add batch script to run simulations with different settings
+- add possibility to specify a custom location for settings
 - fix openGL frontend for double precision runs
 - fix division by zero in plasticity calculation
 - add variable cutoff to plummer distribution

@@ -31,4 +31,3 @@ export OMP_NUM_THREADS=4
 export OMP_PLACES=cores
 
 # Run the program:
-srun ../build/GraSPH2 > prog.out
