@@ -39,6 +39,71 @@ constexpr f1_t H2 = H*H; //!< square of the smoothing length
 constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
 constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
 
+
+
+// tree settings
+/////////////////
+constexpr f3_t domainMin = {-2,-2,-2};
+constexpr f3_t domainMax = {2,2,2};
+/////////////////
+
+/**
+ * @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
+ *          https://devblogs.nvidia.com/thinking-parallel-part-iii-tree-construction-gpu/ on april 29 2019
+ *          for possible expansion on 20 -> 60 bit: https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
+ * @param v integer to expand
+ * @return expanded integer
+ */
+CUDAHOSTDEV unsigned int expandBits(unsigned int v)
+{
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+    return v;
+}
+
+/**
+ * @brief Calculates a 30-bit Morton code for the given 3D point located within the unit cube [0,1].
+ *          https://devblogs.nvidia.com/thinking-parallel-part-iii-tree-construction-gpu/ on april 29 2019
+ * @param x first spacial coordinate
+ * @param y second spacial coordinate
+ * @param z third spacial coordinate
+ * @return resulting 30 bit morton code
+ */
+CUDAHOSTDEV unsigned int mortonKey(float x, float y, float z)
+{
+    // float in [0,1] to 10 bit integer
+    x = min(max(x * 1024.0f, 0.0f), 1023.0f);
+    y = min(max(y * 1024.0f, 0.0f), 1023.0f);
+    z = min(max(z * 1024.0f, 0.0f), 1023.0f);
+    unsigned int xx = expandBits((unsigned int)x);
+    unsigned int yy = expandBits((unsigned int)y);
+    unsigned int zz = expandBits((unsigned int)z);
+    return xx * 4 + yy * 2 + zz;
+}
+
+CUDAHOSTDEV unsigned int calculatePositionKey(const f3_t pos)
+{
+    const f3_t normalizedPos = (pos - domainMin) / (domainMax - domainMin);
+    return mortonKey(normalizedPos.x,normalizedPos.y,normalizedPos.z);
+}
+
+struct Tree
+{
+
+};
+
+Tree buildMeATree(HostParticleBuffer<HOST_POSM> pb)
+{
+    // generate morton keys for all particles
+    // sort particles by morton key
+    // generadte nodes and leafes
+    // calculate node and leaf data
+    // profit
+}
+
+
 /**
  * @brief first pass of derivative computation
  */

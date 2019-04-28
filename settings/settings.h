@@ -68,7 +68,7 @@ constexpr f1_t spawn_radius = 1.0_ft; // the radius particles are spawned in
 // generate a rotating sphere with density distribution according to plummers law
 // only use this with 3D simulations
 //#define ROTATING_PLUMMER_SPHERE
-constexpr f1_t plummer_cutoff = 1.0_ft; // all particles outside the cutoff will be repicked until they fall inside the radius
+constexpr f1_t plummer_cutoff = 8.0_ft; // all particles outside the cutoff will be repicked until they fall inside the radius
 constexpr f1_t plummer_radius = 1.0_ft; // plummer core radius
 
 // parameter for generated initial conditions
@@ -117,7 +117,7 @@ constexpr f1_t cohesion = 0.0_ft; // the materials cohesion
 // The strength of the tidal forces is controlled by the parameter n = sqrt( M / (a*a*a)) (for G=1).
 // where M is the mass of the central body and a the semi-major axis of the orbit
 // You can also define it in terms of the hill radius as n = sqrt( m / (3*r_hill^3)) with m beeing the mass contained within r_hill.
-//#define CLOHESSY_WILTSHIRE
+#define CLOHESSY_WILTSHIRE
 constexpr f1_t cw_n = gcem::sqrt( 1.0_ft / 3.0_ft);
 
 //--------------------
