@@ -42,6 +42,7 @@ constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline 
 
 
 
+using spaceKey = unsigned long long int;
 /**
  * @brief Expands a 21-bit integer into 64 bits by inserting 2 zeros after each bit.
  *          https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
@@ -66,39 +67,121 @@ CUDAHOSTDEV unsigned long long int expandBits( unsigned long long int x)
  * @param z third spacial coordinate
  * @return resulting 30 bit morton code
  */
-CUDAHOSTDEV unsigned long long int mortonKey(f1_t x, f1_t y, f1_t z)
+CUDAHOSTDEV spaceKey mortonKey(f1_t x, f1_t y, f1_t z)
 {
     // float in [0,1] to 21 bit integer
     x = min(max(x * 2'097'151.0_ft, 0.0_ft), 2'097'151.0_ft);
     y = min(max(y * 2'097'151.0_ft, 0.0_ft), 2'097'151.0_ft);
     z = min(max(z * 2'097'151.0_ft, 0.0_ft), 2'097'151.0_ft);
-    unsigned long long int xx = expandBits(static_cast<unsigned long long int>(x));
-    unsigned long long int yy = expandBits(static_cast<unsigned long long int>(y));
-    unsigned long long int zz = expandBits(static_cast<unsigned long long int>(z));
+    spaceKey xx = expandBits(static_cast<spaceKey>(x));
+    spaceKey yy = expandBits(static_cast<spaceKey>(y));
+    spaceKey zz = expandBits(static_cast<spaceKey>(z));
     return xx | (yy << 1u) | (zz << 2u);
 }
 
-CUDAHOSTDEV unsigned long long int calculatePositionKey(const f3_t& pos, const f3_t& domainMin, const f3_t& domainFactor)
+CUDAHOSTDEV spaceKey calculatePositionKey(const f3_t& pos, const f3_t& domainMin, const f3_t& domainFactor)
 {
     const f3_t normalizedPos = (pos - domainMin) * domainFactor;
     return mortonKey(normalizedPos.x,normalizedPos.y,normalizedPos.z);
 }
 
-struct Tree
+struct Node
 {
-
+    bool isLeaf{false};
+    virtual ~Node() = default;
 };
+
+struct LNode : public Node
+{
+    explicit LNode(int i)
+    {
+        id = i;
+        isLeaf=true;
+    }
+
+    int id;
+};
+
+struct INode : public Node
+{
+    INode(std::shared_ptr<Node> l, std::shared_ptr<Node> r)
+    {
+        left = std::move(l);
+        right = std::move(r);
+    }
+    std::shared_ptr<Node> left;
+    std::shared_ptr<Node> right;
+};
+
+void printTree(Node* root)
+{
+    int level = 0;
+
+    std::queue<std::pair<Node*,bool>> queue;
+    queue.push({root,false});
+    queue.push({nullptr,false});
+
+    while(!queue.empty())
+    {
+        Node* node = queue.front().first;
+        if(node->isLeaf)
+        {
+            std::cout << dynamic_cast<LNode *>(node)->id << "\t";
+        }
+        else
+        {
+            if(queue.front().second)
+                std::cout << "r" << level << "\t";
+            else
+                std::cout << "l" << level << "\t";
+            queue.push( {dynamic_cast<INode*>(node)->left.get(), false});
+            queue.push( {dynamic_cast<INode*>(node)->right.get(), true});
+        }
+        queue.pop();
+
+        if(queue.front().first == nullptr)
+        {
+            queue.pop();
+            if(!queue.empty())
+                queue.push({nullptr,false});
+            std::cout << "\n";
+            level++;
+        }
+    }
+    std::cout << std::endl;
+}
+
+int findSplit(spaceKey* sortedKeys, int first, int last)
+{
+    return first + ((last-first) / 2);
+}
+
+std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int last)
+{
+    // single object ==> leaf
+    if(first == last)
+        return std::make_shared<LNode>(first);
+
+    int split = findSplit(sortedKeys, first, last);
+
+    // recurse sub ranges:
+    std::shared_ptr<Node> cA = generateHierarchy(sortedKeys, first, split);
+    std::shared_ptr<Node> cB = generateHierarchy(sortedKeys, split+1, last);
+
+    return std::make_shared<INode>(std::move(cA),std::move(cB));
+}
 
 // tree settings
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
+//#define DEBUG_PRINTS
 /////////////////
 
-Tree buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
+void buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
 {
     // generate morton keys for all particles
-    long long int mKeys[pb.size()];
+    spaceKey mKeys[pb.size()];
     f3_t domainFactor = 1.0_ft / (domainMax - domainMin);
     for(int i =0; i < pb.size(); i++)
     {
@@ -106,6 +189,7 @@ Tree buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
         mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
     }
 
+#ifdef DEBUG_PRINTS
     std::cout << "morton keys generated:\n";
     for(int i =0; i < pb.size(); i++)
     {
@@ -113,6 +197,7 @@ Tree buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
         std::cout << x << "\n";
     }
     std::cout << std::endl;
+#endif
 
     // sort particles by morton key
     for(int j=0; j< pb.size();j++)
@@ -136,12 +221,17 @@ Tree buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
             break;
     }
 
+#ifdef DEBUG_PRINTS
     std::cout << "morton keys sorted:\n";
     for(int i =0; i < pb.size(); i++)
         std::cout << mKeys[i] << "\n";
     std::cout << std::endl;
+#endif
 
     // generate nodes and leafes
+    std::shared_ptr<Node> tree= generateHierarchy(mKeys,0,pb.size()-1);
+    printTree(tree.get());
+
     // calculate node and leaf data
     // profit
 }
@@ -161,16 +251,22 @@ int main()
         pb.storeParticle(i,p);
     }
 
+#ifdef DEBUG_PRINTS
     for(int i =0; i<pb.size(); i++)
         std::cout << pb.loadParticle(i).pos << "\n";
     std::cout << std::endl;
+#endif
 
+    mpu::HRStopwatch sw;
     buildMeATree(pb);
+    sw.pause();
+    std::cout << "Tree generation took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
+#ifdef DEBUG_PRINTS
     for(int i =0; i<pb.size(); i++)
         std::cout << pb.loadParticle(i).pos << "\n";
     std::cout << std::endl;
-
+#endif
 }
 
 
