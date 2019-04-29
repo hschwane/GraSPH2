@@ -111,6 +111,7 @@ struct INode : public Node
     }
     std::shared_ptr<Node> left;
     std::shared_ptr<Node> right;
+    f4_t com{0,0,0,0};
 };
 
 void printTree(Node* root)
@@ -211,7 +212,7 @@ constexpr f3_t domainMax = {2,2,2};
 //#define DEBUG_PRINTS
 /////////////////
 
-void buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
+std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     // generate morton keys for all particles
     spaceKey mKeys[pb.size()];
@@ -263,15 +264,49 @@ void buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
 
     // generate nodes and leafes
     std::shared_ptr<Node> tree= generateHierarchy(mKeys,0,pb.size()-1);
-    printTree(tree.get());
+    return tree;
+}
 
-    // calculate node and leaf data
-    // profit
+f4_t updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    if(tree->isLeaf)
+    {
+        auto p = pb.loadParticle(dynamic_cast<LNode*>(tree)->id);
+        return f4_t{p.pos.x,p.pos.y,p.pos.z,p.mass};
+    }
+    else
+    {
+        // first do the subtrees
+        f4_t leftCom = updateSubtree(dynamic_cast<INode*>(tree)->left.get(), pb);
+        f4_t rightCom = updateSubtree(dynamic_cast<INode*>(tree)->right.get(), pb);
+        // then this node
+        f4_t newCom = leftCom + rightCom;
+        newCom.x *= 0.5_ft;
+        newCom.y *= 0.5_ft;
+        newCom.z *= 0.5_ft;
+        dynamic_cast<INode*>(tree)->com = newCom;
+        return newCom;
+    }
+}
+
+void updateMyTree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    updateSubtree(tree,pb);
+}
+
+void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+
+}
+
+void integrateLeapfrog(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+
 }
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM> pb(100);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(500);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -291,9 +326,13 @@ int main()
 #endif
 
     mpu::HRStopwatch sw;
-    buildMeATree(pb);
+    auto tree = buildMeATree(pb);
     sw.pause();
     std::cout << "Tree generation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+    sw.reset();
+    sw.resume();
+    updateMyTree(tree.get(),pb);
+    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
 #ifdef DEBUG_PRINTS
     for(int i =0; i<pb.size(); i++)
