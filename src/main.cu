@@ -151,9 +151,42 @@ void printTree(Node* root)
     std::cout << std::endl;
 }
 
-int findSplit(spaceKey* sortedKeys, int first, int last)
+int findSplit(const spaceKey* sortedKeys, int first, int last)
 {
-    return first + ((last-first) / 2);
+
+    spaceKey firstCode = sortedKeys[first];
+    spaceKey lastCode = sortedKeys[last];
+
+    // Identical Morton codes => split the range in the middle.
+    if (firstCode == lastCode)
+        return (first + last) >> 1u;
+
+    // number of highest bits that are the same for all objects in the range
+    // get number of leading bits that are the same
+    int commonPrefix = __builtin_clz(first ^ last);
+
+    // now search for the id where the code changes
+    // use binary search to find the where the highest different morten key bit changes first
+    // meaning the highest object that shares more then commonPrefix bits with the first one
+    int split = first;
+    int step = last - first;
+
+    do
+    {
+        step = (step+1u) >> 1u; // divide step by 2
+        int newSplit = split + step; // new guess for the split
+
+        if(newSplit < last)
+        {
+            spaceKey splitCode = sortedKeys[newSplit];
+            int splitPrefix = __builtin_clz(firstCode ^ splitCode);
+            if(splitPrefix > commonPrefix)
+                split = newSplit; // except guess if it shares more bits with the first element
+        }
+    }
+    while(step > 1);
+
+    return split;
 }
 
 std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int last)
@@ -238,7 +271,7 @@ void buildMeATree(HostParticleBuffer<HOST_POSM>& pb)
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM> pb(10);
+    HostParticleBuffer<HOST_POSM> pb(100);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
