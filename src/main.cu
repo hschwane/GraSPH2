@@ -209,6 +209,7 @@ std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int las
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
+constexpr f1_t eps2 = 0.01;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -271,7 +272,7 @@ f4_t updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
 {
     if(tree->isLeaf)
     {
-        auto p = pb.loadParticle(dynamic_cast<LNode*>(tree)->id);
+        auto p = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
         return f4_t{p.pos.x,p.pos.y,p.pos.z,p.mass};
     }
     else
@@ -294,19 +295,93 @@ void updateMyTree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_A
     updateSubtree(tree,pb);
 }
 
-void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+bool needToSeeChildren()
 {
-
+    return false;
 }
 
-void integrateLeapfrog(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
 {
+    // gravity
+    const f1_t distSqr = r2 + eps2;
+    const f1_t invDist = rsqrt(distSqr);
+    const f1_t invDistCube = invDist * invDist * invDist;
+    return -rij * massj * invDistCube;
+}
 
+f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t acc = {0,0,0})
+{
+    if(tree->isLeaf)
+    {
+        auto pj = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
+        f3_t rij = pi.pos - pj.pos;
+        return calcInteraction( pj.mass, dot(rij,rij), rij);
+    }
+    else
+    {
+        INode* node = dynamic_cast<INode*>(tree);
+
+        f3_t rij = pi.pos - f3_t{node->com.x, node->com.y, node->com.z};
+        f1_t r2 = dot(rij,rij);
+        if(needToSeeChildren())
+        {
+            return traverseTree( node->left.get(), pb, pi, acc) + traverseTree( node->right.get(), pb, pi, acc);
+        } else
+        {
+            return calcInteraction( node->com.x, r2, rij);
+        }
+    }
+}
+
+void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    for(int i =0; i < pb.size(); i++)
+    {
+        Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
+        pi.acc = traverseTree(tree,pb,pi);
+        pb.storeParticle(i,Particle<ACC>(pi));
+    }
+}
+
+void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    for(int i =0; i < pb.size(); i++)
+    {
+        Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
+        for(int j = 0; j<pb.size(); j++ )
+        {
+            Particle<POS,MASS> pj = pb.loadParticle<POS,MASS>(j);
+            f3_t rij = pi.pos - pj.pos;
+            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+        }
+        pb.storeParticle(i,Particle<ACC>(pi));
+    }
+}
+
+f3_t calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& reference)
+{
+    if(pb.size() != reference.size())
+        throw std::runtime_error("different particle counts");
+
+    f3_t meanError{0,0,0};
+    for(int i = 0; i < pb.size(); i++)
+    {
+        auto pi = pb.loadParticle<ACC>(i);
+        auto pref = reference.loadParticle<ACC>(i);
+
+//#ifdef DEBUG_PRINTS
+        std::cout << "Buffer A p" << i << " acc: " << pi.acc << std::endl;
+        std::cout << "Buffer B p" << i << " acc: " << pref.acc << std::endl;
+//#endif
+
+        meanError += fabs(pi.acc - pref.acc) / fabs(pref.acc); // get some relative error
+    }
+    return meanError / pb.size();
 }
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(500);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(50);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -314,8 +389,8 @@ int main()
     for(int i =0; i<pb.size(); i++)
     {
         Particle<POS,MASS> p;
-        p.mass = 1/pb.size();
-        p.pos = f3_t{0,dist(rng),0};
+        p.mass = 1.0_ft/pb.size();
+        p.pos = f3_t{dist(rng),dist(rng),dist(rng)};
         pb.storeParticle(i,p);
     }
 
@@ -329,16 +404,31 @@ int main()
     auto tree = buildMeATree(pb);
     sw.pause();
     std::cout << "Tree generation took " << sw.getSeconds() *1000 << "ms" << std::endl;
-    sw.reset();
-    sw.resume();
-    updateMyTree(tree.get(),pb);
-    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
 #ifdef DEBUG_PRINTS
     for(int i =0; i<pb.size(); i++)
         std::cout << pb.loadParticle(i).pos << "\n";
     std::cout << std::endl;
 #endif
+
+    sw.reset();
+    sw.resume();
+    updateMyTree(tree.get(),pb);
+    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+    sw.reset();
+    sw.resume();
+    computeForces(tree.get(),pb);
+    std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+    auto pbRef = pb;
+
+    sw.reset();
+    sw.resume();
+    computeForcesNaive(pbRef);
+    std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+    std::cout << "Mean error: " << calcError(pb,pbRef) << std::endl;
 }
 
 
