@@ -102,6 +102,14 @@ struct LNode : public Node
     int id;
 };
 
+struct cellData
+{
+    f3_t com{0,0,0};
+    f1_t mass{0};
+    f3_t min{0,0,0};
+    f3_t max{0,0,0};
+};
+
 struct INode : public Node
 {
     INode(std::shared_ptr<Node> l, std::shared_ptr<Node> r)
@@ -112,6 +120,7 @@ struct INode : public Node
     std::shared_ptr<Node> left;
     std::shared_ptr<Node> right;
     f4_t com{0,0,0,0};
+    f1_t d2{0};
 };
 
 void printTree(Node* root)
@@ -209,7 +218,8 @@ std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int las
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
-constexpr f1_t eps2 = 0.01;
+constexpr f1_t theta = 1.5_ft;
+constexpr f1_t eps2 = 0.01_ft;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -268,36 +278,49 @@ std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_AC
     return tree;
 }
 
-f4_t updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
+{
+    f3_t l3d = fabs(max - min);
+    f1_t l = fmax(fmax(l3d.x,l3d.y),l3d.z);
+    f3_t cogeo = min + (l3d*0.5_ft);
+    f1_t delta = length(com-cogeo);
+    f1_t od = l / theta + delta;
+    return od*od;
+}
+
+cellData updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     if(tree->isLeaf)
     {
         auto p = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
-        return f4_t{p.pos.x,p.pos.y,p.pos.z,p.mass};
+        return cellData{p.pos,p.mass,p.pos,p.pos};
     }
     else
     {
         // first do the subtrees
-        f4_t leftCom = updateSubtree(dynamic_cast<INode*>(tree)->left.get(), pb);
-        f4_t rightCom = updateSubtree(dynamic_cast<INode*>(tree)->right.get(), pb);
+        INode* node = dynamic_cast<INode*>(tree);
+        Node* left = node->left.get();
+        Node* right = node->right.get();
+        cellData leftCD = updateSubtree( left, pb);
+        cellData rightCD = updateSubtree( right, pb);
+
         // then this node
-        f4_t newCom = leftCom + rightCom;
-        newCom.x *= 0.5_ft;
-        newCom.y *= 0.5_ft;
-        newCom.z *= 0.5_ft;
-        dynamic_cast<INode*>(tree)->com = newCom;
-        return newCom;
+        cellData newCD;
+        newCD.com = (leftCD.com.x * leftCD.mass + rightCD.com * rightCD.mass) / (leftCD.mass + rightCD.mass);
+        newCD.mass = leftCD.mass + rightCD.mass;
+        newCD.min = fmin( leftCD.min, rightCD.min);
+        newCD.max = fmax( leftCD.max, rightCD.max);
+
+        node->d2 = calcOpeningDistance2(newCD.com,  newCD.min, newCD.max);
+        node->com = f4_t{newCD.com.x, newCD.com.y, newCD.com.z, newCD.mass};
+
+        return newCD;
     }
 }
 
 void updateMyTree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     updateSubtree(tree,pb);
-}
-
-bool needToSeeChildren()
-{
-    return false;
 }
 
 f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
@@ -309,10 +332,14 @@ f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
     return -rij * massj * invDistCube;
 }
 
+int interactions=0;
+int leafs=0;
 f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t acc = {0,0,0})
 {
     if(tree->isLeaf)
     {
+        interactions ++;
+        leafs ++;
         auto pj = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
         f3_t rij = pi.pos - pj.pos;
         return calcInteraction( pj.mass, dot(rij,rij), rij);
@@ -323,16 +350,18 @@ f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
 
         f3_t rij = pi.pos - f3_t{node->com.x, node->com.y, node->com.z};
         f1_t r2 = dot(rij,rij);
-        if(needToSeeChildren())
+        if( r2 <= node->d2)
         {
             return traverseTree( node->left.get(), pb, pi, acc) + traverseTree( node->right.get(), pb, pi, acc);
         } else
         {
-            return calcInteraction( node->com.x, r2, rij);
+            interactions ++;
+            return calcInteraction( node->com.w, r2, rij);
         }
     }
 }
 
+int averageLeafs=0;
 void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     for(int i =0; i < pb.size(); i++)
@@ -340,6 +369,8 @@ void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& p
         Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
         pi.acc = traverseTree(tree,pb,pi);
         pb.storeParticle(i,Particle<ACC>(pi));
+        averageLeafs += leafs;
+        leafs=0;
     }
 }
 
@@ -369,10 +400,10 @@ f3_t calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const 
         auto pi = pb.loadParticle<ACC>(i);
         auto pref = reference.loadParticle<ACC>(i);
 
-//#ifdef DEBUG_PRINTS
+#ifdef DEBUG_PRINTS
         std::cout << "Buffer A p" << i << " acc: " << pi.acc << std::endl;
         std::cout << "Buffer B p" << i << " acc: " << pref.acc << std::endl;
-//#endif
+#endif
 
         meanError += fabs(pi.acc - pref.acc) / fabs(pref.acc); // get some relative error
     }
@@ -381,7 +412,7 @@ f3_t calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const 
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(50);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(5000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -411,6 +442,8 @@ int main()
     std::cout << std::endl;
 #endif
 
+    auto pbRef = pb;
+
     sw.reset();
     sw.resume();
     updateMyTree(tree.get(),pb);
@@ -421,12 +454,13 @@ int main()
     computeForces(tree.get(),pb);
     std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
-    auto pbRef = pb;
-
     sw.reset();
     sw.resume();
     computeForcesNaive(pbRef);
     std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
+    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
 
     std::cout << "Mean error: " << calcError(pb,pbRef) << std::endl;
 }
