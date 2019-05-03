@@ -173,7 +173,7 @@ int findSplit(const spaceKey* sortedKeys, int first, int last)
 
     // number of highest bits that are the same for all objects in the range
     // get number of leading bits that are the same
-    int commonPrefix = __builtin_clz(first ^ last);
+    int commonPrefix = __builtin_clz(firstCode ^ lastCode);
 
     // now search for the id where the code changes
     // use binary search to find the where the highest different morten key bit changes first
@@ -218,8 +218,8 @@ std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int las
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
-constexpr f1_t theta = 1.5_ft;
-constexpr f1_t eps2 = 0.01_ft;
+constexpr f1_t theta = 0.75_ft;
+constexpr f1_t eps2 = 0.001_ft;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -412,7 +412,7 @@ f3_t calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const 
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(5000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -442,8 +442,6 @@ int main()
     std::cout << std::endl;
 #endif
 
-    auto pbRef = pb;
-
     sw.reset();
     sw.resume();
     updateMyTree(tree.get(),pb);
@@ -454,6 +452,8 @@ int main()
     computeForces(tree.get(),pb);
     std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
+    auto pbRef = pb;
+
     sw.reset();
     sw.resume();
     computeForcesNaive(pbRef);
@@ -463,6 +463,8 @@ int main()
     std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
 
     std::cout << "Mean error: " << calcError(pb,pbRef) << std::endl;
+
+//    printTree(tree.get());
 }
 
 
