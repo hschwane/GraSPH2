@@ -19,6 +19,7 @@
 #include <cmath>
 #include <initialConditions/particleSources/PlummerSphere.h>
 #include <bitset>
+#include <iterator>
 
 #include "initialConditions/InitGenerator.h"
 #include "initialConditions/particleSources/UniformSphere.h"
@@ -306,7 +307,7 @@ cellData updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,H
 
         // then this node
         cellData newCD;
-        newCD.com = (leftCD.com.x * leftCD.mass + rightCD.com * rightCD.mass) / (leftCD.mass + rightCD.mass);
+        newCD.com = (leftCD.com * leftCD.mass + rightCD.com * rightCD.mass) / (leftCD.mass + rightCD.mass);
         newCD.mass = leftCD.mass + rightCD.mass;
         newCD.min = fmin( leftCD.min, rightCD.min);
         newCD.max = fmax( leftCD.max, rightCD.max);
@@ -334,7 +335,7 @@ f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
 
 int interactions=0;
 int leafs=0;
-f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t acc = {0,0,0})
+void traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t& acc)
 {
     if(tree->isLeaf)
     {
@@ -342,7 +343,8 @@ f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
         leafs ++;
         auto pj = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
         f3_t rij = pi.pos - pj.pos;
-        return calcInteraction( pj.mass, dot(rij,rij), rij);
+        acc += calcInteraction( pj.mass, dot(rij,rij), rij);
+        return ;
     }
     else
     {
@@ -352,11 +354,14 @@ f3_t traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
         f1_t r2 = dot(rij,rij);
         if( r2 <= node->d2)
         {
-            return traverseTree( node->left.get(), pb, pi, acc) + traverseTree( node->right.get(), pb, pi, acc);
+            traverseTree( node->left.get(), pb, pi, acc);
+            traverseTree( node->right.get(), pb, pi, acc);
+            return;
         } else
         {
             interactions ++;
-            return calcInteraction( node->com.w, r2, rij);
+            acc += calcInteraction( node->com.w, r2, rij);
+            return;
         }
     }
 }
@@ -367,7 +372,7 @@ void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& p
     for(int i =0; i < pb.size(); i++)
     {
         Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
-        pi.acc = traverseTree(tree,pb,pi);
+        traverseTree(tree,pb,pi,pi.acc);
         pb.storeParticle(i,Particle<ACC>(pi));
         averageLeafs += leafs;
         leafs=0;
@@ -389,25 +394,29 @@ void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
     }
 }
 
-f3_t calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& reference)
+std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& reference)
 {
     if(pb.size() != reference.size())
         throw std::runtime_error("different particle counts");
 
-    f3_t meanError{0,0,0};
+    std::vector<f1_t> errors(pb.size());
     for(int i = 0; i < pb.size(); i++)
     {
         auto pi = pb.loadParticle<ACC>(i);
         auto pref = reference.loadParticle<ACC>(i);
-
 #ifdef DEBUG_PRINTS
         std::cout << "Buffer A p" << i << " acc: " << pi.acc << std::endl;
         std::cout << "Buffer B p" << i << " acc: " << pref.acc << std::endl;
 #endif
-
-        meanError += fabs(pi.acc - pref.acc) / fabs(pref.acc); // get some relative error
+        errors[i] = length(pi.acc - pref.acc) / length(pref.acc);
     }
-    return meanError / pb.size();
+
+    std::sort(std::begin(errors),std::end(errors));
+    f1_t median = errors[pb.size()/2];
+    f1_t mean = std::accumulate(std::begin(errors),std::end(errors),0.0_ft) / pb.size();
+
+
+    return std::pair<f1_t,f1_t>(median,mean);
 }
 
 int main()
@@ -462,7 +471,9 @@ int main()
     std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
     std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
 
-    std::cout << "Mean error: " << calcError(pb,pbRef) << std::endl;
+    auto error = calcError(pb,pbRef);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
 
 //    printTree(tree.get());
 }
