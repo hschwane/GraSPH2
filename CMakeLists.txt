@@ -13,6 +13,7 @@ if(EXISTS "${LOC_PATH}")
     message(FATAL_ERROR "You cannot build in a source directory (or any directory with a CMakeLists.txt file). Please make a build subdirectory. Feel free to remove CMakeCache.txt and CMakeFiles.")
 endif()
 
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 # -------------------------------------------------------------
 # find dependencies
@@ -20,6 +21,7 @@ endif()
 enable_language(CXX)
 enable_language(CUDA)
 find_package(mpUtils 0.10.2 REQUIRED)
+find_package(TBB REQUIRED)
 
 
 # -------------------------------------------------------------
@@ -92,7 +94,7 @@ if (USE_DEBUG_LOGGING)
 endif()
 
 # link libraries
-target_link_libraries(GraSPH2 mpUtils::mpUtils)
+target_link_libraries(GraSPH2 mpUtils::mpUtils tbb)
 
 # set cuda code generation flags
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${mpUtils_CUDA_ARCH_FLAGS}")

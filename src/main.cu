@@ -21,6 +21,8 @@
 #include <bitset>
 #include <iterator>
 
+#include "tbb/tbb.h"
+
 #include "initialConditions/InitGenerator.h"
 #include "initialConditions/particleSources/UniformSphere.h"
 #include "initialConditions/particleSources/TextFile.h"
@@ -219,7 +221,7 @@ std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int las
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
-constexpr f1_t theta = 0.75_ft;
+constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
 //#define DEBUG_PRINTS
 /////////////////
@@ -227,13 +229,23 @@ constexpr f1_t eps2 = 0.001_ft;
 std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     // generate morton keys for all particles
-    spaceKey mKeys[pb.size()];
+    mpu::HRStopwatch sw;
+
+    std::vector<spaceKey> mKeys(pb.size());
     f3_t domainFactor = 1.0_ft / (domainMax - domainMin);
-    for(int i =0; i < pb.size(); i++)
+
+    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
     {
-        Particle<POS> p = pb.loadParticle<POS>(i);
-        mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
-    }
+        for (auto i = range.begin(); i != range.end(); ++i)
+        {
+            Particle<POS> p = pb.loadParticle<POS>(i);
+            mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
+        }
+    });
+
+
+    sw.pause();
+    std::cout << "Morton codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
 #ifdef DEBUG_PRINTS
     std::cout << "morton keys generated:\n";
@@ -245,27 +257,37 @@ std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_AC
     std::cout << std::endl;
 #endif
 
+    sw.reset();
+    sw.resume();
     // sort particles by morton key
-    for(int j=0; j< pb.size();j++)
+
+    // create and sort a index vector so that mKeys[perm[]] is sorted
+    std::vector<int> perm(pb.size());
+    std::iota(perm.begin(),perm.end(),0);
+    tbb::parallel_sort(perm.begin(),perm.end(), [keysPtr=mKeys.data()](const int idx1, const int idx2) {
+        return keysPtr[idx1] < keysPtr[idx2];
+    });
+
+    // perform gather to apply the new ordering to the particle buffer
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> sorted(pb.size());
+    std::vector<spaceKey> sortedKeys(pb.size());
+
+    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
     {
-        bool swapped = false;
-        for(int i = 0; i < pb.size() - 1; i++)
+        for (auto i = range.begin(); i != range.end(); ++i)
         {
-            if(mKeys[i] > mKeys[i + 1])
-            {
-                auto p1 = pb.loadParticle(i);
-                auto p2 = pb.loadParticle(i + 1);
-                pb.storeParticle(i, p2);
-                pb.storeParticle(i + 1, p1);
-                auto key = mKeys[i];
-                mKeys[i] = mKeys[i + 1];
-                mKeys[i + 1] = key;
-                swapped = true;
-            }
+            const auto pi = pb.loadParticle(perm[i]);
+            sorted.storeParticle(i,pi);
+            sortedKeys[i] = mKeys[perm[i]];
         }
-        if(!swapped)
-            break;
-    }
+    });
+
+    pb = std::move(sorted);
+    mKeys = std::move(sortedKeys);
+
+
+    sw.pause();
+    std::cout << "Sorting codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
 #ifdef DEBUG_PRINTS
     std::cout << "morton keys sorted:\n";
@@ -274,8 +296,12 @@ std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_AC
     std::cout << std::endl;
 #endif
 
+    sw.reset();
+    sw.resume();
     // generate nodes and leafes
-    std::shared_ptr<Node> tree= generateHierarchy(mKeys,0,pb.size()-1);
+    std::shared_ptr<Node> tree= generateHierarchy(&mKeys[0],0,pb.size()-1);
+    sw.pause();
+    std::cout << "Generate nodes took " << sw.getSeconds() *1000 << "ms" << std::endl;
     return tree;
 }
 
@@ -335,20 +361,20 @@ f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
 
 int interactions=0;
 int leafs=0;
-void traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t& acc)
+void traverseTree(const Node*tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const Particle<POS,MASS>& pi, f3_t& acc)
 {
     if(tree->isLeaf)
     {
-        interactions ++;
-        leafs ++;
-        auto pj = pb.loadParticle<POS,MASS>(dynamic_cast<LNode*>(tree)->id);
+//        interactions ++;
+//        leafs ++;
+        auto pj = pb.loadParticle<POS,MASS>(dynamic_cast<const LNode*>(tree)->id);
         f3_t rij = pi.pos - pj.pos;
         acc += calcInteraction( pj.mass, dot(rij,rij), rij);
         return ;
     }
     else
     {
-        INode* node = dynamic_cast<INode*>(tree);
+        auto node = dynamic_cast<const INode*>(tree);
 
         f3_t rij = pi.pos - f3_t{node->com.x, node->com.y, node->com.z};
         f1_t r2 = dot(rij,rij);
@@ -359,7 +385,7 @@ void traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
             return;
         } else
         {
-            interactions ++;
+//            interactions ++;
             acc += calcInteraction( node->com.w, r2, rij);
             return;
         }
@@ -367,31 +393,37 @@ void traverseTree(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
 }
 
 int averageLeafs=0;
-void computeForces(Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+void computeForces(const Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
-    for(int i =0; i < pb.size(); i++)
+    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
     {
-        Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
-        traverseTree(tree,pb,pi,pi.acc);
-        pb.storeParticle(i,Particle<ACC>(pi));
-        averageLeafs += leafs;
-        leafs=0;
-    }
+        for (auto i = range.begin(); i != range.end(); ++i)
+        {
+            Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
+            traverseTree(tree,pb,pi,pi.acc);
+            pb.storeParticle(i,Particle<ACC>(pi));
+//            averageLeafs += leafs;
+//            leafs=0;
+        }
+    });
 }
 
 void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
-    for(int i =0; i < pb.size(); i++)
+    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
     {
-        Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
-        for(int j = 0; j<pb.size(); j++ )
+        for (auto i = range.begin(); i != range.end(); ++i)
         {
-            Particle<POS,MASS> pj = pb.loadParticle<POS,MASS>(j);
-            f3_t rij = pi.pos - pj.pos;
-            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+            Particle<POS,MASS,ACC> pi = pb.loadParticle<POS,MASS>(i);
+            for(int j = 0; j<pb.size(); j++ )
+            {
+                Particle<POS,MASS> pj = pb.loadParticle<POS,MASS>(j);
+                f3_t rij = pi.pos - pj.pos;
+                pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+            }
+            pb.storeParticle(i,Particle<ACC>(pi));
         }
-        pb.storeParticle(i,Particle<ACC>(pi));
-    }
+    });
 }
 
 std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& reference)
@@ -421,7 +453,7 @@ std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
 
 int main()
 {
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(10000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
