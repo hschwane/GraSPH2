@@ -68,7 +68,7 @@ CUDAHOSTDEV unsigned long long int expandBits( unsigned long long int x)
  * @param x first spacial coordinate
  * @param y second spacial coordinate
  * @param z third spacial coordinate
- * @return resulting 30 bit morton code
+ * @return resulting 64 bit morton code
  */
 CUDAHOSTDEV spaceKey mortonKey(f1_t x, f1_t y, f1_t z)
 {
@@ -88,81 +88,45 @@ CUDAHOSTDEV spaceKey calculatePositionKey(const f3_t& pos, const f3_t& domainMin
     return mortonKey(normalizedPos.x,normalizedPos.y,normalizedPos.z);
 }
 
-struct Node
-{
-    bool isLeaf{false};
-    virtual ~Node() = default;
-};
 
-struct LNode : public Node
-{
-    explicit LNode(int i)
-    {
-        id = i;
-        isLeaf=true;
-    }
 
-    int id;
-};
-
-struct cellData
-{
-    f3_t com{0,0,0};
-    f1_t mass{0};
-    f3_t min{0,0,0};
-    f3_t max{0,0,0};
-};
-
-struct INode : public Node
-{
-    INode(std::shared_ptr<Node> l, std::shared_ptr<Node> r)
-    {
-        left = std::move(l);
-        right = std::move(r);
-    }
-    std::shared_ptr<Node> left;
-    std::shared_ptr<Node> right;
-    f4_t com{0,0,0,0};
-    f1_t d2{0};
-};
-
-void printTree(Node* root)
-{
-    int level = 0;
-
-    std::queue<std::pair<Node*,bool>> queue;
-    queue.push({root,false});
-    queue.push({nullptr,false});
-
-    while(!queue.empty())
-    {
-        Node* node = queue.front().first;
-        if(node->isLeaf)
-        {
-            std::cout << dynamic_cast<LNode *>(node)->id << "\t";
-        }
-        else
-        {
-            if(queue.front().second)
-                std::cout << "r" << level << "\t";
-            else
-                std::cout << "l" << level << "\t";
-            queue.push( {dynamic_cast<INode*>(node)->left.get(), false});
-            queue.push( {dynamic_cast<INode*>(node)->right.get(), true});
-        }
-        queue.pop();
-
-        if(queue.front().first == nullptr)
-        {
-            queue.pop();
-            if(!queue.empty())
-                queue.push({nullptr,false});
-            std::cout << "\n";
-            level++;
-        }
-    }
-    std::cout << std::endl;
-}
+//void printTree(Node* root)
+//{
+//    int level = 0;
+//
+//    std::queue<std::pair<Node*,bool>> queue;
+//    queue.push({root,false});
+//    queue.push({nullptr,false});
+//
+//    while(!queue.empty())
+//    {
+//        Node* node = queue.front().first;
+//        if(node->isLeaf)
+//        {
+//            std::cout << dynamic_cast<LNode *>(node)->id << "\t";
+//        }
+//        else
+//        {
+//            if(queue.front().second)
+//                std::cout << "r" << level << "\t";
+//            else
+//                std::cout << "l" << level << "\t";
+//            queue.push( {dynamic_cast<INode*>(node)->left.get(), false});
+//            queue.push( {dynamic_cast<INode*>(node)->right.get(), true});
+//        }
+//        queue.pop();
+//
+//        if(queue.front().first == nullptr)
+//        {
+//            queue.pop();
+//            if(!queue.empty())
+//                queue.push({nullptr,false});
+//            std::cout << "\n";
+//            level++;
+//        }
+//    }
+//    std::cout << std::endl;
+//}
 
 int findSplit(const spaceKey* sortedKeys, int first, int last)
 {
@@ -202,20 +166,20 @@ int findSplit(const spaceKey* sortedKeys, int first, int last)
     return split;
 }
 
-std::shared_ptr<Node> generateHierarchy(spaceKey* sortedKeys, int first, int last)
-{
-    // single object ==> leaf
-    if(first == last)
-        return std::make_shared<LNode>(first);
-
-    int split = findSplit(sortedKeys, first, last);
-
-    // recurse sub ranges:
-    std::shared_ptr<Node> cA = generateHierarchy(sortedKeys, first, split);
-    std::shared_ptr<Node> cB = generateHierarchy(sortedKeys, split+1, last);
-
-    return std::make_shared<INode>(std::move(cA),std::move(cB));
-}
+//void generateHierarchy(spaceKey* sortedKeys, int first, int last)
+//{
+//    // single object ==> leaf
+//    if(first == last)
+//        return std::make_shared<LNode>(first);
+//
+//    int split = findSplit(sortedKeys, first, last);
+//
+//    // recurse sub ranges:
+//    std::shared_ptr<Node> cA = generateHierarchy(sortedKeys, first, split);
+//    std::shared_ptr<Node> cB = generateHierarchy(sortedKeys, split+1, last);
+//
+//    return std::make_shared<INode>(std::move(cA),std::move(cB));
+//}
 
 // tree settings
 /////////////////
@@ -223,87 +187,336 @@ constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
+constexpr int maxLeafParticles = 16;
 //#define DEBUG_PRINTS
 /////////////////
 
-std::shared_ptr<Node> buildMeATree(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+// NOTE: this limits N to 134'217'728 particles
+// and allows for 1 to 16 children (a note with no children is not stored)
+struct MPU_ALIGN(4) TreeDownlink
 {
-    // generate morton keys for all particles
-    mpu::HRStopwatch sw;
+public:
 
-    std::vector<spaceKey> mKeys(pb.size());
-    f3_t domainFactor = 1.0_ft / (domainMax - domainMin);
+    TreeDownlink() : m_data(0) {}
+    TreeDownlink(unsigned int nchildren, unsigned int childid, bool isLeaf) : m_data(((unsigned int)(isLeaf) << leafShift) | ((nchildren-1) << numShift) | (childid & firstMask)) {}
+    CUDAHOSTDEV void setData(unsigned int nchildren, unsigned int childid, bool isLeaf) {m_data = ((unsigned int)(isLeaf) << leafShift) | ((nchildren-1) << numShift) | (childid & firstMask); }
+    CUDAHOSTDEV void setIsLeaf(bool isLeaf) {m_data |= (unsigned int)(isLeaf) << leafShift;}
+    CUDAHOSTDEV void setNChildren(unsigned int nchildren) { m_data |= (nchildren-1) << numShift;} //!< if you put in a number outside of [1,16] the universe will explode!
+    CUDAHOSTDEV void setFirstChild(unsigned int childid) { m_data |= (childid & firstMask);}
 
-    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
+    CUDAHOSTDEV unsigned int firstChild() const { return (m_data & firstMask); }
+    CUDAHOSTDEV unsigned int nChildren() const { return ((m_data & numMask) >> 27u) +1; }
+    CUDAHOSTDEV bool isLeaf() const { return (m_data & leafMask) != 0;}
+
+private:
+    const static unsigned int leafShift = 31u;
+    const static unsigned int leafMask = (1u<<leafShift);
+    const static unsigned int numShift = 27u;
+    const static unsigned int numMask = (15u<<numShift);
+    const static unsigned int firstMask = ~(31u<<27u);
+    unsigned int m_data;
+};
+
+class HostTree
+{
+
+public:
+    template <typename BufferType>
+    void constructTree(BufferType& pb)
     {
-        for (auto i = range.begin(); i != range.end(); ++i)
-        {
-            Particle<POS> p = pb.loadParticle<POS>(i);
-            mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
-        }
-    });
-
-
-    sw.pause();
-    std::cout << "Morton codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
-
-#ifdef DEBUG_PRINTS
-    std::cout << "morton keys generated:\n";
-    for(int i =0; i < pb.size(); i++)
-    {
-        std::bitset<64> x(mKeys[i]);
-        std::cout << x << "\n";
+        calcMortonCodes(pb);
+        sortParticles(pb);
+        generateNodes(pb);
+        linkNodes();
     }
-    std::cout << std::endl;
-#endif
 
-    sw.reset();
-    sw.resume();
-    // sort particles by morton key
+private:
+    std::vector<TreeDownlink> links; //!< information about the children of a tree node
+    HostParticleBuffer<HOST_POSM> iNodes; //!< internal nodes as virtual particles
+    std::vector<f1_t>   od2; //!< opening distance of nodes
 
-    // create and sort a index vector so that mKeys[perm[]] is sorted
-    std::vector<int> perm(pb.size());
-    std::iota(perm.begin(),perm.end(),0);
-    tbb::parallel_sort(perm.begin(),perm.end(), [keysPtr=mKeys.data()](const int idx1, const int idx2) {
-        return keysPtr[idx1] < keysPtr[idx2];
-    });
+    std::vector<int> uplinks; //!< links to a nodes parent for backwards traversal
+    std::vector<int> leafes; //!< ids of leaf nodes for backwards traversal
+    std::vector<spaceKey> nodeKeys; //!< masked morton keys of nodes
+    std::vector<int> nodeLayer; //!< layer of each node
+    std::vector<int> layerId; //!< node id where layer x starts
 
-    // perform gather to apply the new ordering to the particle buffer
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> sorted(pb.size());
-    std::vector<spaceKey> sortedKeys(pb.size());
+    std::vector<spaceKey> mKeys; //!< morten code
+    std::vector<unsigned int> perm; //!< permutation list for sorting
 
-    tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
+    template <typename BufferType>
+    void calcMortonCodes(BufferType& pb)
     {
-        for (auto i = range.begin(); i != range.end(); ++i)
+        mpu::HRStopwatch sw;
+
+        // generate morton keys for all particles
+        mKeys.resize(pb.size());
+        const f3_t domainFactor = 1.0_ft / (domainMax - domainMin);
+        tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
         {
-            const auto pi = pb.loadParticle(perm[i]);
-            sorted.storeParticle(i,pi);
-            sortedKeys[i] = mKeys[perm[i]];
-        }
-    });
+            for (auto i = range.begin(); i != range.end(); ++i)
+            {
+                Particle<POS> p = pb.template loadParticle<POS>(i);
+                mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
+            }
+        });
 
-    pb = std::move(sorted);
-    mKeys = std::move(sortedKeys);
-
-
-    sw.pause();
-    std::cout << "Sorting codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
+        sw.pause();
+        std::cout << "Morton codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
 #ifdef DEBUG_PRINTS
-    std::cout << "morton keys sorted:\n";
+        std::cout << "morton keys generated:\n";
+        for(int i =0; i < pb.size(); i++)
+        {
+            std::bitset<64> x(mKeys[i]);
+            std::cout << x << "\n";
+        }
+        std::cout << std::endl;
+#endif
+    }
+
+    template <typename BufferType>
+    void sortParticles(BufferType& pb)
+    {
+        mpu::HRStopwatch sw;
+
+        // sort particles by morton key
+
+        // create and sort the permutation vector
+        perm.resize(pb.size());
+        std::iota(perm.begin(),perm.end(),0);
+        tbb::parallel_sort(perm.begin(),perm.end(), [keysPtr=mKeys.data()](const int idx1, const int idx2) {
+            return keysPtr[idx1] < keysPtr[idx2];
+        });
+
+        // perform gather to apply the new ordering to the particle buffer
+        BufferType sorted(pb.size());
+        std::vector<spaceKey> sortedKeys(pb.size());
+        tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
+        {
+            for (auto i = range.begin(); i != range.end(); ++i)
+            {
+                const auto pi = pb.loadParticle(perm[i]);
+                sorted.storeParticle(i,pi);
+                sortedKeys[i] = mKeys[perm[i]];
+            }
+        });
+        pb = std::move(sorted);
+        mKeys = std::move(sortedKeys);
+
+        sw.pause();
+        std::cout << "Sorting codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+#ifdef DEBUG_PRINTS
+        std::cout << "morton keys sorted:\n";
     for(int i =0; i < pb.size(); i++)
         std::cout << mKeys[i] << "\n";
     std::cout << std::endl;
 #endif
+    }
 
-    sw.reset();
-    sw.resume();
-    // generate nodes and leafes
-    std::shared_ptr<Node> tree= generateHierarchy(&mKeys[0],0,pb.size()-1);
-    sw.pause();
-    std::cout << "Generate nodes took " << sw.getSeconds() *1000 << "ms" << std::endl;
-    return tree;
-}
+    template <typename BufferType>
+    void generateNodes(BufferType& pb)
+    {
+        mpu::HRStopwatch sw;
+        links.emplace_back(); // root node
+        layerId.push_back(0);
+        nodeLayer.push_back(0);
+        nodeKeys.push_back(0);
+        std::vector<bool> isInLeaf(pb.size(),false);
+
+        // build the tree layer by layer from top to bottom
+        unsigned int layer=1;
+        while( layer < 21 )
+        {
+            spaceKey prevCell;
+            bool isInBlock=false; // are we currently inside a block of particles  with the same masked key?
+
+            // layer id
+            layerId.push_back(links.size());
+
+            std::vector<int> compactedList;
+
+            spaceKey mask =  ~0llu << (63u-(layer*3u)); // get layer mask
+            for(int i = 0; i < pb.size(); i++)
+            {
+                // for all particles that are not yet in a leaf
+                if(!isInLeaf[i])
+                {
+                    // form regions of particles with same masked keys
+                    spaceKey cell = (mKeys[i] & mask);
+                    if( !isInBlock)
+                    {
+                        // put i as start of next section
+                        prevCell=cell;
+                        isInBlock = true;
+                        compactedList.push_back(i);
+                        nodeKeys.push_back(cell);
+
+                    } else if(prevCell != cell)
+                    {
+                        // end section and start a new one
+                        prevCell=cell;
+                        compactedList.push_back(i);
+                        nodeKeys.push_back(cell);
+                        compactedList.push_back(i);
+                    }
+
+                } else if(isInBlock)
+                {
+                    // end section
+                    compactedList.push_back(i);
+                    isInBlock = false;
+                }
+            }
+
+            // check if work was done this layer
+            if(compactedList.empty())
+                break;
+
+            if(compactedList.size() % 2 != 0)
+            {
+                // last section was not ended. That means it is on the end of the buffer. so end it.
+                compactedList.push_back(pb.size());
+            }
+
+            for(int i=0; i<compactedList.size()-1; i+=2)
+            {
+                const int id1 = compactedList[i];
+                const int id2 = compactedList[i+1];
+                const int particlesInNode = id2-id1;
+#ifdef DEBUG_PRINTS
+                std::cout << "group " << float(i)/2.0f << " particles: " << particlesInNode << std::endl;
+#endif
+                TreeDownlink link;
+
+                // is it ok to make a leaf ?
+                if( particlesInNode <= maxLeafParticles)
+                {
+#ifdef DEBUG_PRINTS
+                    std::cout << "Leaf" <<std::endl;
+#endif
+                    link.setData(particlesInNode, id1, true);
+                    leafes.push_back(links.size());
+                    for(int j=id1; j<id2; j++)
+                        isInLeaf[j]=true;
+                }
+                links.push_back(link);
+                nodeLayer.push_back(layer);
+
+            }
+
+            layer++;
+        }
+
+        sw.pause();
+        std::cout << "Generate nodes took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
+#ifdef DEBUG_PRINTS
+        int tc=0;
+        for(const auto &leafe : leafes)
+        {
+            std::cout << "leafe " << leafe << " with " << links[leafe].nChildren() << " children" << std::endl;
+            tc+= links[leafe].nChildren();
+        }
+        std::cout << "Number of leafes: " << leafes.size() << " with total " << tc << " children" << std::endl;
+        std::cout << "Total number of nodes: " << links.size() << " in " << layerId.size() << " layers" << std::endl;
+
+        if(links.size() != nodeLayer.size() || links.size() != nodeKeys.size())
+            throw std::logic_error("stupid programmer error");
+#endif
+
+    }
+
+    void linkNodes()
+    {
+        mpu::HRStopwatch sw;
+
+        uplinks.resize(links.size());
+        for(int i=1; i < links.size(); i++)
+        {
+            // for each node see on which level the parent is and get some information
+            const int parentLayer = nodeLayer[i]-1;
+            int stepsize = layerId[parentLayer+1] - layerId[parentLayer];
+            int parent = layerId[parentLayer];
+
+            // masking this nodes key with the mask of the parents layer should  result in a masked key which is equal to the parents
+            const spaceKey parentMask =  ~0llu << (63u-(parentLayer*3u));
+            const spaceKey thisMaskedKey = (nodeKeys[i] & parentMask);
+
+            // get the the key of the current parent candidate
+            spaceKey parentMaskedKey = nodeKeys[parent];
+
+            // while keys do not match do binary search
+            while(parentMaskedKey != thisMaskedKey)
+            {
+                stepsize = stepsize/2;
+//#ifdef DEBUG_PRINTS
+                if (stepsize < 1)
+                    throw std::logic_error("stupid programmer error");
+//#endif
+                if(parentMaskedKey < thisMaskedKey)
+                    parent += stepsize;
+                else
+                    parent -= stepsize;
+
+                parentMaskedKey = nodeKeys[parent];
+            }
+
+            // parent is now the parent, so link it
+            if( links[parent].nChildren() < 1)
+                links[parent].setData(1,i,false);
+            else
+            {
+                links[parent].setNChildren( links[parent].nChildren()+1);
+                if(links[parent].firstChild() > i)
+                    links[parent].setFirstChild(i);
+            }
+
+            // uplink
+            uplinks[i] = parent;
+        }
+
+        sw.pause();
+        std::cout << "Link nodes " << sw.getSeconds() *1000 << "ms" << std::endl;
+    }
+
+    void updateNodes()
+    {
+        layerId.push_back(links.size());
+        for(int i = layerId.size()-2; i >= 0; i-- )
+        {
+            int layerStart = layerId[i];
+            int layerEnd = layerId[i+1];
+            for(int n = layerStart; n < layerEnd; n++)
+            {
+                f3_t min{std::numeric_limits<f1_t>::infinity(),std::numeric_limits<f1_t>::infinity(),std::numeric_limits<f1_t>::infinity()};
+                f3_t max{0,0,0};
+                f3_t com{0,0,0};
+                f1_t mass=0;
+                f1_t od;
+
+                if(links[n].isLeaf())
+                {
+                    for(int c = links[n].firstChild(); c < links[n].firstChild() + links[n].nChildren(); c++)
+                    {
+
+                    }
+                } else{
+                    for(int c = links[n].firstChild(); c < links[n].firstChild() + links[n].nChildren(); c++)
+                    {
+
+                    }
+                }
+            }
+        }
+    }
+
+    void print()
+    {
+    }
+
+};
 
 f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
 {
@@ -315,6 +528,7 @@ f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
     return od*od;
 }
 
+/*
 cellData updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     if(tree->isLeaf)
@@ -348,15 +562,6 @@ cellData updateSubtree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,H
 void updateMyTree(Node* tree, const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     updateSubtree(tree,pb);
-}
-
-f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
-{
-    // gravity
-    const f1_t distSqr = r2 + eps2;
-    const f1_t invDist = rsqrt(distSqr);
-    const f1_t invDistCube = invDist * invDist * invDist;
-    return -rij * massj * invDistCube;
 }
 
 int interactions=0;
@@ -408,6 +613,17 @@ void computeForces(const Node*tree, HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_A
     });
 }
 
+ */
+
+f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
+{
+    // gravity
+    const f1_t distSqr = r2 + eps2;
+    const f1_t invDist = rsqrt(distSqr);
+    const f1_t invDistCube = invDist * invDist * invDist;
+    return -rij * massj * invDistCube;
+}
+
 void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
@@ -451,8 +667,13 @@ std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
     return std::pair<f1_t,f1_t>(median,mean);
 }
 
+
 int main()
 {
+//    spaceKey k = 7llu << 61u;
+//    std::bitset<64> x(k);
+//    std::cout << x << "\n";
+
     HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(10000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
@@ -472,40 +693,44 @@ int main()
     std::cout << std::endl;
 #endif
 
-    mpu::HRStopwatch sw;
-    auto tree = buildMeATree(pb);
-    sw.pause();
-    std::cout << "Tree generation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+    HostTree myTree;
+    myTree.constructTree(pb);
 
-#ifdef DEBUG_PRINTS
-    for(int i =0; i<pb.size(); i++)
-        std::cout << pb.loadParticle(i).pos << "\n";
-    std::cout << std::endl;
-#endif
 
-    sw.reset();
-    sw.resume();
-    updateMyTree(tree.get(),pb);
-    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
-
-    sw.reset();
-    sw.resume();
-    computeForces(tree.get(),pb);
-    std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
-
-    auto pbRef = pb;
-
-    sw.reset();
-    sw.resume();
-    computeForcesNaive(pbRef);
-    std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
-
-    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
-    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
-
-    auto error = calcError(pb,pbRef);
-    std::cout << "Median error: " << error.first << std::endl;
-    std::cout << "Mean error: " << error.second << std::endl;
+//    mpu::HRStopwatch sw;
+//    auto tree = buildMeATree(pb);
+//    sw.pause();
+//    std::cout << "Tree generation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+//
+//#ifdef DEBUG_PRINTS
+//    for(int i =0; i<pb.size(); i++)
+//        std::cout << pb.loadParticle(i).pos << "\n";
+//    std::cout << std::endl;
+//#endif
+//
+//    sw.reset();
+//    sw.resume();
+//    updateMyTree(tree.get(),pb);
+//    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
+//
+//    sw.reset();
+//    sw.resume();
+//    computeForces(tree.get(),pb);
+//    std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
+//
+//    auto pbRef = pb;
+//
+//    sw.reset();
+//    sw.resume();
+//    computeForcesNaive(pbRef);
+//    std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+//
+//    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
+//    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
+//
+//    auto error = calcError(pb,pbRef);
+//    std::cout << "Median error: " << error.first << std::endl;
+//    std::cout << "Mean error: " << error.second << std::endl;
 
 //    printTree(tree.get());
 }
