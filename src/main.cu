@@ -88,99 +88,6 @@ CUDAHOSTDEV spaceKey calculatePositionKey(const f3_t& pos, const f3_t& domainMin
     return mortonKey(normalizedPos.x,normalizedPos.y,normalizedPos.z);
 }
 
-
-
-//void printTree(Node* root)
-//{
-//    int level = 0;
-//
-//    std::queue<std::pair<Node*,bool>> queue;
-//    queue.push({root,false});
-//    queue.push({nullptr,false});
-//
-//    while(!queue.empty())
-//    {
-//        Node* node = queue.front().first;
-//        if(node->isLeaf)
-//        {
-//            std::cout << dynamic_cast<LNode *>(node)->id << "\t";
-//        }
-//        else
-//        {
-//            if(queue.front().second)
-//                std::cout << "r" << level << "\t";
-//            else
-//                std::cout << "l" << level << "\t";
-//            queue.push( {dynamic_cast<INode*>(node)->left.get(), false});
-//            queue.push( {dynamic_cast<INode*>(node)->right.get(), true});
-//        }
-//        queue.pop();
-//
-//        if(queue.front().first == nullptr)
-//        {
-//            queue.pop();
-//            if(!queue.empty())
-//                queue.push({nullptr,false});
-//            std::cout << "\n";
-//            level++;
-//        }
-//    }
-//    std::cout << std::endl;
-//}
-
-int findSplit(const spaceKey* sortedKeys, int first, int last)
-{
-
-    spaceKey firstCode = sortedKeys[first];
-    spaceKey lastCode = sortedKeys[last];
-
-    // Identical Morton codes => split the range in the middle.
-    if (firstCode == lastCode)
-        return (first + last) >> 1u;
-
-    // number of highest bits that are the same for all objects in the range
-    // get number of leading bits that are the same
-    int commonPrefix = __builtin_clz(firstCode ^ lastCode);
-
-    // now search for the id where the code changes
-    // use binary search to find the where the highest different morten key bit changes first
-    // meaning the highest object that shares more then commonPrefix bits with the first one
-    int split = first;
-    int step = last - first;
-
-    do
-    {
-        step = (step+1u) >> 1u; // divide step by 2
-        int newSplit = split + step; // new guess for the split
-
-        if(newSplit < last)
-        {
-            spaceKey splitCode = sortedKeys[newSplit];
-            int splitPrefix = __builtin_clz(firstCode ^ splitCode);
-            if(splitPrefix > commonPrefix)
-                split = newSplit; // except guess if it shares more bits with the first element
-        }
-    }
-    while(step > 1);
-
-    return split;
-}
-
-//void generateHierarchy(spaceKey* sortedKeys, int first, int last)
-//{
-//    // single object ==> leaf
-//    if(first == last)
-//        return std::make_shared<LNode>(first);
-//
-//    int split = findSplit(sortedKeys, first, last);
-//
-//    // recurse sub ranges:
-//    std::shared_ptr<Node> cA = generateHierarchy(sortedKeys, first, split);
-//    std::shared_ptr<Node> cB = generateHierarchy(sortedKeys, split+1, last);
-//
-//    return std::make_shared<INode>(std::move(cA),std::move(cB));
-//}
-
 // tree settings
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
@@ -551,8 +458,9 @@ private:
         {
             // for each node see on which level the parent is and get some information
             const int parentLayer = nodeLayer[i]-1;
-            int stepsize = layerId[parentLayer+1] - layerId[parentLayer];
-            int parent = layerId[parentLayer];
+            int l = layerId[parentLayer];
+            int r = layerId[parentLayer+1]-1;
+            int parent = (lastParent >= layerId[parentLayer]) ? lastParent : l+(r-l)/2; // a parent can have up to 8 children, so start testing with the old parent if it is in the correct layer
 
             // masking this nodes key with the mask of the parents layer results in a masked key which is equal to the parents
             const spaceKey parentMask =  ~0llu << (63u-(parentLayer*3u));
@@ -564,23 +472,15 @@ private:
             // while keys do not match do binary search
             while(parentMaskedKey != thisMaskedKey)
             {
-                stepsize = stepsize/2;
-//#ifdef DEBUG_PRINTS
-                if (stepsize < 1) // TODO: sometimes a parent is not found but linear search says it does exist
-                {
-                    bool exists=false;
-                    for(int blubber = layerId[parentLayer]; blubber < layerId[parentLayer+1]; blubber++ )
-                        if(thisMaskedKey == nodeKeys[blubber])
-                            exists = true;
-
+                if(l==r)
                     throw std::logic_error("stupid programmer error");
-                }
-//#endif
-                if(parentMaskedKey < thisMaskedKey)
-                    parent += stepsize;
-                else
-                    parent -= stepsize;
 
+                if(parentMaskedKey < thisMaskedKey)
+                    l=parent+1; // ignore left part
+                else
+                    r=parent-1; // ignore right part
+
+                parent = l+(r-l)/2; // get new parent using midpoint of current intervall
                 parentMaskedKey = nodeKeys[parent];
             }
 
@@ -675,7 +575,7 @@ int main()
 //    std::bitset<64> x(k);
 //    std::cout << x << "\n";
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(9'000'000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(10000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
