@@ -232,6 +232,17 @@ public:
         }
     }
 
+    template <typename BufferType>
+    void computeForces(BufferType& pb)
+    {
+        mpu::HRStopwatch sw;
+
+
+
+        sw.pause();
+        std::cout << "Total time of tree construction " << sw.getSeconds() *1000 << "ms" << std::endl;
+    }
+
 private:
     std::vector<TreeDownlink> links; //!< information about the children of a tree node
     HostParticleBuffer<HOST_POSM> iNodes; //!< internal nodes as virtual particles
@@ -411,6 +422,8 @@ private:
             layer++;
         }
 
+        assert_critical(layer<=21,"Octree","layer limit reached during node creation")
+
         // resize all the buffers
         uplinks.resize(links.size());
         aabbmin.resize(links.size());
@@ -424,7 +437,9 @@ private:
         sw.pause();
         std::cout << "Generate nodes took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
-//#ifdef DEBUG_PRINTS
+        assert_true(links.size() == nodeLayer.size() && links.size() == nodeKeys.size(),"Octree","array sizes do not match after construction")
+
+#ifdef DEBUG_PRINTS
         int tc=0;
         for(const auto &leaf : leafs)
         {
@@ -442,10 +457,7 @@ private:
 //                      << " num children: " << l.nChildren() << std::endl;
 //            nodeid++;
 //        }
-
-        if(links.size() != nodeLayer.size() || links.size() != nodeKeys.size())
-            throw std::logic_error("stupid programmer error");
-//#endif
+#endif
 
     }
 
@@ -458,9 +470,7 @@ private:
         {
             // for each node see on which level the parent is and get some information
             const int parentLayer = nodeLayer[i]-1;
-            int l = layerId[parentLayer];
-            int r = layerId[parentLayer+1]-1;
-            int parent = (lastParent >= layerId[parentLayer]) ? lastParent : l+(r-l)/2; // a parent can have up to 8 children, so start testing with the old parent if it is in the correct layer
+            int parent = (lastParent >= layerId[parentLayer]) ? lastParent : layerId[parentLayer]; // a parent can have up to 8 children, so start testing with the old parent if it is in the correct layer
 
             // masking this nodes key with the mask of the parents layer results in a masked key which is equal to the parents
             const spaceKey parentMask =  ~0llu << (63u-(parentLayer*3u));
@@ -469,20 +479,12 @@ private:
             // get the the key of the current parent candidate
             spaceKey parentMaskedKey = nodeKeys[parent];
 
-            // while keys do not match do binary search
+            // if last nodes parent is not this nodes parent, high chances are it will be close, so do linear search instead of binary
             while(parentMaskedKey != thisMaskedKey)
-            {
-                if(l==r)
-                    throw std::logic_error("stupid programmer error");
+                parentMaskedKey = nodeKeys[++parent];
 
-                if(parentMaskedKey < thisMaskedKey)
-                    l=parent+1; // ignore left part
-                else
-                    r=parent-1; // ignore right part
-
-                parent = l+(r-l)/2; // get new parent using midpoint of current intervall
-                parentMaskedKey = nodeKeys[parent];
-            }
+            assert_true( parent < layerId[parentLayer+1] && parent >= layerId[parentLayer], "Octree", "parent assumed in wrong layer")
+            assert_true( nodeKeys[parent] == thisMaskedKey, "Octree", "Wrong parent assumed during linking.")
 
             // parent is now the parent, so link it. But first we need to know if we are the first child
             if(lastParent != parent)
