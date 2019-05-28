@@ -39,9 +39,10 @@ ADD_RESOURCE(Settings,"settings.h");
 ADD_RESOURCE(HeadlessSettings,"headlessSettings.h");
 ADD_RESOURCE(PrecisionSettings,"precisionSettings.h");
 
-constexpr f1_t H2 = H*H; //!< square of the smoothing length
-constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
-constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
+//constexpr f1_t H2 = H*H; //!< square of the smoothing length
+//constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
+//constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
+
 
 
 
@@ -134,10 +135,20 @@ f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
     return od*od;
 }
 
+f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
+{
+    // gravity
+    const f1_t distSqr = r2 + eps2;
+    const f1_t invDist = rsqrt(distSqr);
+    const f1_t invDistCube = invDist * invDist * invDist;
+    return -rij * massj * invDistCube;
+}
+
 class HostTree
 {
 
 public:
+    //!< this is not const since particles will be sorted
     template <typename BufferType>
     void construct(BufferType& pb)
     {
@@ -237,10 +248,18 @@ public:
     {
         mpu::HRStopwatch sw;
 
-
+        tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
+        {
+            for (auto i = range.begin(); i != range.end(); ++i)
+            {
+                Particle<POS,MASS,ACC> p = pb.template loadParticle<POS,MASS>(i);
+                this->traverseTree(p,pb);
+                pb.template storeParticle(i,Particle<ACC>(p));
+            }
+        });
 
         sw.pause();
-        std::cout << "Total time of tree construction " << sw.getSeconds() *1000 << "ms" << std::endl;
+        std::cout << "Computing forces took " << sw.getSeconds() *1000 << "ms" << std::endl;
     }
 
 private:
@@ -260,7 +279,7 @@ private:
     std::vector<unsigned int> perm; //!< permutation list for sorting
 
     template <typename BufferType>
-    void calcMortonCodes(BufferType& pb)
+    void calcMortonCodes(const BufferType& pb)
     {
         mpu::HRStopwatch sw;
 
@@ -331,7 +350,7 @@ private:
     }
 
     template <typename BufferType>
-    void generateNodes(BufferType& pb)
+    void generateNodes(const BufferType& pb)
     {
         mpu::HRStopwatch sw;
         links.emplace_back(); // root node
@@ -516,16 +535,51 @@ private:
 
     }
 
-};
+    template <typename BufferType>
+    void traverseTree(Particle<POS,MASS,ACC>& p, const BufferType& pb) const
+    {
+        std::vector<int> nextLvl; // next level stack
+        std::vector<int> thisLvl; // current level stack
 
-f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
-{
-    // gravity
-    const f1_t distSqr = r2 + eps2;
-    const f1_t invDist = rsqrt(distSqr);
-    const f1_t invDistCube = invDist * invDist * invDist;
-    return -rij * massj * invDistCube;
-}
+        // add children of root
+        for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
+            thisLvl.push_back(child);
+
+        while(!thisLvl.empty())
+        {
+            for(auto id : thisLvl)
+            {
+                // check if node needs to be opened
+                const Particle<POS,MASS> node = iNodes.loadParticle(id);
+                const f3_t rij = p.pos - node.pos;
+                const f1_t r2 = dot(rij,rij);
+                if(r2 < od2[id])
+                {
+                    // it needs to be opened, for leafs interact with all particles, for nodes add them to the next level stack
+                    if(links[id].isLeaf())
+                    {
+                        for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
+                        {
+                            const Particle<POS,MASS> pj = pb.template loadParticle(child);
+                            const f3_t rpij = p.pos - pj.pos;
+                            const f1_t rp2 = dot(rpij,rpij);
+                            p.acc += calcInteraction(pj.mass,rp2,rpij);
+                        }
+                    } else
+                        for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
+                            nextLvl.push_back(child);
+                } else
+                {
+                    // no need to open it, so interact with it already
+                    p.acc += calcInteraction(node.mass,r2,rij);
+                }
+            }
+            thisLvl = std::move(nextLvl);
+            nextLvl.clear();
+        }
+    }
+
+};
 
 void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
@@ -553,11 +607,11 @@ std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
     std::vector<f1_t> errors(pb.size());
     for(int i = 0; i < pb.size(); i++)
     {
-        auto pi = pb.loadParticle<ACC>(i);
-        auto pref = reference.loadParticle<ACC>(i);
+        auto pi = pb.loadParticle<POS,ACC>(i);
+        auto pref = reference.loadParticle<POS,ACC>(i);
 #ifdef DEBUG_PRINTS
-        std::cout << "Buffer A p" << i << " acc: " << pi.acc << std::endl;
-        std::cout << "Buffer B p" << i << " acc: " << pref.acc << std::endl;
+        std::cout << "Buffer A p" << i << " acc: " << pi.acc << "\tpos: " << pi.pos << std::endl;
+        std::cout << "Buffer B p" << i << " acc: " << pref.acc << "\tpos: " << pi.pos << std::endl;
 #endif
         errors[i] = length(pi.acc - pref.acc) / length(pref.acc);
     }
@@ -576,6 +630,8 @@ int main()
 //    spaceKey k = 7llu << 61u;
 //    std::bitset<64> x(k);
 //    std::cout << x << "\n";
+
+//    tbb::task_scheduler_init init(1);
 
     HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(10000);
 
@@ -600,33 +656,23 @@ int main()
     myTree.construct(pb);
     myTree.update(pb);
 
-    myTree.print(0,10);
+    myTree.computeForces(pb);
 
-//    sw.reset();
-//    sw.resume();
-//    updateMyTree(tree.get(),pb);
-//    std::cout << "Tree update took " << sw.getSeconds() *1000 << "ms" << std::endl;
-//
-//    sw.reset();
-//    sw.resume();
-//    computeForces(tree.get(),pb);
-//    std::cout << "Tree traverse took " << sw.getSeconds() *1000 << "ms" << std::endl;
-//
-//    auto pbRef = pb;
-//
-//    sw.reset();
-//    sw.resume();
-//    computeForcesNaive(pbRef);
-//    std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+    auto pbRef = pb;
+
+    mpu::HRStopwatch sw;
+    computeForcesNaive(pbRef);
+    std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
 //
 //    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
 //    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
 //
-//    auto error = calcError(pb,pbRef);
-//    std::cout << "Median error: " << error.first << std::endl;
-//    std::cout << "Mean error: " << error.second << std::endl;
+    auto error = calcError(pb,pbRef);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
 
-//    printTree(tree.get());
+//    myTree.print(0,10);
+
 }
 
 
