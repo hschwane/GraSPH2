@@ -96,6 +96,7 @@ constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
 constexpr int maxLeafParticles = 16;
+constexpr int maxCriticalParticles = 64;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -123,6 +124,19 @@ private:
     static constexpr unsigned int numMask = (15u<<numShift);  // 01111000 00000000 00000000 00000000
     static constexpr unsigned int firstMask = ~(31u<<27u);    // 00000111 11111111 11111111 11111111
     unsigned int m_data;
+};
+
+struct MPU_ALIGN(16) NodeOpeningData
+{
+    f3_t com;
+    f1_t od2;
+};
+
+struct CriticalNode
+{
+    int firstParticle;
+    int nParticles;
+    int nodeId;
 };
 
 f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
@@ -196,19 +210,18 @@ public:
                     {
                         min = fmin(min, aabbmin[c]);
                         max = fmax(max, aabbmax[c]);
-                        auto p = iNodes.template loadParticle<POS,MASS>(c);
-                        com += p.pos * p.mass;
-                        mass += p.mass;
+                        com += openingData[c].com * nodeMass[c];
+                        mass += nodeMass[c];
                     }
                 }
 
                 // store the results
                 com /= mass;
-                Particle<POS,MASS> p(com,mass);
-                iNodes.storeParticle(n,p);
                 aabbmin[n] = min;
                 aabbmax[n] = max;
-                od2[n] = calcOpeningDistance2(com, min, max);
+                nodeMass[n] = mass;
+                openingData[n].com = com;
+                openingData[n].od2 = calcOpeningDistance2(com, min, max);
 
             }
         }
@@ -225,9 +238,8 @@ public:
         for(int i = startNode; i < endNode; ++i)
         {
             auto const & l = links[i];
-            auto p = iNodes.loadParticle(i);
             std::cout << "Node " << i << " is leaf: " << l.isLeaf() << " first child: " << l.firstChild()
-                      << " num children: " << l.nChildren() << " com: " << p.pos << " mass: " << p.mass << std::endl;
+                      << " num children: " << l.nChildren() << " com: " << openingData[i].com << " mass: " << nodeMass[i] << std::endl;
         }
 
         if(printGeneralInfo)
@@ -237,9 +249,16 @@ public:
                 if(l.isLeaf())
                     tc+=l.nChildren();
 
+            int ncnp=0;
+            for(const auto &node : criticalNodes)
+            {
+                ncnp += node.nParticles;
+            }
+
             // print some gerneral information
             std::cout << "Number of leafs: " << leafs.size() << " with total " << tc << " children" << std::endl;
             std::cout << "Total number of nodes: " << links.size() << " in " << layerId.size()-1 << " layers" << std::endl;
+            std::cout << "Number of Critical Nodes: " << criticalNodes.size() << " with total of " << ncnp << " particles" << std::endl;
         }
     }
 
@@ -248,13 +267,11 @@ public:
     {
         mpu::HRStopwatch sw;
 
-        tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
+        tbb::parallel_for( tbb::blocked_range<size_t>(0, criticalNodes.size()), [&](const auto &range)
         {
             for (auto i = range.begin(); i != range.end(); ++i)
             {
-                Particle<POS,MASS,ACC> p = pb.template loadParticle<POS,MASS>(i);
-                this->traverseTree(p,pb);
-                pb.template storeParticle(i,Particle<ACC>(p));
+                this->traverseTree(criticalNodes[i],pb);
             }
         });
 
@@ -264,8 +281,10 @@ public:
 
 private:
     std::vector<TreeDownlink> links; //!< information about the children of a tree node
-    HostParticleBuffer<HOST_POSM> iNodes; //!< internal nodes as virtual particles
-    std::vector<f1_t>   od2; //!< opening distance of nodes
+    std::vector<NodeOpeningData> openingData; //!< data needed to check if node should be opened
+    std::vector<f1_t> nodeMass; //!< total mass of nodes
+
+    std::vector<CriticalNode> criticalNodes; //!< nodes that will traverse the tree
 
     std::vector<f3_t> aabbmin; //!< max corner of this nodes axis aligned bounding box
     std::vector<f3_t> aabbmax; //!< min corner of this nodes axis aligned bounding box
@@ -352,12 +371,21 @@ private:
     template <typename BufferType>
     void generateNodes(const BufferType& pb)
     {
+        links.clear();
+        layerId.clear();
+        nodeLayer.clear();
+        nodeKeys.clear();
+        criticalNodes.clear();
+
         mpu::HRStopwatch sw;
         links.emplace_back(); // root node
         layerId.push_back(0);
         nodeLayer.push_back(0);
         nodeKeys.push_back(0);
+
+        // temp storage
         std::vector<bool> isInLeaf(pb.size(),false);
+        std::vector<bool> isInCritical(pb.size(),false);
 
         // build the tree layer by layer from top to bottom
         unsigned int layer=1;
@@ -414,6 +442,7 @@ private:
                 compactedList.push_back(pb.size());
             }
 
+            // go over the compacted list and generate nodes from it
             for(int i=0; i<compactedList.size()-1; i+=2)
             {
                 const int id1 = compactedList[i];
@@ -423,6 +452,14 @@ private:
                 std::cout << "group " << float(i)/2.0f << " particles: " << particlesInNode << std::endl;
 #endif
                 TreeDownlink link{};
+
+                // do we need to make a critical node?
+                if(particlesInNode <= maxCriticalParticles && !isInCritical[id1])
+                {
+                    criticalNodes.push_back(CriticalNode{id1,particlesInNode, static_cast<int>(links.size())});
+                    for(int j=id1; j<id2; j++)
+                        isInCritical[j]=true;
+                }
 
                 // is it ok to make a leaf ?
                 if( particlesInNode <= maxLeafParticles)
@@ -447,8 +484,8 @@ private:
         uplinks.resize(links.size());
         aabbmin.resize(links.size());
         aabbmax.resize(links.size());
-        od2.resize(links.size());
-        iNodes = HostParticleBuffer<HOST_POSM>(links.size());
+        nodeMass.resize(links.size());
+        openingData.resize(links.size());
 
         // add the end of the node list to the layer list (not needed, this is already done implicitly by the algorithm above)
         // layerId.push_back(links.size());
@@ -535,47 +572,82 @@ private:
 
     }
 
+
     template <typename BufferType>
-    void traverseTree(Particle<POS,MASS,ACC>& p, const BufferType& pb) const
+    void traverseTree(const CriticalNode& group, BufferType& pb) const
     {
         std::vector<int> nextLvl; // next level stack
         std::vector<int> thisLvl; // current level stack
+
+        std::vector<int> groupNodeInteractions;
+        std::vector<int> groupParticleInteractions;
 
         // add children of root
         for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
             thisLvl.push_back(child);
 
+        f3_t com = openingData[group.nodeId].com;
+
+        // traverse the tree
         while(!thisLvl.empty())
         {
             for(auto id : thisLvl)
             {
+                if(id == group.nodeId)
+                    continue;
+
                 // check if node needs to be opened
-                const Particle<POS,MASS> node = iNodes.loadParticle(id);
-                const f3_t rij = p.pos - node.pos;
+                const f3_t rij = com - openingData[id].com;
                 const f1_t r2 = dot(rij,rij);
-                if(r2 < od2[id])
+                if(r2 < openingData[id].od2)
                 {
                     // it needs to be opened, for leafs interact with all particles, for nodes add them to the next level stack
                     if(links[id].isLeaf())
                     {
                         for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
-                        {
-                            const Particle<POS,MASS> pj = pb.template loadParticle(child);
-                            const f3_t rpij = p.pos - pj.pos;
-                            const f1_t rp2 = dot(rpij,rpij);
-                            p.acc += calcInteraction(pj.mass,rp2,rpij);
-                        }
+                            groupParticleInteractions.push_back(child);
                     } else
                         for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
                             nextLvl.push_back(child);
                 } else
                 {
                     // no need to open it, so interact with it already
-                    p.acc += calcInteraction(node.mass,r2,rij);
+                    groupNodeInteractions.push_back(id);
                 }
             }
             thisLvl = std::move(nextLvl);
             nextLvl.clear();
+        }
+
+        // calculate the interactions
+        for(int i = group.firstParticle; i < group.firstParticle + group.nParticles; i++)
+        {
+            Particle<POS,MASS,ACC> pi = pb.template loadParticle<POS,MASS>(i);
+
+            // with nodes:
+            for(const auto j : groupNodeInteractions)
+            {
+                f3_t rij = pi.pos - openingData[j].com;
+                pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+            }
+
+            // with particles in same group:
+            for(int j = group.firstParticle; j < group.firstParticle + group.nParticles; j++)
+            {
+                Particle<POS,MASS> pj = pb.template loadParticle<POS,MASS>(j);
+                f3_t rij = pi.pos - pj.pos;
+                pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+            }
+
+            // with particles in leafs:
+            for(const auto j : groupParticleInteractions)
+            {
+                Particle<POS,MASS> pj = pb.template loadParticle<POS,MASS>(j);
+                f3_t rij = pi.pos - pj.pos;
+                pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+            }
+
+            pb.template storeParticle(i,Particle<ACC>(pi));
         }
     }
 
@@ -633,7 +705,7 @@ int main()
 
 //    tbb::task_scheduler_init init(1);
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(10000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(50000);
 
     std::default_random_engine rng(mpu::getRanndomSeed());
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -671,7 +743,7 @@ int main()
     std::cout << "Median error: " << error.first << std::endl;
     std::cout << "Mean error: " << error.second << std::endl;
 
-//    myTree.print(0,10);
+    myTree.print(0,10);
 
 }
 
