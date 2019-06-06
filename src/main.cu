@@ -95,10 +95,10 @@ constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
-constexpr int maxLeafParticles = 16;
+constexpr int maxLeafParticles = 1;
 constexpr int maxCriticalParticles = 256;
 constexpr int stackSizePerThread = 4096;
-constexpr int interactionListSize = 40000;
+constexpr int interactionListSize = 1000;
 constexpr int nodeListSize = 1000;
 //#define DEBUG_PRINTS
 /////////////////
@@ -194,8 +194,8 @@ public:
             for(int n = layerStart; n < layerEnd; n++)
             {
                 // for each node go over all leafs to calculate com, total mass and bounding box
-                f3_t min{std::numeric_limits<f1_t>::infinity(),std::numeric_limits<f1_t>::infinity(),std::numeric_limits<f1_t>::infinity()};
-                f3_t max{0,0,0};
+                f3_t min = domainMax;
+                f3_t max = domainMin;
                 f3_t com{0,0,0};
                 f1_t mass=0;
 
@@ -270,17 +270,11 @@ public:
     void computeForces(BufferType& pb)
     {
         mpu::HRStopwatch sw;
-
         tbb::parallel_for( tbb::blocked_range<size_t>(0, criticalNodes.size()), [&](const auto &range)
         {
-            std::array<int, stackSizePerThread> buffer1;
-            std::array<int, stackSizePerThread> buffer2;
-            std::array<int, interactionListSize> ilist;
-            std::array<int, nodeListSize> nlist;
-
             for (auto i = range.begin(); i != range.end(); ++i)
             {
-                this->traverseTree(criticalNodes[i],pb, &buffer1[0], &buffer2[0], &ilist[0], &nlist[0]);
+                this->traverseTree(criticalNodes[i],pb, &buffer1.local()[0], &buffer2.local()[0], &ilist.local()[0], &nlist.local()[0]);
             }
         });
 
@@ -305,6 +299,12 @@ private:
 
     std::vector<spaceKey> mKeys; //!< morten code
     std::vector<unsigned int> perm; //!< permutation list for sorting
+
+    // per thread buffer used during traversal only
+    tbb::enumerable_thread_specific<std::array<int, stackSizePerThread>> buffer1;
+    tbb::enumerable_thread_specific<std::array<int, stackSizePerThread>> buffer2;
+    tbb::enumerable_thread_specific<std::array<int, interactionListSize>> ilist;
+    tbb::enumerable_thread_specific<std::array<int, nodeListSize>> nlist;
 
     template <typename BufferType>
     void calcMortonCodes(const BufferType& pb)
@@ -730,7 +730,7 @@ int main()
 
 //    tbb::task_scheduler_init init(1);
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(50000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(5000);
 
     std::default_random_engine rng(161214);
     std::uniform_real_distribution<f1_t > dist(-2,2);
