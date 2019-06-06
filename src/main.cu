@@ -96,7 +96,10 @@ constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
 constexpr int maxLeafParticles = 16;
-constexpr int maxCriticalParticles = 64;
+constexpr int maxCriticalParticles = 256;
+constexpr int stackSizePerThread = 4096;
+constexpr int interactionListSize = 40000;
+constexpr int nodeListSize = 1000;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -146,7 +149,8 @@ f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
     f3_t cogeo = min + (l3d*0.5_ft);
     f1_t delta = length(com-cogeo);
     f1_t od = l / theta + delta;
-    return od*od;
+    f1_t od2 = od*od;
+    return (std::isnan(od2) ? std::numeric_limits<f1_t>::infinity() : od2);
 }
 
 f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
@@ -269,9 +273,14 @@ public:
 
         tbb::parallel_for( tbb::blocked_range<size_t>(0, criticalNodes.size()), [&](const auto &range)
         {
+            std::array<int, stackSizePerThread> buffer1;
+            std::array<int, stackSizePerThread> buffer2;
+            std::array<int, interactionListSize> ilist;
+            std::array<int, nodeListSize> nlist;
+
             for (auto i = range.begin(); i != range.end(); ++i)
             {
-                this->traverseTree(criticalNodes[i],pb);
+                this->traverseTree(criticalNodes[i],pb, &buffer1[0], &buffer2[0], &ilist[0], &nlist[0]);
             }
         });
 
@@ -574,25 +583,34 @@ private:
 
 
     template <typename BufferType>
-    void traverseTree(const CriticalNode& group, BufferType& pb) const
+    void traverseTree(const CriticalNode& group, BufferType& pb, int *stackWrite, int *stackRead, int *particleInteractionList, int* nodeInteractionList) const
     {
-        std::vector<int> nextLvl; // next level stack
-        std::vector<int> thisLvl; // current level stack
+        int *stackEndRead= stackRead;
+        int *stackEndWrite= stackWrite;
 
-        std::vector<int> groupNodeInteractions;
-        std::vector<int> groupParticleInteractions;
+        int *pilStart= particleInteractionList;
+        int *nilStart= nodeInteractionList;
 
         // add children of root
         for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
-            thisLvl.push_back(child);
+            *(stackWrite++) = child;
+
+        // swap stacks
+        stackRead = stackWrite;
+        stackWrite = stackEndRead;
+        std::swap(stackEndRead,stackEndWrite);
 
         f3_t com = openingData[group.nodeId].com;
 
-        // traverse the tree
-        while(!thisLvl.empty())
+        // traversal finished when this stack is empty directly after swapping
+        while(stackRead != stackEndRead)
         {
-            for(auto id : thisLvl)
+            // make this level stack empty
+            while(stackRead != stackEndRead)
             {
+                int id = *(--stackRead);
+
+                // self interaction is handled later
                 if(id == group.nodeId)
                     continue;
 
@@ -605,19 +623,25 @@ private:
                     if(links[id].isLeaf())
                     {
                         for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
-                            groupParticleInteractions.push_back(child);
+                            *(particleInteractionList++) = child;
                     } else
                         for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
-                            nextLvl.push_back(child);
+                            *(stackWrite++) = child;
                 } else
                 {
                     // no need to open it, so interact with it already
-                    groupNodeInteractions.push_back(id);
+                    *(nodeInteractionList++) = id;
                 }
             }
-            thisLvl = std::move(nextLvl);
-            nextLvl.clear();
+            // swap stacks
+            stackRead = stackWrite;
+            stackWrite = stackEndRead;
+            std::swap(stackEndRead,stackEndWrite);
+            assert_true(stackRead-stackEndRead < stackSizePerThread,"TREE","stack overflow during tree travers")
         }
+
+//        std::cout << "particle list size: " << particleInteractionList - pilStart
+//                    << " node list size: " << nodeInteractionList - nilStart << std::endl;
 
         // calculate the interactions
         for(int i = group.firstParticle; i < group.firstParticle + group.nParticles; i++)
@@ -625,8 +649,9 @@ private:
             Particle<POS,MASS,ACC> pi = pb.template loadParticle<POS,MASS>(i);
 
             // with nodes:
-            for(const auto j : groupNodeInteractions)
+            for(int index = 0; index < nodeInteractionList - nilStart; index++)
             {
+                int j = nilStart[index];
                 f3_t rij = pi.pos - openingData[j].com;
                 pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
             }
@@ -640,9 +665,9 @@ private:
             }
 
             // with particles in leafs:
-            for(const auto j : groupParticleInteractions)
+            for(int index = 0; index < particleInteractionList - pilStart; index++)
             {
-                Particle<POS,MASS> pj = pb.template loadParticle<POS,MASS>(j);
+                Particle<POS,MASS> pj = pb.template loadParticle<POS,MASS>(pilStart[index]);
                 f3_t rij = pi.pos - pj.pos;
                 pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
             }
@@ -707,7 +732,7 @@ int main()
 
     HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(50000);
 
-    std::default_random_engine rng(mpu::getRanndomSeed());
+    std::default_random_engine rng(161214);
     std::uniform_real_distribution<f1_t > dist(-2,2);
 
     for(int i =0; i<pb.size(); i++)
@@ -743,7 +768,7 @@ int main()
     std::cout << "Median error: " << error.first << std::endl;
     std::cout << "Mean error: " << error.second << std::endl;
 
-    myTree.print(0,10);
+    myTree.print(0,1);
 
 }
 
