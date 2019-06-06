@@ -95,7 +95,7 @@ constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
-constexpr int maxLeafParticles = 1;
+constexpr int maxLeafParticles = 16;
 constexpr int maxCriticalParticles = 256;
 constexpr int stackSizePerThread = 4096;
 constexpr int interactionListSize = 1000;
@@ -144,7 +144,7 @@ struct CriticalNode
 
 f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
 {
-    f3_t l3d = fabs(max - min);
+    f3_t l3d = max - min;
     f1_t l = fmax(fmax(l3d.x,l3d.y),l3d.z);
     f3_t cogeo = min + (l3d*0.5_ft);
     f1_t delta = length(com-cogeo);
@@ -581,6 +581,13 @@ private:
 
     }
 
+    f1_t minDistanceSquare(f3_t min, f3_t max, f3_t point) const
+    {
+        const f3_t dmin = fabs(min-point);
+        const f3_t dmax = fabs(max-point);
+        const f3_t mdv = fmin(dmin,dmax);
+        return dot(mdv,mdv);
+    }
 
     template <typename BufferType>
     void traverseTree(const CriticalNode& group, BufferType& pb, int *stackWrite, int *stackRead, int *particleInteractionList, int* nodeInteractionList) const
@@ -600,7 +607,8 @@ private:
         stackWrite = stackEndRead;
         std::swap(stackEndRead,stackEndWrite);
 
-        f3_t com = openingData[group.nodeId].com;
+        const f3_t min = aabbmin[group.nodeId];
+        const f3_t max = aabbmax[group.nodeId];
 
         // traversal finished when this stack is empty directly after swapping
         while(stackRead != stackEndRead)
@@ -615,9 +623,8 @@ private:
                     continue;
 
                 // check if node needs to be opened
-                const f3_t rij = com - openingData[id].com;
-                const f1_t r2 = dot(rij,rij);
-                if(r2 < openingData[id].od2)
+                const f1_t r2 = minDistanceSquare(min,max,openingData[id].com);
+                if(r2 <= openingData[id].od2)
                 {
                     // it needs to be opened, for leafs interact with all particles, for nodes add them to the next level stack
                     if(links[id].isLeaf())
@@ -740,6 +747,10 @@ int main()
         Particle<POS,MASS> p;
         p.mass = 1.0_ft/pb.size();
         p.pos = f3_t{dist(rng),dist(rng),dist(rng)};
+//        while(length(p.pos) > 2)
+//        {
+//            p.pos = f3_t{dist(rng), dist(rng), dist(rng)};
+//        }
         pb.storeParticle(i,p);
     }
 
