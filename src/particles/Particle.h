@@ -44,7 +44,7 @@ public:
 
     using attributes = std::tuple<Args...>;
 
-    CUDAHOSTDEV constexpr size_t numAttributes() //!< the number of attributes this particle has
+    CUDAHOSTDEV static constexpr size_t numAttributes() //!< the number of attributes this particle has
     {
         return std::tuple_size<attributes >::value;
     }

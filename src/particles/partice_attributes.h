@@ -49,6 +49,7 @@ public: \
     using type = member_type; \
     using is_derivative_of = is_deriv_of; \
     using bind_ref_to_t = r ## class_name; \
+    static constexpr const char* debugName() {return #class_name;} \
     \
     class_name()=default;\
     CUDAHOSTDEV explicit class_name(type v) : member_name(std::move(v)) {}\
@@ -68,6 +69,7 @@ public: \
     using bind_ref_to_t = class_name ; \
     using is_derivative_of = is_deriv_of; \
     using type = member_type; \
+    static constexpr const char* debugName() {return #class_name;} \
     \
     CUDAHOSTDEV explicit r ## class_name(member_type & v) : member_name(v) {} \
     CUDAHOSTDEV explicit r ## class_name(class_name & v) : member_name(v. member_name) {} \
