@@ -57,7 +57,6 @@ if(NOT mpUtils_CUDA_AVAILIBLE)
     message(SEND_ERROR "The mpUtils instalation was compiled without cuda support, however cuda support is needed.")
 endif()
 
-
 # -------------------------------------------------------------
 # create target
 # -------------------------------------------------------------
@@ -118,6 +117,12 @@ else()
             ${CMAKE_CURRENT_SOURCE_DIR}/settings
         )
 endif()
+
+# -------------------------------------------------------------
+# add dependencies from "external" folder
+# -------------------------------------------------------------
+add_subdirectory(external/HighFive)
+target_link_libraries(GraSPH2 HighFive)
 
 
 # -------------------------------------------------------------

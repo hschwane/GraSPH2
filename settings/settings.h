@@ -34,7 +34,7 @@ constexpr f1_t timestep=0.0002;
 
 // storing results as file
 #define STORE_RESULTS
-constexpr char RESULT_FOLDER[] = "/home/hendrik/test/"; // results will be stored in this folder
+constexpr char RESULT_FOLDER[] = "/home/emma/test/"; // results will be stored in this folder
 constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk

@@ -20,6 +20,7 @@
 #include <queue>
 #include <mutex>
 #include "particles/Particles.h"
+
 //--------------------
 
 // particle parameters that are saved to disk
@@ -91,6 +92,7 @@ private:
     };
 
     void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file
+    void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
 };
 
 
