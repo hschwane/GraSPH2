@@ -201,7 +201,7 @@ size_t getDimension<f2_t>()
 {return 2;}
 
 template <typename A>
-void writeAttributeDataset(const HostDiscPT& data, HighFive::File file)
+void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
 {
     //For the Dataset we need information about the dimensions of the data type, e.g. if its vec3, we want to get 3
     size_t dim = getDimension<A::type>();
@@ -228,7 +228,7 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File file)
 template<typename ...Args>
 struct writeAllParticles
 {
-    void operator()(const HostDiscPT &data, HighFive::File file)
+    void operator()(const HostDiscPT &data, HighFive::File& file)
     {
         int t[] = {0, ((void) (writeAttributeDataset<Args>(data, file)), 1)...};
         (void) t[0]; // silence compiler warning about t being unused
@@ -246,5 +246,5 @@ void ResultStorageManager::printHDF5File(HostDiscPT& data, f1_t time)
 //    HighFive::DataSet dset = file.createDataSet(dataset_name, HighFive::DataSpace(data.size(),HostDiscPT::particleType::numAttributes()));
 
     mpu::instantiate_from_tuple_t<writeAllParticles, HostDiscPT::particleType::attributes> myWriteFunction;
-    myWriteFunction(data, file);
+    myWriteFunction(data, &file);
 }
