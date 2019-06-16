@@ -206,7 +206,7 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
     dims[1] = dim;
 
     //Create DataSpace for DataSet
-    HighFive::DataSpace dspace = DataSpace({data.size(),1}, {data.size(), 19})
+    HighFive::DataSpace dspace = HighFive::DataSpace({data.size(),1}, {data.size(), 19});
     // Create a new Dataset
     HighFive::DataSet dset = file.createDataSet(A::debugName(), dspace, dims);
 
