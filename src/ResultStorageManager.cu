@@ -180,10 +180,6 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     }
 }
 
-writeP(f3_t vec3, dataset) ...
-writeP(f2_t vec2, dataset) ...
-writeP(f1_t vec2, dataset) ...
-
 template<typename T>
 size_t getDimension()
 {return 0;}
