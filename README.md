@@ -125,3 +125,8 @@ You may also try to extend / modify the code yourself if you know any c++.
 CUDA knowledge is only required if you want to modify the deeper infrastructure
 of the code, not for extending the physical models.
 
+
+-----------------------
+## included 3rd party code
+
+[HighFive - Header-only C++ HDF5 interface](https://github.com/BlueBrain/HighFive)
