@@ -53,9 +53,11 @@ class Selection : public SliceTraits<Selection> {
     DataSpace _mem_space, _file_space;
     DataSet _set;
 
-    template <typename Derivate>
+#ifndef __CUDACC__ // this bugfix doeas not work with cuda -.-
+    template <typename T>
     friend class ::HighFive::SliceTraits;
     // absolute namespace naming due to GCC bug 52625
+#endif
 };
 }
 

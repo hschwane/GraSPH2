@@ -13,7 +13,6 @@
 
 // includes
 //--------------------
-#include <highfive/H5DataSpace.hpp>
 #include <highfive/H5DataSet.hpp>
 #include <highfive/H5DataSpace.hpp>
 #include <highfive/H5File.hpp>
@@ -200,18 +199,19 @@ template <typename A>
 void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
 {
     //For the Dataset we need information about the dimensions of the data type, e.g. if its vec3, we want to get 3
-    size_t dim = getDimension<A::type>();
+    size_t dim = getDimension<typename A::type>();
     std::vector<size_t> dims(2);
     dims[0] = data.size();
     dims[1] = dim;
 
     //Create DataSpace for DataSet
     HighFive::DataSpace dspace = HighFive::DataSpace({data.size(),1}, {data.size(), 19});
+
     // Create a new Dataset
-    HighFive::DataSet dset = file.createDataSet(A::debugName(), dspace, dims);
+    HighFive::DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, HighFive::AtomicType<f1_t>());
 
     //Since we've saved the dimensions of data in the variable dims, we cann just write the whole data at once without for loop
-    dset.write(data);
+    //    dset.write(data); -> nope, data is of type  const HostDiscPT& which hdf5 does not support. you will need to save every particle individually
 
     // create dataset ... A::debugName();
     /*for (int i = 0; i < data.size(); ++i)
@@ -242,5 +242,5 @@ void ResultStorageManager::printHDF5File(HostDiscPT& data, f1_t time)
 //    HighFive::DataSet dset = file.createDataSet(dataset_name, HighFive::DataSpace(data.size(),HostDiscPT::particleType::numAttributes()));
 
     mpu::instantiate_from_tuple_t<writeAllParticles, HostDiscPT::particleType::attributes> myWriteFunction;
-    myWriteFunction(data, &file);
+    myWriteFunction(data, file);
 }

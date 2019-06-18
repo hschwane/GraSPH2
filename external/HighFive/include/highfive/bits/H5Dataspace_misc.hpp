@@ -12,6 +12,7 @@
 #include <vector>
 #include <array>
 #include <initializer_list>
+#include <numeric>
 
 #include <H5Spublic.h>
 

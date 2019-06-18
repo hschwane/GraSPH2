@@ -20,7 +20,7 @@ endif()
 enable_language(CXX)
 enable_language(CUDA)
 enable_language(C)
-find_package(mpUtils 0.10.2 REQUIRED)
+find_package(mpUtils 0.10.1 REQUIRED)
 find_package(HDF5)
 
 # -------------------------------------------------------------
@@ -148,6 +148,7 @@ target_compile_definitions(GraSPH2 PRIVATE "GRASPH_VERSION_SHA=\"${VERSION_SHA1}
 
 target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread>)
 target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+#target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-v --keep>)
 if (USE_FAST_MATH)
     target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
     target_compile_definitions(GraSPH2 PRIVATE "USING_CUDA_FAST_MATH")
