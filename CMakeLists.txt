@@ -19,8 +19,9 @@ endif()
 # -------------------------------------------------------------
 enable_language(CXX)
 enable_language(CUDA)
-find_package(mpUtils 0.10.1 REQUIRED)
-
+enable_language(C)
+find_package(mpUtils 0.10.2 REQUIRED)
+find_package(HDF5)
 
 # -------------------------------------------------------------
 # set up project
@@ -121,8 +122,13 @@ endif()
 # -------------------------------------------------------------
 # add dependencies from "external" folder
 # -------------------------------------------------------------
-add_subdirectory(external/HighFive)
-target_link_libraries(GraSPH2 HighFive)
+if(HDF5_FOUND)
+    message(STATUS "libhdf5 found, hdf5 support enabled")
+    add_subdirectory(external/HighFive)
+    target_link_libraries(GraSPH2 HighFive)
+else()
+    message(WARNING "libhdf5 was not found. hdf5 support will be disabled")
+endif()
 
 
 # -------------------------------------------------------------
