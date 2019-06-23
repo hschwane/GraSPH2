@@ -268,6 +268,7 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
         // Create a new Dataset
         DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>(), props);
 
+        //One long float vector, in which the position/ density/ mass / vel is stored
         std::vector<float> res;
 
         // create dataset ... A::debugName();
