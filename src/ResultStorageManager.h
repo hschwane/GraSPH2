@@ -20,6 +20,9 @@
 #include <queue>
 #include <mutex>
 #include "particles/Particles.h"
+#include <highfive/H5DataSet.hpp>
+#include <highfive/H5DataSpace.hpp>
+#include <highfive/H5File.hpp>
 
 //--------------------
 
@@ -58,6 +61,19 @@ public:
 
     std::string getStartTime() const {return m_startTime;} //!< get the timestep when the simulation was started
 
+    struct attributeHDF5Printer
+    {
+    public:
+        template <typename T> CUDAHOSTDEV void operator()(T v);
+        explicit attributeHDF5Printer(std::vector<float>& s);
+        ~attributeHDF5Printer();
+    private:
+        std::vector<float>& m_data;
+    };
+
+    //Sorry that this is public, will be cleaned TO DO
+    //void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file); //Declaration of this function is here, because otherwise the attributeHDF5Printer would not be accessible within the function scope
+
 private:
 
     const std::string m_directory; //!< the directory where all the snapshots are saved
@@ -81,7 +97,7 @@ private:
     std::thread m_workerThread; //!< handle to the worker thread
     void worker(); //!< main function of the worker thread
 
-    struct attributePrinter
+    /*struct attributePrinter
     {
     public:
         template <typename T> CUDAHOSTDEV void operator()(T v);
@@ -91,7 +107,7 @@ private:
         std::ostream& m_stream;
     };
 
-    void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file
+    void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file*/
     void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
 };
 

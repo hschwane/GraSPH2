@@ -13,9 +13,6 @@
 
 // includes
 //--------------------
-#include <highfive/H5DataSet.hpp>
-#include <highfive/H5DataSpace.hpp>
-#include <highfive/H5File.hpp>
 #include "ResultStorageManager.h"
 //--------------------
 
@@ -92,7 +89,7 @@ ResultStorageManager::~ResultStorageManager()
     }
     m_workerThread.join();
 }
-
+/*
 template<typename T>
 void ResultStorageManager::attributePrinter::operator()(T v)
 {
@@ -169,6 +166,8 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     {
         auto p = data.loadParticle(i);
         p.doForEachAttribute(attributePrinter(file));
+        std::vector<float> res;
+        p.doForEachAttribute(attributeHDF5Printer(res));
     }
 
     if(file.fail())
@@ -177,7 +176,8 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
         logFlush();
         throw std::runtime_error("Could not write to output file.");
     }
-}
+}*/
+
 
 template<typename T>
 size_t getDimension()
@@ -195,30 +195,94 @@ template<>
 size_t getDimension<f2_t>()
 {return 2;}
 
+// Functions to convert particle data into atomic types
+
+template<typename T>
+void ResultStorageManager::attributeHDF5Printer::operator()(T v)
+{
+#ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
+    m_data.push_back(v);
+#endif
+}
+
+template<>
+void ResultStorageManager::attributeHDF5Printer::operator()(f2_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_data.push_back(v.x);
+    m_data.push_back(v.y);
+#endif
+}
+
+template<>
+void ResultStorageManager::attributeHDF5Printer::operator()(f3_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_data.push_back(v.x);
+    m_data.push_back(v.y);
+    m_data.push_back(v.z);
+#endif
+}
+
+template<>
+void ResultStorageManager::attributeHDF5Printer::operator()(f4_t v)
+{
+#ifndef __CUDA_ARCH__
+    m_data.push_back(v.x);
+    m_data.push_back(v.y);
+    m_data.push_back(v.z);
+    m_data.push_back(v.w);
+#endif
+}
+
+template<>
+void ResultStorageManager::attributeHDF5Printer::operator()(m3_t v)
+{
+#ifndef __CUDA_ARCH__
+    for(int i = 0; i < 9; ++i)
+    {
+        m_data.push_back(v(i));
+    }
+#endif
+}
+
+ResultStorageManager::attributeHDF5Printer::attributeHDF5Printer(std::vector<float>& s) : m_data(s)
+{
+}
+
+ResultStorageManager::attributeHDF5Printer::~attributeHDF5Printer()
+{
+}
+
 template <typename A>
 void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
 {
-    //For the Dataset we need information about the dimensions of the data type, e.g. if its vec3, we want to get 3
-    size_t dim = getDimension<typename A::type>();
-    std::vector<size_t> dims(2);
-    dims[0] = data.size();
-    dims[1] = dim;
-
-    //Create DataSpace for DataSet
-    HighFive::DataSpace dspace = HighFive::DataSpace({data.size(),1}, {data.size(), 19});
-
-    // Create a new Dataset
-    HighFive::DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, HighFive::AtomicType<f1_t>());
-
-    //Since we've saved the dimensions of data in the variable dims, we cann just write the whole data at once without for loop
-    //    dset.write(data); -> nope, data is of type  const HostDiscPT& which hdf5 does not support. you will need to save every particle individually
-
-    // create dataset ... A::debugName();
-    /*for (int i = 0; i < data.size(); ++i)
+    using namespace HighFive;
+    try
     {
-        auto p = data.loadParticle<A>(i);
-        dset.write(p);
-    }*/
+        //Create DataSpace for DataSet (min size and max size)
+        DataSpace dspace = HighFive::DataSpace({data.size(),1}, {data.size(), 19});
+        // Use chunking, since we use variable dimensions
+        DataSetCreateProps props;
+        props.add(Chunking(std::vector<hsize_t>{2, 2}));
+        // Create a new Dataset
+        DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>(), props);
+
+        std::vector<float> res;
+
+        // create dataset ... A::debugName();
+        for (int i = 0; i < data.size(); ++i)
+        {
+            auto p = data.loadParticle<A>(i);
+            std::vector<float> res;
+            p.doForEachAttribute(ResultStorageManager::attributeHDF5Printer(res));
+            dset.write(res);
+        }
+    }
+    catch(const Exception& err)
+    {
+        std::cerr << err.what() << std::endl;
+    }
 }
 
 template<typename ...Args>
@@ -238,8 +302,6 @@ void ResultStorageManager::printHDF5File(HostDiscPT& data, f1_t time)
 
     //Create HDF5 File and DataSet which stores the result of one time step (all attributes of all particles at this timestep)
     HighFive::File file(filename.str(), HighFive::File::ReadWrite | HighFive::File::Create | HighFive::File::Truncate);
-
-//    HighFive::DataSet dset = file.createDataSet(dataset_name, HighFive::DataSpace(data.size(),HostDiscPT::particleType::numAttributes()));
 
     mpu::instantiate_from_tuple_t<writeAllParticles, HostDiscPT::particleType::attributes> myWriteFunction;
     myWriteFunction(data, file);
