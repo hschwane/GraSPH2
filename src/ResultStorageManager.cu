@@ -261,12 +261,9 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
     try
     {
         //Create DataSpace for DataSet (min size and max size)
-        DataSpace dspace = HighFive::DataSpace({data.size(),1}, {data.size(), 19});
-        // Use chunking, since we use variable dimensions
-        DataSetCreateProps props;
-        props.add(Chunking(std::vector<hsize_t>{2, 2}));
+        DataSpace dspace = HighFive::DataSpace({data.size(),9}); // TODO: set correct value instead of 9
         // Create a new Dataset
-        DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>(), props);
+        DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
 
         //One long float vector, in which the position/ density/ mass / vel is stored
         std::vector<float> res;
@@ -277,7 +274,7 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
             auto p = data.loadParticle<A>(i);
             std::vector<float> res;
             p.doForEachAttribute(ResultStorageManager::attributeHDF5Printer(res));
-            dset.write(res);
+            dset.select({size_t(i),0},{1,res.size()}).write(res);
         }
     }
     catch(const Exception& err)
