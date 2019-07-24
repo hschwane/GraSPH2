@@ -46,10 +46,10 @@ class Selection : public SliceTraits<Selection> {
     DataSet& getDataset();
     const DataSet& getDataset() const;
 
-  private:
+    /// this is only public because of cuda, do not touch yourself
     Selection(const DataSpace& memspace, const DataSpace& file_space,
               const DataSet& set);
-
+  private:
     DataSpace _mem_space, _file_space;
     DataSet _set;
 
