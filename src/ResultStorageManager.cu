@@ -178,22 +178,25 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     }
 }*/
 
-
-template<typename T>
-size_t getDimension()
+template<typename A>
+size_t getDim()
 {return 0;}
 
 template<>
-size_t getDimension<f1_t>()
-{return 1;}
-
-template<>
-size_t getDimension<f3_t>()
+size_t getDim<POS>()
 {return 3;}
 
 template<>
-size_t getDimension<f2_t>()
-{return 2;}
+size_t getDim<VEL>()
+{return 3;}
+
+template<>
+size_t getDim<MASS>()
+{return 1;}
+
+template<>
+size_t getDim<DENSITY>()
+{return 1;}
 
 // Functions to convert particle data into atomic types
 
@@ -260,8 +263,8 @@ void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
     using namespace HighFive;
     try
     {
-        //Create DataSpace for DataSet (min size and max size)
-        DataSpace dspace = HighFive::DataSpace({data.size(),9}); // TODO: set correct value instead of 9
+        //Create DataSpace for DataSet (min size and max size);
+        DataSpace dspace = HighFive::DataSpace({data.size(), getDim<A>()});
         // Create a new Dataset
         DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
 
