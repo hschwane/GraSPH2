@@ -61,19 +61,6 @@ public:
 
     std::string getStartTime() const {return m_startTime;} //!< get the timestep when the simulation was started
 
-    struct attributeHDF5Printer
-    {
-    public:
-        template <typename T> CUDAHOSTDEV void operator()(T v);
-        explicit attributeHDF5Printer(std::vector<float>& s);
-        ~attributeHDF5Printer();
-    private:
-        std::vector<float>& m_data;
-    };
-
-    //Sorry that this is public, will be cleaned TO DO
-    //void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file); //Declaration of this function is here, because otherwise the attributeHDF5Printer would not be accessible within the function scope
-
 private:
 
     const std::string m_directory; //!< the directory where all the snapshots are saved
@@ -97,7 +84,33 @@ private:
     std::thread m_workerThread; //!< handle to the worker thread
     void worker(); //!< main function of the worker thread
 
-    /*struct attributePrinter
+    // hdf5 file printing
+    void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
+
+    //!< functor to push a particle atrribute into a vector of floats
+    struct attributeHDF5Printer
+    {
+    public:
+        template <typename T> CUDAHOSTDEV void operator()(T v);
+        explicit attributeHDF5Printer(std::vector<f1_t>& s);
+    private:
+        std::vector<float>& m_data;
+    };
+
+    //!< helper template which prints all particles to a hdf5 file
+    template<typename ...Args> struct writeAllParticles
+    {
+        void operator()(const HostDiscPT& data, HighFive::File& file);
+    };
+
+    //!< writes for all particles one attribute to the dataset
+    template <typename A> static void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file);
+
+    // text file printing:
+    void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file*/
+
+    //!<
+    struct attributePrinter
     {
     public:
         template <typename T> CUDAHOSTDEV void operator()(T v);
@@ -107,8 +120,6 @@ private:
         std::ostream& m_stream;
     };
 
-    void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file*/
-    void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
 };
 
 

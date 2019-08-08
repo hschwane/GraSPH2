@@ -89,7 +89,7 @@ ResultStorageManager::~ResultStorageManager()
     }
     m_workerThread.join();
 }
-/*
+
 template<typename T>
 void ResultStorageManager::attributePrinter::operator()(T v)
 {
@@ -176,27 +176,7 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
         logFlush();
         throw std::runtime_error("Could not write to output file.");
     }
-}*/
-
-template<typename A>
-size_t getDim()
-{return 0;}
-
-template<>
-size_t getDim<POS>()
-{return 3;}
-
-template<>
-size_t getDim<VEL>()
-{return 3;}
-
-template<>
-size_t getDim<MASS>()
-{return 1;}
-
-template<>
-size_t getDim<DENSITY>()
-{return 1;}
+}
 
 // Functions to convert particle data into atomic types
 
@@ -204,6 +184,14 @@ template<typename T>
 void ResultStorageManager::attributeHDF5Printer::operator()(T v)
 {
 #ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
+    assert_critical(false,"ResultStorageManager","implement the attribute hdf5 printer for your data type");
+#endif
+}
+
+template<>
+void ResultStorageManager::attributeHDF5Printer::operator()(f1_t v)
+{
+#ifndef __CUDA_ARCH__
     m_data.push_back(v);
 #endif
 }
@@ -253,48 +241,33 @@ ResultStorageManager::attributeHDF5Printer::attributeHDF5Printer(std::vector<flo
 {
 }
 
-ResultStorageManager::attributeHDF5Printer::~attributeHDF5Printer()
-{
-}
-
 template <typename A>
-void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
+void ResultStorageManager::writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
 {
     using namespace HighFive;
-    try
-    {
-        //Create DataSpace for DataSet (min size and max size);
-        DataSpace dspace = HighFive::DataSpace({data.size(), getDim<A>()});
-        // Create a new Dataset
-        DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
 
-        //One long float vector, in which the position/ density/ mass / vel is stored
+    //Create DataSpace for DataSet (min size and max size);
+    DataSpace dspace = HighFive::DataSpace({data.size(), static_cast<size_t>(getDim<typename A::type>())});
+
+    // Create a new Dataset
+    DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
+
+    // fill the dataset
+    for (int i = 0; i < data.size(); ++i)
+    {
+        auto p = data.loadParticle<A>(i);
         std::vector<float> res;
-
-        // create dataset ... A::debugName();
-        for (int i = 0; i < data.size(); ++i)
-        {
-            auto p = data.loadParticle<A>(i);
-            std::vector<float> res;
-            p.doForEachAttribute(ResultStorageManager::attributeHDF5Printer(res));
-            dset.select({size_t(i),0},{1,res.size()}).write(res);
-        }
-    }
-    catch(const Exception& err)
-    {
-        std::cerr << err.what() << std::endl;
+        p.doForEachAttribute(ResultStorageManager::attributeHDF5Printer(res));
+        dset.select({size_t(i),0},{1,res.size()}).write(res);
     }
 }
 
 template<typename ...Args>
-struct writeAllParticles
+void ResultStorageManager::writeAllParticles<Args...>::operator()(const HostDiscPT &data, HighFive::File& file)
 {
-    void operator()(const HostDiscPT &data, HighFive::File& file)
-    {
-        int t[] = {0, ((void) (writeAttributeDataset<Args>(data, file)), 1)...};
-        (void) t[0]; // silence compiler warning about t being unused
-    }
-};
+    int t[] = {0, ((void) (writeAttributeDataset<Args>(data, file)), 1)...};
+    (void) t[0]; // silence compiler warning about t being unused
+}
 
 void ResultStorageManager::printHDF5File(HostDiscPT& data, f1_t time)
 {
