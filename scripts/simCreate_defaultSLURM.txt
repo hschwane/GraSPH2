@@ -6,13 +6,13 @@
 #SBATCH -D ./
 #
 #SBATCH -J GraSPH2
+#
 # Queue:
-#SBATCH --partition=gpu1
 # Node feature:
 #SBATCH --constraint="gpu"
 # Specify number of GPUs to use:
-#SBATCH --gres=gpu:1
-#SBATCH --mem=61000
+#SBATCH --gres=gpu:v100:1
+#SBATCH --mem=32000
 #
 # Number of nodes and MPI tasks per node:
 #SBATCH --nodes=1
