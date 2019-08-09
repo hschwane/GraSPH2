@@ -20,14 +20,15 @@
 #include <queue>
 #include <mutex>
 #include "particles/Particles.h"
-#include <highfive/H5DataSet.hpp>
-#include <highfive/H5DataSpace.hpp>
-#include <highfive/H5File.hpp>
+#include "outputSettings.h"
+
+#if defined(STORE_HDF5)
+    #include <highfive/H5DataSet.hpp>
+    #include <highfive/H5DataSpace.hpp>
+    #include <highfive/H5File.hpp>
+#endif
 
 //--------------------
-
-// particle parameters that are saved to disk
-using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>;
 
 //-------------------------------------------------------------------
 /**
@@ -84,10 +85,13 @@ private:
     std::thread m_workerThread; //!< handle to the worker thread
     void worker(); //!< main function of the worker thread
 
+    void printFile(HostDiscPT& data, f1_t time); //!< selects between different file formats
+
     // hdf5 file printing
+#if defined(STORE_HDF5)
     void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
 
-    //!< functor to push a particle atrribute into a vector of floats
+    //!< functor to push a particle attribute into a vector of floats
     struct attributeHDF5Printer
     {
     public:
@@ -105,11 +109,12 @@ private:
 
     //!< writes for all particles one attribute to the dataset
     template <typename A> static void writeAttributeDataset(const HostDiscPT& data, HighFive::File& file);
+#endif
 
     // text file printing:
     void printTextFile(HostDiscPT& data, f1_t time); //!< function to actually print data to a file*/
 
-    //!<
+    //!< functor to print a particle attribute to a stream
     struct attributePrinter
     {
     public:

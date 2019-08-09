@@ -29,6 +29,15 @@ ResultStorageManager::ResultStorageManager(std::string directory, std::string pr
     m_workerThread = std::thread(&ResultStorageManager::worker, this);
 }
 
+void ResultStorageManager::printFile(HostDiscPT& data, f1_t time)
+{
+#if defined(STORE_HDF5)
+    printHDF5File(data,time);
+#else
+    printTextFile(data,time);
+#endif
+}
+
 void ResultStorageManager::worker()
 {
     std::unique_lock<std::mutex> lck(m_workerMutex);
@@ -57,7 +66,7 @@ void ResultStorageManager::worker()
                     hostData = *deviceJob.first;
                     assert_cuda(cudaGetLastError());
 
-                    printHDF5File(hostData,deviceJob.second);
+                    printFile(hostData,deviceJob.second);
                     m_numberJobs--;
                     logDEBUG("ResultStorageManager") << "Results stored for t= " << deviceJob.second;
                 }
@@ -71,7 +80,7 @@ void ResultStorageManager::worker()
                     m_hostDiskCopy.pop();
                     hdc_lck.unlock();
 
-                    printHDF5File(*hostJob.first, hostJob.second);
+                    printFile(*hostJob.first, hostJob.second);
                     m_numberJobs--;
                     logDEBUG("ResultStorageManager") << "Results stored for t= " << hostJob.second;
                 }
@@ -166,8 +175,6 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     {
         auto p = data.loadParticle(i);
         p.doForEachAttribute(attributePrinter(file));
-        std::vector<float> res;
-        p.doForEachAttribute(attributeHDF5Printer(res));
     }
 
     if(file.fail())
@@ -178,7 +185,8 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
     }
 }
 
-// Functions to convert particle data into atomic types
+// functions for hdf5 output
+#if defined(STORE_HDF5)
 
 template<typename T>
 void ResultStorageManager::attributeHDF5Printer::operator()(T v)
@@ -280,3 +288,5 @@ void ResultStorageManager::printHDF5File(HostDiscPT& data, f1_t time)
     mpu::instantiate_from_tuple_t<writeAllParticles, HostDiscPT::particleType::attributes> myWriteFunction;
     myWriteFunction(data, file);
 }
+
+#endif

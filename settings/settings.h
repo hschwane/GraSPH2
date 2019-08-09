@@ -17,7 +17,8 @@
 #include "particles/Particles.h"
 // -------------------
 
-// This file contains all important settings for the GraSPH2 simulation code.
+// This file contains most important settings for the GraSPH2 simulation code.
+// see also other settings files in this directory
 // Entries of the style "constexpr type name = value" can be just be set to the value you need.
 // Entries of the style "#define NAME" are on/off switches. Comment out a line to turn the feature off.
 // You will find some additional settings in the headlessSettings.h and precisionSettings.h files.
@@ -31,13 +32,6 @@ constexpr Dim dimension=Dim::three;
 
 // the integration timestep for the constant timestep leapfrog integrator
 constexpr f1_t timestep=0.0002;
-
-// storing results as file
-#define STORE_RESULTS
-constexpr char RESULT_FOLDER[] = "/home/emma/test/"; // results will be stored in this folder
-constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
-constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
-constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 
 // enable / disable self gravity (gravitational constant is 1)
 #define ENABLE_SELF_GRAVITY

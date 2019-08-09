@@ -119,6 +119,7 @@ else()
         )
 endif()
 
+
 # -------------------------------------------------------------
 # add dependencies from "external" folder
 # -------------------------------------------------------------
@@ -157,6 +158,10 @@ endif ()
 # force c++17 if using opengl
 if(OPENGL_FRONTEND)
     set_target_properties(GraSPH2 PROPERTIES CXX_STANDARD 17)
+endif()
+
+if(HDF5_FOUND)
+    target_compile_definitions(GraSPH2 PRIVATE "HDF5_AVAILABLE")
 endif()
 
 # set -Wa,-I for resources search path
