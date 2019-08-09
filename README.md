@@ -24,7 +24,7 @@ To compile GraSPH2 yourself you will need:
 - CUDA 9
 - gcc 6.4
 - cmake 3.8 or higher
-- [mpUtils v0.9.3](http://www.github.com/hschwane/mpUtils)
+- [mpUtils v0.10.1](http://www.github.com/hschwane/mpUtils)
 
 If you want to use real time simulation / visualization you will additionally need:
 
@@ -105,14 +105,9 @@ See `src/settings/settings.h` for all options. You can also extend the main() fu
 
 ### results
 
-In the file `src/settings/settings.h` you can name a folder where simulation results are written.
-For each step of the simulation a new .tsv is generated. It contains
-one line for every particle using the following format:
-```
-POS_x \t POS_y \t POS_z \t MASS \t VEL_x \t VEL_y \t VEL_z \t DENSITY \n
-```
-This .tsv files can be opened for example by a text editor, a table calculation tool, python, etc.
-
+In the file `src/settings/outputSettings.h` you can name a folder where simulation results are written.
+For each step of the simulation a new file is generated. 
+You can use .tsv or hdf5 files if libhdf5 is availibe on your system.
 
 ## bugs / missing features / contributing
 
