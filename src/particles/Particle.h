@@ -62,7 +62,7 @@ public:
     template <typename T>
     CUDAHOSTDEV auto getAttribute() //!< get the value of the attribute T
     {
-        static_assert(mpu::index_of<T,attributes>::value > 0, "The attribute you are asking for does not exist.");
+        static_assert( mpu::index_of<T,attributes>::value >= 0, "The attribute you are asking for does not exist.");
         return T::getMember();
     }
 
@@ -75,7 +75,7 @@ public:
     template <typename T, typename V>
     CUDAHOSTDEV void setAttribute(const V& value) //!< set the value of attribute T
     {
-        static_assert(mpu::index_of<T,attributes>::value > 0, "The attribute you are asking for does not exist.");
+        static_assert(mpu::index_of<T,attributes>::value >= 0, "The attribute you are asking for does not exist.");
         return T::setMember(value);
     }
 
@@ -88,7 +88,7 @@ public:
     template <typename T>
     CUDAHOSTDEV auto& getAttributeRef() //!< get a reference to the attribute T
     {
-        static_assert(mpu::index_of<T,attributes>::value > 0, "The attribute you are asking for does not exist.");
+        static_assert(mpu::index_of<T,attributes>::value >= 0, "The attribute you are asking for does not exist.");
         return T::getMemberRef();
     }
 
@@ -101,16 +101,24 @@ public:
     template <typename T>
     CUDAHOSTDEV const auto& getAttributeRef() const //!< get a const reference to the attribute T
     {
-        static_assert(mpu::index_of<T,attributes>::value > 0, "The attribute you are asking for does not exist.");
+        static_assert(mpu::index_of<T,attributes>::value >= 0, "The attribute you are asking for does not exist.");
         return T::getMemberRef();
     }
 
     template <typename F>
-    CUDAHOSTDEV void doForEachAttribute(F f) //!< execute functor for each attribute of the particle operator() of f needs to be static and over
+    CUDAHOSTDEV void doForEachAttribute(F f) //!< execute functor for each attribute of the particle operator() of f needs to be overloaded on the different datatypes
     {
         int t[] = {0, ((void)(f(Args::getMemberRef())),1)...};
         (void)t[0]; // silence compiler warning about t being unused
     }
+
+    template <typename F>
+    CUDAHOSTDEV static void doForEachAttributeType(F f) //!< execute functor for each attribute of the particle operator() of f needs to be templated and work on different particle attributes
+    {
+        int t[] = {0, ((void)(f.template operator()<Args>()),1)...};
+        (void)t[0]; // silence compiler warning about t being unused
+    }
+
 
     Particle()= default; //!< default construct particle values are undefined
 

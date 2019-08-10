@@ -22,6 +22,7 @@
 #include "initialConditions/InitGenerator.h"
 #include "initialConditions/particleSources/UniformSphere.h"
 #include "initialConditions/particleSources/TextFile.h"
+#include "initialConditions/particleSources/HDF5File.h"
 #include "frontends/frontendInterface.h"
 #include "particles/Particles.h"
 #include "sph/kernel.h"
@@ -372,12 +373,15 @@ int main()
 #if defined(READ_FROM_FILE)
     generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
 #elif defined(ROTATING_UNIFORM_SPHERE)
-    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
+//    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
     generator.addParticles( ps::PlummerSphere(particle_count,plummer_radius,plummer_cutoff,tmass,rho0).addAngularVelocity(angVel), true, true);
 #endif
 
+    generator.addParticles(ps::HDF5File<particleToRead>("/home/hendrik/test.h5"));
+
     auto hpb = generator.generate();
+    return 0;
 
     // create cuda buffer
     DeviceParticlesType pb(hpb.size());

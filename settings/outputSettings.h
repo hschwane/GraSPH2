@@ -11,6 +11,8 @@
 #ifndef GRASPH2_OUTPUTSETTINGS_H
 #define GRASPH2_OUTPUTSETTINGS_H
 
+#include "types.h"
+#include "particles/Particles.h"
 
 // --------------------------------
 // settings about how output data is stored
@@ -22,14 +24,14 @@ constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
 using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>; // particle attributes to be stored
-//#define STORE_HDF5 // use hdf5 files instead of
+#define STORE_HDF5 // use hdf5 files instead of
 
 // DO NOT MODIFY BELOW HERE
 //-------------------------------------------------------------------------
 // DO NOT MODIFY BELOW HERE
 // check if options are valid...
 
-#if defined(STORE_HDF5) && !(HDF5_AVAILABLE)
+#if defined(STORE_HDF5) && !( defined(HDF5_AVAILABLE))
     #warning "App was not compiled with hdf5 libhdf5. Output will use text files instead."
     #undef STORE_HDF5
 #endif

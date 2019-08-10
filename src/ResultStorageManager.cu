@@ -260,13 +260,16 @@ void ResultStorageManager::writeAttributeDataset(const HostDiscPT& data, HighFiv
     // Create a new Dataset
     DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
 
+    std::vector<float> res;
+    res.reserve(9);
+    ResultStorageManager::attributeHDF5Printer printer(res);
     // fill the dataset
-    for (int i = 0; i < data.size(); ++i)
+    for (size_t i = 0; i < data.size(); ++i)
     {
         auto p = data.loadParticle<A>(i);
-        std::vector<float> res;
-        p.doForEachAttribute(ResultStorageManager::attributeHDF5Printer(res));
-        dset.select({size_t(i),0},{1,res.size()}).write(res);
+        printer(p.template getAttribute<A>());
+        dset.select({i,0},{1,res.size()}).write(res);
+        res.clear();
     }
 }
 

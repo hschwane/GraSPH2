@@ -10,7 +10,6 @@
 
 ### simulation feature
 - linear consistency fix and investigate angular momentum (not)conservation
-- variable timestep
 
 ### simulation management
 - make the compute derivatives function more organized
@@ -18,11 +17,11 @@
 - find better solution for 2D simulation
 
 ### integration
+- variable timestep
 - automatically integrate what is needed using TMP
 
 ### performance
 - somehow automatically adjust particle attributes based on options
-- optimize the functions in models.h
 
 
 ## low priority / ideas / long term projects
@@ -37,6 +36,7 @@
 - enhance compile time when using particle templates
 - have attributes that are the same for all particles in constant memory
 - better storage for long data types like matrices
+- better storage for vec3 / enable cpu vectorization
 
 ### simulation management
 - find better solution to switch options on and off
@@ -46,7 +46,8 @@
 - adaptive algorithms
 
 ### performance
-- check out shuffle operations an vote functions
+- profile and maybe optimize some functions 
+- check out shuffle operations and vote functions
 - add datastructures
 - try new graph style kernel launching
 - MPI support
@@ -58,13 +59,16 @@
 - different materials (using recursive kernel launches)
 
 ### output data handling
-- provide binary data format
 - provide python script to generate (3d html) plots USE: ipyvolume
 
 
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
+
+
+- update slurm scripts to work on new cobra gpus
+- add hdf5 support for storing files
 
 --- v0.4.0 --- 27.04.2018
 - add batch script to run simulations with different settings

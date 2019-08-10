@@ -44,7 +44,7 @@ template <typename ParticleToRead>
 class TextFile : public ParticleSource<ParticleToRead,TextFile<ParticleToRead>>
 {
 public:
-    TextFile(std::string filename, char seperator='\t'); //!< construct this using a filename and a seperator
+    TextFile(const std::string& filename, char seperator='\t'); //!< construct this using a filename and a seperator
     ~TextFile() override = default;
 
 private:
@@ -74,7 +74,7 @@ private:
 //-------------------------------------------------------------------
 
 template <typename ParticleToRead>
-TextFile<ParticleToRead>::TextFile(std::string filename, char seperator) : m_data(), m_seperator(seperator)
+TextFile<ParticleToRead>::TextFile(const std::string& filename, char seperator) : m_data(), m_seperator(seperator)
 {
     std::ifstream file(filename);
     if(!file.is_open())

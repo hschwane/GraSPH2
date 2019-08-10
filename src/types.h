@@ -56,33 +56,33 @@ enum class Dim
 #endif
 
 //!< helper functions to check how many floats or doubles are in a datatype
-template<typename A> int getDim();
+template<typename A> size_t getDim();
 
 //-------------------------------------------------------------------
 // template function definitions
 
-template<typename A> inline int getDim()
+template<typename A> inline size_t getDim()
 {return 0;}
 
-template<> inline int getDim<f1_t>()
+template<> inline size_t getDim<f1_t>()
 {return 1;}
 
-template<> inline int getDim<f2_t>()
+template<> inline size_t getDim<f2_t>()
 {return 2;}
 
-template<> inline int getDim<f3_t>()
+template<> inline size_t getDim<f3_t>()
 {return 3;}
 
-template<> inline int getDim<f4_t>()
+template<> inline size_t getDim<f4_t>()
 {return 4;}
 
-template<> inline int getDim<m2_t>()
+template<> inline size_t getDim<m2_t>()
 {return 4;}
 
-template<> inline int getDim<m3_t>()
+template<> inline size_t getDim<m3_t>()
 {return 9;}
 
-template<> inline int getDim<m4_t>()
+template<> inline size_t getDim<m4_t>()
 {return 16;}
 
 #endif //MPUTILS_TYPESETTINGS_H
