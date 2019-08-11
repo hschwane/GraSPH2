@@ -58,7 +58,7 @@ private:
         explicit datasetLoader(const HighFive::File& file, DsStorage& datasets, DsIdMap& datasetId);
         bool allAttributesInFile() {return m_allThere;}
 
-        template<typename T> void operator()();
+        template<typename T> CUDAHOSTDEV void operator()();
     private:
         bool m_allThere;
         const HighFive::File& m_fileToCheck;
@@ -70,7 +70,7 @@ private:
     {
     public:
         explicit attributeLoader(const HighFive::File& file, ParticleToRead& p, size_t id, DsStorage& datasets, DsIdMap& datasetId);
-        template<typename T> void operator()();
+        template<typename T> CUDAHOSTDEV void operator()();
     private:
         size_t m_id;
         ParticleToRead& m_particle;
@@ -111,6 +111,7 @@ template <typename ParticleToRead>
 template <typename T>
 void HDF5File<ParticleToRead>::datasetLoader::operator()()
 {
+#ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
     if( !m_fileToCheck.exist( T::debugName()) )
     {
         logWARNING("InitialConditions") << "Attribute " << T::debugName << " does not exist in file";
@@ -121,6 +122,7 @@ void HDF5File<ParticleToRead>::datasetLoader::operator()()
     std::pair<std::string,int> sdsp(T::debugName(), m_datasets.size());
     m_datasets.push_back(ds);
     m_datasetId.insert( sdsp );
+#endif
 }
 
 template <typename ParticleToRead>
@@ -142,7 +144,9 @@ template <typename ParticleToRead>
 template <typename T>
 void HDF5File<ParticleToRead>::attributeLoader::operator()()
 {
+#ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
     m_datasets[m_datasetId[T::debugName()]].select({m_id,0},{1,getDim<typename T::type>()}).read( reinterpret_cast<f1_t*>(&m_particle.template getAttributeRef<T>()));
+#endif
 }
 
 }
