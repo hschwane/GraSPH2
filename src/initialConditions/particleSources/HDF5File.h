@@ -19,6 +19,8 @@
 #include "../ParticleSource.h"
 #include <particles/Particles.h>
 #include <highfive/H5File.hpp>
+#include <unordered_map>
+#include <vector>
 //--------------------
 
 // namespace
@@ -37,7 +39,7 @@ template <typename ParticleToRead>
 class HDF5File : public ParticleSource<ParticleToRead,HDF5File<ParticleToRead>>
 {
 public:
-    HDF5File(const std::string& filename, char seperator='\t'); //!< construct this using a filename and a seperator
+    explicit HDF5File(const std::string& filename); //!< construct this using a filename and a seperator
     ~HDF5File() override = default;
 
 private:
@@ -45,29 +47,36 @@ private:
 
     HighFive::File m_file; //!< all lines from the file
 
-    std::unordered_map<std::string, HighFive::DataSet> m_datasets; //!< preload all datasets here
+    using DsIdMap = std::unordered_map<std::string, int>;
+    using DsStorage = std::vector<HighFive::DataSet>;
+    DsIdMap m_datasetId; //!< map dataset names to ids in vector
+    DsStorage m_datasets; //!< preload all datasets here
 
     struct datasetLoader
     {
     public:
-        explicit datasetLoader(const HighFive::File& file);
+        explicit datasetLoader(const HighFive::File& file, DsStorage& datasets, DsIdMap& datasetId);
         bool allAttributesInFile() {return m_allThere;}
 
         template<typename T> void operator()();
     private:
         bool m_allThere;
         const HighFive::File& m_fileToCheck;
+        DsStorage& m_datasets;
+        DsIdMap& m_datasetId;
     };
 
     struct attributeLoader
     {
     public:
-        explicit attributeLoader(const HighFive::File& file, ParticleToRead& p, size_t id);
+        explicit attributeLoader(const HighFive::File& file, ParticleToRead& p, size_t id, DsStorage& datasets, DsIdMap& datasetId);
         template<typename T> void operator()();
     private:
         size_t m_id;
         ParticleToRead& m_particle;
         const HighFive::File& m_hdf5file;
+        DsStorage& m_datasets;
+        DsIdMap& m_datasetId;
     };
 };
 
@@ -75,10 +84,10 @@ private:
 //-------------------------------------------------------------------
 
 template <typename ParticleToRead>
-HDF5File<ParticleToRead>::HDF5File(const std::string& filename, char seperator)
+HDF5File<ParticleToRead>::HDF5File(const std::string& filename)
     : m_file(filename, HighFive::File::ReadOnly)
 {
-    datasetLoader ac(m_file);
+    datasetLoader ac(m_file, m_datasets,m_datasetId);
     ParticleToRead::doForEachAttributeType(ac);
     if( !ac.allAttributesInFile())
     {
@@ -93,8 +102,8 @@ HDF5File<ParticleToRead>::HDF5File(const std::string& filename, char seperator)
 }
 
 template <typename ParticleToRead>
-HDF5File<ParticleToRead>::datasetLoader::datasetLoader(const HighFive::File& file)
-        : m_allThere(true), m_fileToCheck(file)
+HDF5File<ParticleToRead>::datasetLoader::datasetLoader(const HighFive::File& file, DsStorage& datasets, DsIdMap& datasetId)
+        : m_allThere(true), m_fileToCheck(file), m_datasets(datasets), m_datasetId(datasetId)
 {
 }
 
@@ -107,20 +116,25 @@ void HDF5File<ParticleToRead>::datasetLoader::operator()()
         logWARNING("InitialConditions") << "Attribute " << T::debugName << " does not exist in file";
         m_allThere = false;
     }
+
+    HighFive::DataSet ds = m_fileToCheck.getDataSet(T::debugName());
+    std::pair<std::string,int> sdsp(T::debugName(), m_datasets.size());
+    m_datasets.push_back(ds);
+    m_datasetId.insert( sdsp );
 }
 
 template <typename ParticleToRead>
 ParticleToRead HDF5File<ParticleToRead>::generateParticle(size_t id)
 {
     ParticleToRead p;
-    attributeLoader al(m_file,p,id);
+    attributeLoader al(m_file,p,id,m_datasets,m_datasetId);
     ParticleToRead::doForEachAttributeType(al);
     return p;
 }
 
 template <typename ParticleToRead>
-HDF5File<ParticleToRead>::attributeLoader::attributeLoader(const HighFive::File& file, ParticleToRead& p, size_t id)
-    : m_hdf5file(file), m_particle(p), m_id(id)
+HDF5File<ParticleToRead>::attributeLoader::attributeLoader(const HighFive::File& file, ParticleToRead& p, size_t id, DsStorage& datasets, DsIdMap& datasetId)
+    : m_hdf5file(file), m_particle(p), m_id(id), m_datasets(datasets), m_datasetId(datasetId)
 {
 }
 
@@ -128,8 +142,7 @@ template <typename ParticleToRead>
 template <typename T>
 void HDF5File<ParticleToRead>::attributeLoader::operator()()
 {
-    HighFive::DataSet ds = m_hdf5file.getDataSet(T::debugName());
-    ds.select({m_id,0},{1,getDim<typename T::type>()}).read( reinterpret_cast<f1_t*>(&m_particle.template getAttributeRef<T>()));
+    m_datasets[m_datasetId[T::debugName()]].select({m_id,0},{1,getDim<typename T::type>()}).read( reinterpret_cast<f1_t*>(&m_particle.template getAttributeRef<T>()));
 }
 
 }

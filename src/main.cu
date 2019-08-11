@@ -379,9 +379,7 @@ int main()
 #endif
 
     generator.addParticles(ps::HDF5File<particleToRead>("/home/hendrik/test.h5"));
-
     auto hpb = generator.generate();
-    return 0;
 
     // create cuda buffer
     DeviceParticlesType pb(hpb.size());
