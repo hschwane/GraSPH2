@@ -98,8 +98,8 @@ constexpr f1_t eps2 = 0.001_ft;
 constexpr int maxLeafParticles = 16;
 constexpr int maxCriticalParticles = 256;
 constexpr int stackSizePerThread = 4096;
-constexpr int interactionListSize = 1000;
-constexpr int nodeListSize = 1000;
+constexpr int interactionListSize = 8* 1000;
+constexpr int nodeListSize = 8* 1000;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -153,7 +153,7 @@ f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
     return (std::isnan(od2) ? std::numeric_limits<f1_t>::infinity() : od2);
 }
 
-f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
+CUDAHOSTDEV f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
 {
     // gravity
     const f1_t distSqr = r2 + eps2;
@@ -636,7 +636,7 @@ private:
                             *(stackWrite++) = child;
                 } else
                 {
-                    // no need to open it, so interact with it already
+                    // no need to open it, so put it into the interaction list
                     *(nodeInteractionList++) = id;
                 }
             }
@@ -644,7 +644,9 @@ private:
             stackRead = stackWrite;
             stackWrite = stackEndRead;
             std::swap(stackEndRead,stackEndWrite);
-            assert_true(stackRead-stackEndRead < stackSizePerThread,"TREE","stack overflow during tree travers")
+            assert_critical(stackRead-stackEndRead < stackSizePerThread,"TREE","stack overflow during tree travers")
+            assert_critical(particleInteractionList-pilStart < interactionListSize,"TREE","particle interaction list overflow")
+            assert_critical(nodeInteractionList-nilStart < interactionListSize,"TREE","node interaction list overflow")
         }
 
 //        std::cout << "particle list size: " << particleInteractionList - pilStart
@@ -728,6 +730,68 @@ std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
     return std::pair<f1_t,f1_t>(median,mean);
 }
 
+//!< calculate gravity naive on the gpu
+struct NaiveGPU
+{
+    // define particle attributes to use
+    using load_type = Particle<POS,MASS>; //!< particle attributes to load from main memory
+    using store_type = Particle<ACC>; //!< particle attributes to store to main memory
+    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
+    using pj_type = Particle<POS,MASS>; //!< the particle attributes to load from main memory of all the interaction partners j
+    //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
+    template<size_t n> using shared = SharedParticles<n,SHARED_POSM>;
+
+    //!< This function is executed for each particle before the interactions are computed.
+    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
+    {
+        pi.acc = {0,0,0};
+    }
+
+    //!< This function will be called for each pair of particles.
+    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
+    {
+        f3_t rij = pi.pos - pj.pos;
+        pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+    }
+
+    //!< This function will be called for particle i after the interactions with the other particles are computed.
+    CUDAHOSTDEV store_type do_after(pi_type& pi)
+    {
+        return pi;
+    }
+};
+
+void computeForcesNaiveOnGPU(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    mpu::HRStopwatch sw;
+
+    DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC> devpb(pb.size());
+
+    sw.pause();
+    std::cout << "GPU Memory allocation " << sw.getSeconds() *1000 << "ms" << std::endl;
+    sw.reset();
+
+    devpb = pb;
+
+    sw.pause();
+    std::cout << "Particle data upload took " << sw.getSeconds() *1000 << "ms" << std::endl;
+    sw.reset();
+
+    do_for_each_pair_fast<NaiveGPU>(devpb);
+    assert_cuda( cudaDeviceSynchronize());
+
+    sw.pause();
+    std::cout << "Naive force computation on GPU took " << sw.getSeconds() *1000 << "ms" << std::endl;
+    sw.reset();
+
+    pb = devpb;
+
+    std::cout << "Particle data download took " << sw.getSeconds() *1000 << "ms" << std::endl;
+}
+
+
+// TODO: fix distance calculation
+
 
 int main()
 {
@@ -737,7 +801,7 @@ int main()
 
 //    tbb::task_scheduler_init init(1);
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(5000);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1<<15);
 
     std::default_random_engine rng(161214);
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -747,10 +811,6 @@ int main()
         Particle<POS,MASS> p;
         p.mass = 1.0_ft/pb.size();
         p.pos = f3_t{dist(rng),dist(rng),dist(rng)};
-//        while(length(p.pos) > 2)
-//        {
-//            p.pos = f3_t{dist(rng), dist(rng), dist(rng)};
-//        }
         pb.storeParticle(i,p);
     }
 
@@ -761,27 +821,48 @@ int main()
 #endif
 
     HostTree myTree;
-    myTree.construct(pb);
-    myTree.update(pb);
 
+    std::cout << "\n-------------------------------------------\n CONSTRUCTION" << std::endl;
+
+    myTree.construct(pb);
+
+    std::cout << "\n-------------------------------------------\n TREE INFO" << std::endl;
+    myTree.print(0,1);
+
+    std::cout << "\n-------------------------------------------\n CPU" << std::endl;
+    myTree.update(pb);
     myTree.computeForces(pb);
 
-    auto pbRef = pb;
+    auto pbRefCpu = pb;
+    auto pbRefGPU = pb;
+    auto pbGPU = pb;
 
     mpu::HRStopwatch sw;
-    computeForcesNaive(pbRef);
+    computeForcesNaive(pbRefCpu);
+    sw.pause();
     std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
+
 //
 //    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
 //    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
 //
-    auto error = calcError(pb,pbRef);
+
+    std::cout << "\n-------------------------------------------\n GPU Naive" << std::endl;
+    computeForcesNaiveOnGPU(pbRefGPU);
+
+
+    std::cout << "\n-------------------------------------------\n ERORR" << std::endl;
+    std::cout << "CPU Tree" << std::endl;
+    auto error = calcError(pb, pbRefCpu);
     std::cout << "Median error: " << error.first << std::endl;
     std::cout << "Mean error: " << error.second << std::endl;
 
-    myTree.print(0,1);
-
+    std::cout << "GPU Naive" << std::endl;
+    error = calcError(pbRefCpu, pbRefGPU);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
 }
+
 
 
 
