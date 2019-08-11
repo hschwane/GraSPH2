@@ -213,7 +213,7 @@ void DEVICE_BASE<implementation>::registerGLGraphicsResource(uint32_t resourceID
 template <typename implementation>
 void DEVICE_BASE<implementation>::mapGraphicsResource()
 {
-    if(m_graphicsResource)
+    if(m_graphicsResource && m_data == nullptr)
     {
         size_t mappedBufferSize;
         assert_cuda(cudaGraphicsMapResources(1, &m_graphicsResource));
