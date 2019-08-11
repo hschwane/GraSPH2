@@ -281,6 +281,39 @@ struct integrateLeapfrog
 };
 
 /**
+ * @brief decides if file is hdf5 or text file and adds it to a particle generator
+ * @tparam LoadParticleType The type of particles expected in the file
+ * @param filename the path to the file to load
+ * @param generator reference to the generator where the file will be added to
+ * @param textfileSeperator in case of text file this is the seperator used
+ */
+template<typename LoadParticleType, typename GeneratorType>
+void loadParticlesFromFile(const std::string& filename, GeneratorType& generator, char textfileSeperator = '\t')
+{
+    auto fileEnding = filename.substr(filename.find_last_of('.')+1);
+    if(fileEnding == "h5")
+    {
+        logINFO("InitialConditions") << "Input file was detected to be a hdf5 file.";
+        generator.addParticles(ps::HDF5File<LoadParticleType>(filename));
+    }
+    else if(fileEnding == "tsv")
+    {
+        logINFO("InitialConditions") << "Input file treated as tsv file.";
+        generator.addParticles(ps::TextFile<LoadParticleType>(filename,'\t'));
+    }
+    else if(fileEnding == "csv")
+    {
+        logINFO("InitialConditions") << "Input file treated as csv file.";
+        generator.addParticles(ps::TextFile<LoadParticleType>(filename,','));
+    }
+    else
+    {
+        logINFO("InitialConditions") << "Input file treated as text file.";
+        generator.addParticles(ps::TextFile<LoadParticleType>(filename,textfileSeperator));
+    }
+}
+
+/**
  * @brief The main function of the simulation. Sets up the initial conditions and frontend and then manages running the simulation.
  *
  */
@@ -371,14 +404,13 @@ int main()
     InitGenerator<HostParticlesType> generator;
 
 #if defined(READ_FROM_FILE)
-    generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
+    loadParticlesFromFile<particleToRead>(FILENAME,generator,SEPERATOR);
 #elif defined(ROTATING_UNIFORM_SPHERE)
-//    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
+    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
 #elif defined(ROTATING_PLUMMER_SPHERE)
     generator.addParticles( ps::PlummerSphere(particle_count,plummer_radius,plummer_cutoff,tmass,rho0).addAngularVelocity(angVel), true, true);
 #endif
 
-    generator.addParticles(ps::HDF5File<particleToRead>("/home/hendrik/test.h5"));
     auto hpb = generator.generate();
 
     // create cuda buffer
