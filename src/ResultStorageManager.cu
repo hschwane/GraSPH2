@@ -188,67 +188,6 @@ void ResultStorageManager::printTextFile(HostDiscPT& data, f1_t time)
 // functions for hdf5 output
 #if defined(STORE_HDF5)
 
-template<typename T>
-void ResultStorageManager::attributeHDF5Printer::operator()(T v)
-{
-#ifndef __CUDA_ARCH__ // protection against calling from device code (mostly to shut up compiler warning)
-    assert_critical(false,"ResultStorageManager","implement the attribute hdf5 printer for your data type");
-#endif
-}
-
-template<>
-void ResultStorageManager::attributeHDF5Printer::operator()(f1_t v)
-{
-#ifndef __CUDA_ARCH__
-    m_data.push_back(v);
-#endif
-}
-
-template<>
-void ResultStorageManager::attributeHDF5Printer::operator()(f2_t v)
-{
-#ifndef __CUDA_ARCH__
-    m_data.push_back(v.x);
-    m_data.push_back(v.y);
-#endif
-}
-
-template<>
-void ResultStorageManager::attributeHDF5Printer::operator()(f3_t v)
-{
-#ifndef __CUDA_ARCH__
-    m_data.push_back(v.x);
-    m_data.push_back(v.y);
-    m_data.push_back(v.z);
-#endif
-}
-
-template<>
-void ResultStorageManager::attributeHDF5Printer::operator()(f4_t v)
-{
-#ifndef __CUDA_ARCH__
-    m_data.push_back(v.x);
-    m_data.push_back(v.y);
-    m_data.push_back(v.z);
-    m_data.push_back(v.w);
-#endif
-}
-
-template<>
-void ResultStorageManager::attributeHDF5Printer::operator()(m3_t v)
-{
-#ifndef __CUDA_ARCH__
-    for(int i = 0; i < 9; ++i)
-    {
-        m_data.push_back(v(i));
-    }
-#endif
-}
-
-ResultStorageManager::attributeHDF5Printer::attributeHDF5Printer(std::vector<float>& s) : m_data(s)
-{
-}
-
 template <typename A>
 void ResultStorageManager::writeAttributeDataset(const HostDiscPT& data, HighFive::File& file)
 {
@@ -260,16 +199,11 @@ void ResultStorageManager::writeAttributeDataset(const HostDiscPT& data, HighFiv
     // Create a new Dataset
     DataSet dset = file.createDataSet(std::string(A::debugName()), dspace, AtomicType<float>());
 
-    std::vector<float> res;
-    res.reserve(9);
-    ResultStorageManager::attributeHDF5Printer printer(res);
     // fill the dataset
     for (size_t i = 0; i < data.size(); ++i)
     {
         auto p = data.loadParticle<A>(i);
-        printer(p.template getAttribute<A>());
-        dset.select({i,0},{1,res.size()}).write(res);
-        res.clear();
+        dset.select({i,0},{1,getDim<typename A::type>()}).write(reinterpret_cast<f1_t*>(&p.template getAttributeRef<A>()));
     }
 }
 

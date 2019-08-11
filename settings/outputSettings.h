@@ -23,7 +23,7 @@ constexpr char RESULT_FOLDER[] = "/home/hendrik/test/"; // results will be store
 constexpr char RESULT_PREFIX[] = "graSPH2_"; // prefix for filename
 constexpr f1_t store_intervall=0.03; // simulation time between files (should be bigger then the simulation timestep)
 constexpr int maxJobs=10; // maximum number of snapshots to be stored in RAM, before simulation will be paused to save the files to disk
-using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY>; // particle attributes to be stored
+using HostDiscPT = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_DENSITY,HOST_DSTRESS>; // particle attributes to be stored
 #define STORE_HDF5 // use hdf5 files instead of
 
 // DO NOT MODIFY BELOW HERE

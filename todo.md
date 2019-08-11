@@ -66,6 +66,9 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.5.1 --- 11.08.2019
+- fix bugs on hdf5 loading and writing
+
 --- v0.5.0 --- 11.08.2019
 - update slurm scripts to work on new cobra gpus
 - allow file loading via drag and drop on the openGL frontend

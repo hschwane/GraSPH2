@@ -91,16 +91,6 @@ private:
 #if defined(STORE_HDF5)
     void printHDF5File(HostDiscPT& data, f1_t time); //!< function to actually print data to a HDF5 file
 
-    //!< functor to push a particle attribute into a vector of floats
-    struct attributeHDF5Printer
-    {
-    public:
-        template <typename T> CUDAHOSTDEV void operator()(T v);
-        explicit attributeHDF5Printer(std::vector<f1_t>& s);
-    private:
-        std::vector<float>& m_data;
-    };
-
     //!< helper template which prints all particles to a hdf5 file
     template<typename ...Args> struct writeAllParticles
     {
