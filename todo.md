@@ -66,11 +66,13 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
-
+--- v0.5.0 --- 11.08.2019
 - update slurm scripts to work on new cobra gpus
+- allow file loading via drag and drop on the openGL frontend
+- add hdf5 support for reading files
 - add hdf5 support for storing files
 
---- v0.4.0 --- 27.04.2018
+--- v0.4.0 --- 27.04.2019
 - add batch script to run simulations with different settings
 - add possibility to specify a custom location for settings
 - fix openGL frontend for double precision runs
@@ -92,7 +94,7 @@ for motivation, all finished todo entries are moved here instead of being delete
 - add new modifiers for the initial conditions
 - rework initial condition generation to work better with the new particle storage system
 
---- v0.3.0 --- 17.01.2018
+--- v0.3.0 --- 17.01.2019
 - option to use fast math computation to further enhance speed
 - add possibility to store result data with different particle attributes
 - improve performance of storing result data

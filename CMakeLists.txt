@@ -20,7 +20,7 @@ endif()
 enable_language(CXX)
 enable_language(CUDA)
 enable_language(C)
-find_package(mpUtils 0.10.2 REQUIRED)
+find_package(mpUtils 0.10.1 REQUIRED)
 find_package(HDF5)
 
 # -------------------------------------------------------------

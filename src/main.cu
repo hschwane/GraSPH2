@@ -292,7 +292,7 @@ template<typename LoadParticleType, typename GeneratorType>
 void loadParticlesFromFile(const std::string& filename, GeneratorType& generator, char textfileSeperator = '\t')
 {
     auto fileEnding = filename.substr(filename.find_last_of('.')+1);
-    if(fileEnding == "h5")
+    if(fileEnding == "h5" || fileEnding == "hdf5")
     {
         logINFO("InitialConditions") << "Input file was detected to be a hdf5 file.";
         generator.addParticles(ps::HDF5File<LoadParticleType>(filename));
@@ -430,6 +430,20 @@ int main()
     pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
     pb.registerGLGraphicsResource<DEV_DENSITY>(fnd::getDensityBuffer(pb.size()));
     pb.mapGraphicsResource();
+
+    // when file is dropped on window load it
+    fnd::setDropHandler([&](const std::string& filename)
+    {
+        InitGenerator<HostParticlesType> newGenerator;
+        loadParticlesFromFile<particleToRead>(filename,newGenerator,SEPERATOR);
+        hpb = newGenerator.generate();
+        pb = DeviceParticlesType(hpb.size());
+        pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
+        pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
+        pb.registerGLGraphicsResource<DEV_DENSITY>(fnd::getDensityBuffer(pb.size()));
+        pb.mapGraphicsResource();
+        pb = hpb;
+    });
 #endif
 
     // upload particles

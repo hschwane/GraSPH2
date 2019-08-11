@@ -226,7 +226,7 @@ void DEVICE_BASE<implementation>::mapGraphicsResource()
 template <typename implementation>
 void DEVICE_BASE<implementation>::unmapGraphicsResource()
 {
-    if(m_graphicsResource)
+    if(m_graphicsResource && m_data != nullptr)
     {
         assert_cuda(cudaGraphicsUnmapResources(1, &m_graphicsResource));
         m_data = nullptr;
@@ -236,8 +236,8 @@ void DEVICE_BASE<implementation>::unmapGraphicsResource()
 template <typename implementation>
 void DEVICE_BASE<implementation>::unregisterGraphicsResource()
 {
+    unmapGraphicsResource();
     assert_cuda(cudaGraphicsUnregisterResource(m_graphicsResource));
-    m_data=nullptr;
     m_graphicsResource = nullptr;
 }
 

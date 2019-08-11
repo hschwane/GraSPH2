@@ -81,8 +81,8 @@ to the console regularly and the program will terminate once the set time limit 
 ### interactive mode
 
 After launching the executable a window will open showing
-the initial conditions. Press "1" on your
-keyboard to start the simulation. You can pause it again at any time using the "2"
+the initial conditions. You can load also load a tsv or hdf5 file by dragging it onto the window.
+Press "1" on your keyboard to start the simulation. You can pause it again at any time using the "2"
 key. The Camera can be moved using "W", "A", "S" and "D", like in a video  game.
 To fly up and down use "Q" and "E". "+" and "-" can be used to change the cameras movement speed.
 The console will display some timing information.

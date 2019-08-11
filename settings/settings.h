@@ -48,6 +48,7 @@ constexpr f1_t timestep=0.0002;
 // represent the different particle attributes
 // The option "particleToRead" specifies the particle attributes to be read. For example Particle<POS,MASS,VEL,DENSITY> would assume the following file structure:
 // POS_x | POS_y | POS_z | MASS | VEL_x | VEL_y | VEL_z | DENSITY
+// hdf5 files are also supported and will be detected according to file ending
 //#define READ_FROM_FILE
 using particleToRead = Particle<POS,MASS,VEL,DENSITY>;
 constexpr char FILENAME[] = "/home/hendrik/inputData.tsv";

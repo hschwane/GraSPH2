@@ -25,6 +25,7 @@ uint32_t getPositionBuffer(size_t n);   //!< generate a position buffer and get 
 uint32_t getVelocityBuffer(size_t n);    //!< generate a velocity buffer and get its openGL id (only defined for the opgenGL frontend)
 uint32_t getDensityBuffer(size_t n);    //!< generate a density buffer and get its openGL id (only defined for the opgenGL frontend)
 void setPauseHandler(std::function<void(bool)> f); //!< the function f is called with true when the simulation should pause and with false when it should resume
+void setDropHandler(std::function<void(std::string)> f); //!< the function f is called when a file is dropped onto the openGL window
 bool handleFrontend(double t); //!< allow the frontend to do all its regular tasks. call in the main loop. pass the total simulated time in t. returns false if the app was terminated by the user
 void setParticleSize(float pradius); //!< set the particle size for openGL rendering
 

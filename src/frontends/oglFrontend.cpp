@@ -89,7 +89,8 @@ mpu::gph::Window &window()
     return _interalWindow;
 }
 
-std::function<void(bool)> pauseHandler; //!< function to be calles when the simulation needs to be paused
+std::function<void(bool)> pauseHandler; //!< function to be called when the simulation needs to be paused
+std::function<void(const std::string&)> dropHandler; //!< function is called when a file is dropped onto the window
 
 // opengl buffer
 size_t particleCount{0};
@@ -160,6 +161,12 @@ void recompileShader()
     shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
     shader.uniform1f("upperBound",upperBound);
     shader.uniform1f("lowerBound",lowerBound);
+}
+
+void window_drop_callback(GLFWwindow * w, int count, const char ** c)
+{
+    pauseHandler(true);
+    dropHandler(std::string(c[0]));
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -419,6 +426,13 @@ void setParticleSize(float pradius)
     using namespace oglFronted;
     particleRenderSize = pradius;
     shader.uniform1f("render_size",particleRenderSize);
+}
+
+void setDropHandler(std::function<void(std::string)> f)
+{
+    using namespace oglFronted;
+    dropHandler = f;
+    window().setDropCallbac(window_drop_callback);
 }
 
 }
