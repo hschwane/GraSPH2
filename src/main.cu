@@ -35,6 +35,7 @@
 ADD_RESOURCE(Settings,"settings.h");
 ADD_RESOURCE(HeadlessSettings,"headlessSettings.h");
 ADD_RESOURCE(PrecisionSettings,"precisionSettings.h");
+ADD_RESOURCE(OutputSettings,"outputSettings.h");
 
 constexpr f1_t H2 = H*H; //!< square of the smoothing length
 constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< spline kernel prefactor
@@ -313,14 +314,8 @@ void loadParticlesFromFile(const std::string& filename, GeneratorType& generator
     }
 }
 
-/**
- * @brief The main function of the simulation. Sets up the initial conditions and frontend and then manages running the simulation.
- *
- */
-int main()
+void printSettings(mpu::Log& log)
 {
-    mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
-
     std::string buildType;
 #if defined(NDEBUG)
     buildType = "Release";
@@ -328,27 +323,7 @@ int main()
     buildType = "Debug";
 #endif
 
-#if defined(STORE_RESULTS)
-    // set up file saving engine
-    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
-    // setup log output file
-    myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
-    // collect all settings and print them into a file
-    {
-        mpu::Resource headlessSettings = LOAD_RESOURCE(HeadlessSettings);
-        mpu::Resource precisionSettings = LOAD_RESOURCE(PrecisionSettings);
-        mpu::Resource settings = LOAD_RESOURCE(Settings);
-        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
-        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
-                        << std::string(headlessSettings.data(), headlessSettings.size())
-                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
-                        << std::string(precisionSettings.data(), precisionSettings.size())
-                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
-                        << std::string(settings.data(), settings.size());
-    }
-#endif
-
-    myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
+    log.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
     logINFO("GraSPH2") << "Welcome to GraSPH2!";
 #if defined(SINGLE_PRECISION)
     logINFO("GraSPH2") << "Running in single precision mode.";
@@ -361,39 +336,73 @@ int main()
     assert_cuda(cudaSetDevice(0));
 
     // print some important settings to the console
-    myLog.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
-                        << "Integration:"
-                        << "Leapfrog"
-                        << "Timestep: constant, " << timestep << "\n"
-                        << "Initial Conditions:\n"
-                #if defined(READ_FROM_FILE)
-                        << "Data is read from: " << FILENAME << "\n"
-                #elif defined(ROTATING_UNIFORM_SPHERE)
-                        << "Using a random uniform sphere with radius " << spawn_radius << "\n"
+    log.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
+                                   << "Integration:"
+                                   << "Leapfrog"
+                                   << "Timestep: constant, " << timestep << "\n"
+                                   << "Initial Conditions:\n"
+                                   #if defined(READ_FROM_FILE)
+                                   << "Data is read from: " << FILENAME << "\n"
+                                   #elif defined(ROTATING_UNIFORM_SPHERE)
+                                   << "Using a random uniform sphere with radius " << spawn_radius << "\n"
+                                   << "Total mass: " << tmass << "\n"
+                                   << "Number of particles: " << particle_count << "\n"
+                                   << "additional angular velocity: " << angVel << "\n"
+                                   #elif defined(ROTATING_PLUMMER_SPHERE)
+                                   << "Using a Plummer distribution with core radius " << plummer_radius << " and cutoff " << plummer_cutoff << "\n"
                         << "Total mass: " << tmass << "\n"
                         << "Number of particles: " << particle_count << "\n"
                         << "additional angular velocity: " << angVel << "\n"
-                #elif defined(ROTATING_PLUMMER_SPHERE)
-                        << "Using a Plummer distribution with core radius " << plummer_radius << " and cutoff " << plummer_cutoff << "\n"
-                        << "Total mass: " << tmass << "\n"
-                        << "Number of particles: " << particle_count << "\n"
-                        << "additional angular velocity: " << angVel << "\n"
-                #endif
-                        << "Compressed radius set to " << compressesd_radius << "\n"
-                        << "resulting in particle radius of " << pradius << "\n"
-                        << "and smoothing length " << H << "\n"
-                        << "Material Settings:\n"
-                        << "material density: " << rho0 << "\n"
-                        << "speed of sound: " << SOUNDSPEED << "\n"
-                        << "bulk-modulus: " << BULK << "\n"
-                        << "shear-modulus: " << shear << "\n"
-                        << "Environment Settings:\n"
-                #if defined(CLOHESSY_WILTSHIRE)
-                        << "Clohessy-Wiltshire enabled with n = " << cw_n << "\n";
-                #else
-                        << "Clohessy-Wiltshire disabled" << "\n"
-                #endif
-                        ;
+                                   #endif
+                                   << "Compressed radius set to " << compressesd_radius << "\n"
+                                   << "resulting in particle radius of " << pradius << "\n"
+                                   << "and smoothing length " << H << "\n"
+                                   << "Material Settings:\n"
+                                   << "material density: " << rho0 << "\n"
+                                   << "speed of sound: " << SOUNDSPEED << "\n"
+                                   << "bulk-modulus: " << BULK << "\n"
+                                   << "shear-modulus: " << shear << "\n"
+                                   << "Environment Settings:\n"
+                                   #if defined(CLOHESSY_WILTSHIRE)
+                                   << "Clohessy-Wiltshire enabled with n = " << cw_n << "\n";
+                                   #else
+                                   << "Clohessy-Wiltshire disabled" << "\n"
+                                   #endif
+            ;
+}
+
+/**
+ * @brief The main function of the simulation. Sets up the initial conditions and frontend and then manages running the simulation.
+ *
+ */
+int main()
+{
+    mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
+
+#if defined(STORE_RESULTS)
+    // set up file saving engine
+    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
+    // setup log output file
+    myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
+    // collect all settings and print them into a file
+    {
+        mpu::Resource headlessSettings = LOAD_RESOURCE(HeadlessSettings);
+        mpu::Resource precisionSettings = LOAD_RESOURCE(PrecisionSettings);
+        mpu::Resource outputSettings = LOAD_RESOURCE(OutputSettings);
+        mpu::Resource settings = LOAD_RESOURCE(Settings);
+        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
+        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
+                        << std::string(headlessSettings.data(), headlessSettings.size())
+                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
+                        << std::string(precisionSettings.data(), precisionSettings.size())
+                        << "\n\n\n//////////////////////////\n// outputSettings.h \n//////////////////////////\n\n"
+                        << std::string(outputSettings.data(), outputSettings.size())
+                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
+                        << std::string(settings.data(), settings.size());
+    }
+#endif
+
+    printSettings(myLog);
 
     // set up frontend
     fnd::initializeFrontend();
