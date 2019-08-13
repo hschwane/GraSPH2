@@ -66,6 +66,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- change output filenames for windows
+
 --- v0.5.1 --- 11.08.2019
 - fix bugs on hdf5 loading and writing
 

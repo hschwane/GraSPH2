@@ -22,7 +22,7 @@
 
 ResultStorageManager::ResultStorageManager(std::string directory, std::string prefix, int maxJobs)
     : m_directory(directory), m_prefix(prefix), m_terminateWorker(false), m_maxQueue(maxJobs),
-    m_numberJobs(0), m_startTime(mpu::timestamp("%Y-%m-%d_%H:%M"))
+    m_numberJobs(0), m_startTime(mpu::timestamp("%Y-%m-%d_%H-%M"))
 
 {
     assert_critical(m_maxQueue>1, "ResultStorageManager", "Can't work with Maximum job number below 1.")
