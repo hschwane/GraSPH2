@@ -182,7 +182,7 @@ struct cdB
                 const f3_t vij = pi.vel - pj.vel;
     #if defined(ARTIFICIAL_STRESS)
                 // artificial stress
-                const f1_t f = pow(kernel::Wspline(r, H, W_prefactor) / kernel::Wspline(normalsep, H, W_prefactor) , matexp;
+                const f1_t f = pow(kernel::Wspline(r, H, W_prefactor) / kernel::Wspline(normalsep, H, W_prefactor) , matexp);
                 stress += f*(arts_i + artificialStress(mateps, sigOverRho_j));
     #endif
 
