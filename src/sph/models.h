@@ -205,8 +205,8 @@ m3_t dstress_dt(const m3_t &edot, const m3_t &rdot, const m3_t &dstress, const f
                 if(d == e)
                     dstress_dt[d][e] -= 2.0_ft * shear * edot[f][f] / 3.0_ft;
 
-                dstress_dt[d][e] += dstress[d][f] * rdot[f][e];
-                dstress_dt[d][e] -= dstress[f][e] * rdot[d][f];
+                dstress_dt[d][e] += dstress[d][f] * rdot[e][f];
+                dstress_dt[d][e] += dstress[e][f] * rdot[d][f];
             }
 
         }
