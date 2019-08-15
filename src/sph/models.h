@@ -195,18 +195,18 @@ void addStrainRateAndRotationRate(m3_t &edot, m3_t &rdot, const f1_t mass_j, con
 
 m3_t dstress_dt(const m3_t &edot, const m3_t &rdot, const m3_t &dstress, const f1_t shear)
 {
-    m3_t dstress_dt(0);
+    m3_t dstress_dt;
     for(int d = 0; d < 3; ++d)
         for(int e = 0; e < 3; ++e)
         {
-            dstress_dt[d][e] += 2.0_ft * shear * edot[d][e];
+            dstress_dt[d][e] = 2.0_ft * shear * edot[d][e];
             for(int f = 0; f < 3; f++)
             {
                 if(d == e)
-                    dstress_dt[d][e] += 2.0_ft * shear * edot[f][f] / 3.0_ft;
+                    dstress_dt[d][e] -= 2.0_ft * shear * edot[f][f] / 3.0_ft;
 
-                dstress_dt[d][e] += dstress[d][f] * rdot[e][f];
-                dstress_dt[d][e] += dstress[e][f] * rdot[d][f];
+                dstress_dt[d][e] += dstress[d][f] * rdot[f][e];
+                dstress_dt[d][e] -= dstress[f][e] * rdot[d][f];
             }
 
         }
