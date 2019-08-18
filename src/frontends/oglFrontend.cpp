@@ -49,13 +49,13 @@ glm::vec3 particleColor     = {1.0,1.0,1.0}; // color used when color mode is se
 float particleAlpha = 1.0f;
 float materialShininess = 4.0f;
 double printIntervall       = 4.0;
-bool linkLightToCamera = false;
+bool linkLightToCamera = true;
 glm::vec3 lightPosition = {1000,500,500};
-glm::vec3 lightDiffuse = {0.6,0.6,0.6};
-glm::vec3 lightSpecular = {0.4,0.4,0.4};
-glm::vec3 lightAmbient = {0.2,0.2,0.2};
+glm::vec3 lightDiffuse = {0.5,0.5,0.5};
+glm::vec3 lightSpecular = {0.3,0.3,0.3};
+glm::vec3 lightAmbient = {0.1,0.1,0.1};
 bool renderFlatDisks = false;
-bool flatFalloff = true;
+bool flatFalloff = false;
 
 //--------------------
 
@@ -126,7 +126,7 @@ void recompileShader()
     shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH},{GEOM_SHADER_PATH}},definitions);
     shader.uniform1f("sphereRadius", particleRadius);
     shader.uniformMat4("view", glm::mat4(1.0f));
-    shader.uniformMat4("modelView", glm::mat4(1.0f));
+    shader.uniformMat4("model", glm::mat4(1.0f));
     shader.uniformMat4("projection", glm::mat4(1.0f));
     shader.uniform3f("defaultColor",particleColor);
     shader.uniform1f("materialAlpha",particleAlpha);
@@ -196,7 +196,7 @@ void initializeFrontend()
 
     camera().setMVP(&mvp);
     camera().setClip(0.001,20);
-    camera().setFOV(10);
+    camera().setFOV(45);
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }
@@ -288,7 +288,6 @@ bool handleFrontend(double t)
     vao.bind();
     shader.use();
     shader.uniformMat4("view", mvp.getView());
-    shader.uniformMat4("modelView", mvp.getModelView());
     shader.uniformMat4("projection", mvp.getProj());
     glDrawArrays(GL_POINTS, 0, particleCount);
 
@@ -376,8 +375,6 @@ bool handleFrontend(double t)
     }
     else if(!key_y && wasZpressed)
         wasZpressed = false;
-
-    std::cout << particleRadius << "  " << glm::to_string(camera().getPosition()) << std::endl;
 
     return window().update();
 }

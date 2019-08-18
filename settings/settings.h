@@ -68,7 +68,7 @@ constexpr f1_t plummer_radius = 1.0_ft; // plummer core radius
 
 // parameter for generated initial conditions
 constexpr f1_t tmass = 1.0_ft; // total mass of the sphere
-constexpr size_t particle_count=100; // number of particles
+constexpr size_t particle_count=1<<14; // number of particles
 constexpr f3_t angVel=f3_t{0,0,1}; // angular velocity of the cloud omega
 
 // set a value for the smoothing length H

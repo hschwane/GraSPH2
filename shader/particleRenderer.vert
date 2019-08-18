@@ -2,14 +2,16 @@
 
 #include "math.glsl"
 
-layout(location=0) in vec4 input_position; // positions where spheres are rendered
-layout(location=1) in vec4 input_velocity; // vector field for color
+layout(location=0) in vec3 input_position; // positions where spheres are rendered
+layout(location=1) in vec3 input_velocity; // vector field for color
 layout(location=2) in float input_density; // scalar field for color
 
 uniform vec3 defaultColor; // particle color in color mode 5
 uniform uint colorMode; // 1: color by vector field direction, 2: color by vector field magnitude, 3: color by scalar field, 0: constant color
 uniform float upperBound; // highest value of scalar field / vector field magnitude
 uniform float lowerBound; // lowest value of scalar field / vector field magnitude
+uniform mat4 model; // model matrix of the object
+
 
 out vec3 sphereColor;
 
@@ -19,16 +21,16 @@ out vec3 sphereColor;
 // for sphere imposter rendering
 void main()
 {
-	gl_Position = input_position;
+	gl_Position = model * vec4(input_position.xyz,1.0);
 
     switch(colorMode)
     {
     case 1: // vector field direction
-        if(iszero(vec4(input_velocity).xyz))
+        if(iszero(input_velocity))
             sphereColor = defaultColor;
         else
         {
-            sphereColor = 0.5f*normalize(vec4(input_velocity).xyz)+vec3(0.5f);
+            sphereColor = 0.5f*normalize(input_velocity)+vec3(0.5f);
         }
         break;
     case 2: // vector magnitude

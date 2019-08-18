@@ -37,7 +37,6 @@ uniform bool renderFlatDisks = false; // render disks instead of spheres
 uniform bool flatFalloff = false; // apply color falloff from center when using flat shading
 
 uniform mat4 view; // view matrix
-uniform mat4 modelView; // modelView matrix (model * view)
 uniform mat4 projection; // projection matrix
 
 // calculate 3d position on the sphere
@@ -116,7 +115,7 @@ void main()
             discard;
         }
 
-        // set the depth
+        // set the depth (since quads are rendered in front of actual)
         const vec4 clipPos = projection * viewPosOnPlane;
         gl_FragDepth = ((gl_DepthRange.diff * (clipPos.z / clipPos.w)) + gl_DepthRange.near + gl_DepthRange.far) / 2.0f;
 
