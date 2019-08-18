@@ -21,16 +21,6 @@
 namespace fnd {
 namespace oglFronted {
 
-//!< differnt falloff types
-enum class Falloff
-{
-    NONE,
-    LINEAR,
-    SQUARED,
-    CUBED,
-    ROOT
-};
-
 //!< different coloring modes
 enum class ColorMode
 {
@@ -47,42 +37,49 @@ std::string colorModeToString[] = {"constant","velocity","speed","density"};
 glm::uvec2 SIZE = {800,800}; //!< initial and current size of the window
 constexpr char TITLE[] = "sph";
 
+const bool enableVsync    = false;
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
-const bool enableVsync    = false;
-
-float particleRenderSize    = 0.0004f;
-float particleBrightness    = 1.0f;
-Falloff falloffStyle        = Falloff::LINEAR;
-bool perspectiveSize        = true;
-bool roundParticles         = true;
+float particleRadius    = 0.0004f;
 bool additiveBlending       = false;
 ColorMode colorMode      = ColorMode::CONSTANT;
 float upperBound = 1;   // upper bound of density / velocity transfer function
 float lowerBound = 0.001;   // lower bound of density / velocity transfer function
-glm::vec4 particleColor     = {1.0,1.0,1.0,1.0};
+glm::vec3 particleColor     = {1.0,1.0,1.0}; // color used when color mode is set to constant
+float particleAlpha = 1.0f;
+float materialShininess = 4.0f;
 double printIntervall       = 4.0;
+bool linkLightToCamera = false;
+glm::vec3 lightPosition = {1000,500,500};
+glm::vec3 lightDiffuse = {0.6,0.6,0.6};
+glm::vec3 lightSpecular = {0.4,0.4,0.4};
+glm::vec3 lightAmbient = {0.2,0.2,0.2};
+bool renderFlatDisks = false;
+bool flatFalloff = true;
 
-#if defined(DOUBLE_PRECISION)
-    using vecType=glm::dvec4;
-    using fType=double;
-    GLenum glType=GL_DOUBLE;
-#elif defined(SINGLE_PRECISION)
-    using vecType=glm::vec4;
-    using fType=float;
-    GLenum glType=GL_FLOAT;
-#endif
-
-constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
-constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
-
-constexpr int POS_BUFFER_BINDING = 0;
-constexpr int VEL_BUFFER_BINDING = 1;
-constexpr int DENSITY_BUFFER_BINDING = 2;
 //--------------------
 
 // internal global variables
 //--------------------
+
+#if defined(DOUBLE_PRECISION)
+using vecType=glm::dvec4;
+    using fType=double;
+    GLenum glType=GL_DOUBLE;
+#elif defined(SINGLE_PRECISION)
+using vecType=glm::vec4;
+using fType=float;
+GLenum glType=GL_FLOAT;
+#endif
+
+constexpr char FRAG_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.frag";
+constexpr char VERT_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.vert";
+constexpr char GEOM_SHADER_PATH[] = PROJECT_SHADER_PATH"particleRenderer.geom";
+
+constexpr int POS_BUFFER_BINDING = 0;
+constexpr int VEL_BUFFER_BINDING = 1;
+constexpr int DENSITY_BUFFER_BINDING = 2;
+
 mpu::gph::Window &window()
 {
     static mpu::gph::Window _interalWindow(SIZE.x, SIZE.y, TITLE);
@@ -119,48 +116,31 @@ bool wasZpressed=false;
 bool needInfoPrintingUpper=false;
 bool needInfoPrintingLower=false;
 bool needInfoPrintingSize=false;
-bool needInfoPrintingBrightness=false;
 
 //--------------------
 
 void recompileShader()
 {
     std::vector<mpu::gph::glsl::Definition> definitions;
-    if(perspectiveSize)
-        definitions.push_back({"PARTICLES_PERSPECTIVE"});
-    if(roundParticles)
-        definitions.push_back({"PARTICLES_ROUND"});
 
-    switch(falloffStyle)
-    {
-        case Falloff::LINEAR:
-            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter)"}});
-            break;
-        case Falloff::SQUARED:
-            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter*distFromCenter)"}});
-            break;
-        case Falloff::CUBED:
-            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-distFromCenter*distFromCenter*distFromCenter)"}});
-            break;
-        case Falloff::ROOT:
-            definitions.push_back({"PARTICLE_FALLOFF",{"color=color*(1-sqrt(distFromCenter))"}});
-            break;
-        case Falloff::NONE:
-        default:
-            definitions.push_back({"PARTICLE_FALLOFF",{""}});
-            break;
-    }
-
-    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH}},definitions);
-    shader.uniform2f("viewport_size", glm::vec2(SIZE));
-    shader.uniform1f("render_size", particleRenderSize);
-    shader.uniform1f("brightness", particleBrightness);
-    shader.uniformMat4("model_view_projection", glm::mat4(1.0f));
+    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH},{GEOM_SHADER_PATH}},definitions);
+    shader.uniform1f("sphereRadius", particleRadius);
+    shader.uniformMat4("view", glm::mat4(1.0f));
+    shader.uniformMat4("modelView", glm::mat4(1.0f));
     shader.uniformMat4("projection", glm::mat4(1.0f));
-    shader.uniform4f("defaultColor",particleColor);
+    shader.uniform3f("defaultColor",particleColor);
+    shader.uniform1f("materialAlpha",particleAlpha);
+    shader.uniform1f("materialShininess",materialShininess);
     shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
     shader.uniform1f("upperBound",upperBound);
     shader.uniform1f("lowerBound",lowerBound);
+    shader.uniform3f("light.position",lightPosition);
+    shader.uniform3f("light.diffuse",lightDiffuse);
+    shader.uniform3f("light.specular",lightSpecular);
+    shader.uniform3f("ambientLight",lightAmbient);
+    shader.uniform1b("lightInViewSpace",linkLightToCamera);
+    shader.uniform1b("renderFlatDisks",renderFlatDisks);
+    shader.uniform1b("flatFalloff",flatFalloff);
 }
 
 void window_drop_callback(GLFWwindow * w, int count, const char ** c)
@@ -174,7 +154,6 @@ void window_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0,0,width,height);
     camera().setAspect( float(width) / height);
     SIZE={width,height};
-    shader.uniform2f("viewport_size", glm::vec2(SIZE));
 }
 
 void setBlending(bool additive)
@@ -215,9 +194,9 @@ void initializeFrontend()
     shader.recreate();
     recompileShader();
 
-
     camera().setMVP(&mvp);
     camera().setClip(0.001,20);
+    camera().setFOV(10);
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }
@@ -308,7 +287,8 @@ bool handleFrontend(double t)
 
     vao.bind();
     shader.use();
-    shader.uniformMat4("model_view_projection", mvp.getModelViewProjection());
+    shader.uniformMat4("view", mvp.getView());
+    shader.uniformMat4("modelView", mvp.getModelView());
     shader.uniformMat4("projection", mvp.getProj());
     glDrawArrays(GL_POINTS, 0, particleCount);
 
@@ -370,41 +350,21 @@ bool handleFrontend(double t)
     // handle changes of particle size
     if(window().getKey(GLFW_KEY_R))
     {
-        particleRenderSize += (particleRenderSize+std::numeric_limits<float>::min())*0.5f*delta;
-        shader.uniform1f("render_size",particleRenderSize);
+        particleRadius += (particleRadius + std::numeric_limits<float>::min()) * 0.5f * delta;
+        shader.uniform1f("sphereRadius", particleRadius);
         needInfoPrintingSize=true;
 
     } else if(window().getKey(GLFW_KEY_F))
     {
-        particleRenderSize -= (particleRenderSize+std::numeric_limits<float>::min()) * 0.5f*delta;
-        particleRenderSize = (particleRenderSize < 0) ? 0 : particleRenderSize;
-        shader.uniform1f("render_size",particleRenderSize);
+        particleRadius -= (particleRadius + std::numeric_limits<float>::min()) * 0.5f * delta;
+        particleRadius = (particleRadius < 0) ? 0 : particleRadius;
+        shader.uniform1f("sphereRadius", particleRadius);
         needInfoPrintingSize=true;
     }
     else if(needInfoPrintingSize)
     {
-        logINFO("openGL Frontend") << "Rendered Particle Size: " << particleRenderSize;
+        logINFO("openGL Frontend") << "Rendered Particle Size: " << particleRadius;
         needInfoPrintingSize = false;
-    }
-
-    // handle changes of particle brightness
-    if(window().getKey(GLFW_KEY_T))
-    {
-        particleBrightness += (particleBrightness+std::numeric_limits<float>::min())*0.5f*delta;
-        shader.uniform1f("brightness",particleBrightness);
-        needInfoPrintingBrightness=true;
-
-    } else if(window().getKey(GLFW_KEY_G))
-    {
-        particleBrightness -= (particleBrightness+std::numeric_limits<float>::min()) * 0.5f*delta;
-        particleBrightness = (particleBrightness < 0) ? 0 : particleBrightness;
-        shader.uniform1f("brightness",particleBrightness);
-        needInfoPrintingBrightness=true;
-    }
-    else if(needInfoPrintingBrightness)
-    {
-        logINFO("openGL Frontend") << "Rendered Particle Brightness: " << particleBrightness;
-        needInfoPrintingBrightness = false;
     }
 
     bool key_y=window().getKey(GLFW_KEY_Y);
@@ -417,6 +377,7 @@ bool handleFrontend(double t)
     else if(!key_y && wasZpressed)
         wasZpressed = false;
 
+    std::cout << particleRadius << "  " << glm::to_string(camera().getPosition()) << std::endl;
 
     return window().update();
 }
@@ -424,8 +385,8 @@ bool handleFrontend(double t)
 void setParticleSize(float pradius)
 {
     using namespace oglFronted;
-    particleRenderSize = pradius;
-    shader.uniform1f("render_size",particleRenderSize);
+    particleRadius = pradius;
+    shader.uniform1f("sphereRadius", particleRadius);
 }
 
 void setDropHandler(std::function<void(std::string)> f)

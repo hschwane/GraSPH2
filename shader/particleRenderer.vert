@@ -1,62 +1,47 @@
-#version 450
+#version 450 core
 
 #include "math.glsl"
 
-layout(location=0) in vec4 input_position;
-layout(location=1) in vec4 input_velocity;
-layout(location=2) in float input_density;
+layout(location=0) in vec4 input_position; // positions where spheres are rendered
+layout(location=1) in vec4 input_velocity; // vector field for color
+layout(location=2) in float input_density; // scalar field for color
 
-uniform mat4 model_view_projection;
-uniform mat4 projection;
-uniform vec2 viewport_size;
-uniform float render_size;
-uniform vec4 defaultColor;
-uniform uint colorMode;
-uniform float upperBound;
-uniform float lowerBound;
+uniform vec3 defaultColor; // particle color in color mode 5
+uniform uint colorMode; // 1: color by vector field direction, 2: color by vector field magnitude, 3: color by scalar field, 0: constant color
+uniform float upperBound; // highest value of scalar field / vector field magnitude
+uniform float lowerBound; // lowest value of scalar field / vector field magnitude
 
-out vec2 center;
-out float radius;
-out vec4 vel_color;
+out vec3 sphereColor;
 
+// see https://github.com/tdd11235813/spheres_shader/tree/master/src/shader
+// and: https://paroj.github.io/gltut/Illumination/Tutorial%2013.html
+// as well as chapter 14 and 15
+// for sphere imposter rendering
 void main()
 {
-	gl_Position = model_view_projection * vec4(vec3(input_position),1);
-
-    float size = render_size;
-
-#ifdef PARTICLES_PERSPECTIVE
-	gl_PointSize = viewport_size.y * projection[1][1] * size / gl_Position.w;
-#else
-    gl_PointSize = size;
-#endif
+	gl_Position = input_position;
 
     switch(colorMode)
     {
-    case 1: // velocity
+    case 1: // vector field direction
         if(iszero(vec4(input_velocity).xyz))
-            vel_color = defaultColor;
+            sphereColor = defaultColor;
         else
         {
-            vec3 nv = 0.5f*normalize(vec4(input_velocity).xyz)+vec3(0.5f);
-            vel_color = vec4( nv, 1);
+            sphereColor = 0.5f*normalize(vec4(input_velocity).xyz)+vec3(0.5f);
         }
         break;
-    case 2: // speed
+    case 2: // vector magnitude
         float leng = smoothstep(lowerBound,upperBound,length(input_velocity));
-        vel_color = vec4((leng*2) +0.3, (leng) +0.1, (0.5*leng) +0.1,1);
+        sphereColor = vec3((leng*2.0f) +0.3f, (leng) +0.1f, (0.5f*leng) +0.1f);
         break;
-    case 3: // density
+    case 3: // scalar
         float rho = smoothstep(lowerBound , upperBound, input_density);
-        vel_color = vec4((rho*2) +0.3, (rho) +0.1, (0.5*rho) +0.1,1);
-//        vel_color = vec4(rho,0.5,0.5,1);
+        sphereColor = vec3((rho*2.0f) +0.3f, (rho) +0.1f, (0.5f*rho) +0.1f);
         break;
-    case 5: // constant
+    case 0: // constant
     default:
-        vel_color = defaultColor;
+        sphereColor = defaultColor;
         break;
     }
-
-	center = (0.5 * gl_Position.xy/gl_Position.w +0.5) * viewport_size;
-	radius = gl_PointSize / 2;
 }
