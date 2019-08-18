@@ -40,18 +40,18 @@ constexpr char TITLE[] = "sph";
 const bool enableVsync    = false;
 const glm::vec4 BG_COLOR = {0.3f,0.3f,0.3f,1};
 
-float particleRadius    = 0.0004f;
-bool additiveBlending       = false;
-ColorMode colorMode      = ColorMode::CONSTANT;
+float particleRadius = 0.0004f;
+bool additiveBlending = false;
+ColorMode colorMode = ColorMode::CONSTANT;
 float upperBound = 1;   // upper bound of density / velocity transfer function
 float lowerBound = 0.001;   // lower bound of density / velocity transfer function
 glm::vec3 particleColor     = {1.0,1.0,1.0}; // color used when color mode is set to constant
 float particleAlpha = 1.0f;
 float materialShininess = 4.0f;
-double printIntervall       = 4.0;
+double printIntervall = 4.0;
 bool linkLightToCamera = true;
-glm::vec3 lightPosition = {1000,500,500};
-glm::vec3 lightDiffuse = {0.5,0.5,0.5};
+glm::vec3 lightPosition = {500,500,1000};
+glm::vec3 lightDiffuse = {0.4,0.4,0.4};
 glm::vec3 lightSpecular = {0.3,0.3,0.3};
 glm::vec3 lightAmbient = {0.1,0.1,0.1};
 bool renderFlatDisks = false;
@@ -113,6 +113,9 @@ int frames{0};
 // input
 bool wasCpressed=false;
 bool wasZpressed=false;
+bool wasHpressed=false;
+bool wasUpressed=false;
+bool wasJpressed=false;
 bool needInfoPrintingUpper=false;
 bool needInfoPrintingLower=false;
 bool needInfoPrintingSize=false;
@@ -375,6 +378,38 @@ bool handleFrontend(double t)
     }
     else if(!key_y && wasZpressed)
         wasZpressed = false;
+
+    bool key_h=window().getKey(GLFW_KEY_H);
+    if( key_h && !wasHpressed)
+    {
+        linkLightToCamera = !linkLightToCamera;
+        shader.uniform1b("lightInViewSpace",linkLightToCamera);
+        wasHpressed=true;
+    }
+    else if(!key_h && wasHpressed)
+        wasHpressed = false;
+
+    bool key_u=window().getKey(GLFW_KEY_U);
+    if( key_u && !wasUpressed)
+    {
+        renderFlatDisks = !renderFlatDisks;
+        shader.uniform1b("renderFlatDisks",renderFlatDisks);
+        wasUpressed=true;
+    }
+    else if(!key_u && wasUpressed)
+        wasUpressed = false;
+
+
+    bool key_j=window().getKey(GLFW_KEY_J);
+    if( key_j && !wasJpressed)
+    {
+        flatFalloff = !flatFalloff;
+        shader.uniform1b("flatFalloff",flatFalloff);
+        wasJpressed=true;
+    }
+    else if(!key_j && wasJpressed)
+        wasJpressed = false;
+
 
     return window().update();
 }

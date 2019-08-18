@@ -88,8 +88,10 @@ To fly up and down use "Q" and "E". "+" and "-" can be used to change the camera
 The console will display some timing information.
 Press "C" to switch between different color visualization modes.
 Use "X" and "V" to scale the transfer function and "Y"and "B" to set the starting value.
-Keys "R" and "F" control the size of the rendered particles while "T" and "G" control the brightness.
-Use "Z" to turn additive blending on and off.
+Keys "R" and "F" control the size of the rendered particles.
+Use "Z" to turn additive blending on and off. "H" toggles the link between lights position and camera movement.
+"U" switches from spheres to flat disks and "J" toggles on a brightness falloff in disk mode
+Beware "Z" and "Y" will be swapped if you are on an english keyboard.
 
 ### settings
 

@@ -66,6 +66,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- better opengl visualization with real looking spheres
 - change output filenames for windows
 
 --- v0.5.1 --- 11.08.2019
