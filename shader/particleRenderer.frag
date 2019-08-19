@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_conservative_depth : require
 
-layout (depth_greater) out float gl_FragDepth; // enable early depth test
+//layout (depth_greater) out float gl_FragDepth; // enable early depth test
 
 struct Material
 {
@@ -35,6 +35,8 @@ uniform float materialShininess=4.0f; // material shininess
 
 uniform bool renderFlatDisks = false; // render disks instead of spheres
 uniform bool flatFalloff = false; // apply color falloff from center when using flat shading
+
+uniform bool enableEdgeHighlights = true; // draw dark rings on the edges
 
 uniform mat4 view; // view matrix
 uniform mat4 projection; // projection matrix
@@ -72,7 +74,7 @@ bool ImposterSphere(in const vec3 viewPosOnPlane, in const vec3 viewSphereCenter
 }
 
 // computes blinn phong lighting
-vec3 BlinnPhong(in const Material mat, in const Light light, in const vec3 viewPosition, in const vec3 viewNormal)
+vec3 BlinnPhong(in const Material mat, in const Light light, in const vec3 viewPosition, in const vec3 viewDir, in const vec3 viewNormal)
 {
     // compute light pos in view space
     vec3 viewLightPos;
@@ -83,7 +85,6 @@ vec3 BlinnPhong(in const Material mat, in const Light light, in const vec3 viewP
 
     // compute required directions
     const vec3 lightDir = normalize(viewLightPos-viewPosition);
-    const vec3 viewDir = normalize(-viewPosition);
 
     const vec3 halfAngle = normalize(lightDir + viewDir);
     const vec3 reflectDir = reflect(-lightDir, viewNormal);
@@ -136,8 +137,13 @@ void main()
             gl_FragDepth = ((gl_DepthRange.diff * (clipPos.z / clipPos.w)) + gl_DepthRange.near + gl_DepthRange.far) / 2.0f;
 
             // lighting
-            const vec3 color = BlinnPhong(mat, light, viewPosOnSphere, viewNormal);
+            const vec3 viewDir = normalize(-viewPosOnSphere);
+            const vec3 color = BlinnPhong(mat, light, viewPosOnSphere, viewDir, viewNormal);
             fragment_color = vec4(mat.ambient * ambientLight + color, mat.alpha);
+
+            if(enableEdgeHighlights && dot(viewNormal,viewDir) < 0.3)
+                fragment_color.xyz = vec3(0);
+
         }
         else // we are not on the sphere
         {

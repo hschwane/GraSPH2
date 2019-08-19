@@ -56,6 +56,7 @@ glm::vec3 lightSpecular = {0.3,0.3,0.3};
 glm::vec3 lightAmbient = {0.1,0.1,0.1};
 bool renderFlatDisks = false;
 bool flatFalloff = false;
+bool enableEdgeHighlights = false;
 
 //--------------------
 
@@ -116,6 +117,7 @@ bool wasZpressed=false;
 bool wasHpressed=false;
 bool wasUpressed=false;
 bool wasJpressed=false;
+bool wasTpressed=false;
 bool needInfoPrintingUpper=false;
 bool needInfoPrintingLower=false;
 bool needInfoPrintingSize=false;
@@ -144,6 +146,7 @@ void recompileShader()
     shader.uniform1b("lightInViewSpace",linkLightToCamera);
     shader.uniform1b("renderFlatDisks",renderFlatDisks);
     shader.uniform1b("flatFalloff",flatFalloff);
+    shader.uniform1b("enableEdgeHighlights",enableEdgeHighlights);
 }
 
 void window_drop_callback(GLFWwindow * w, int count, const char ** c)
@@ -409,6 +412,16 @@ bool handleFrontend(double t)
     }
     else if(!key_j && wasJpressed)
         wasJpressed = false;
+
+    bool key_t=window().getKey(GLFW_KEY_T);
+    if( key_t && !wasTpressed)
+    {
+        flatFalloff = !flatFalloff;
+        shader.uniform1b("enableEdgeHighlights",enableEdgeHighlights);
+        wasTpressed=true;
+    }
+    else if(!key_t && wasTpressed)
+        wasTpressed = false;
 
 
     return window().update();

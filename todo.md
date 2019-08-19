@@ -66,6 +66,7 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add edge highlighting to visualization
 - better opengl visualization with real looking spheres
 - change output filenames for windows
 
