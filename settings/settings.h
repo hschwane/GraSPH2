@@ -30,15 +30,26 @@
 //constexpr Dim dimension=Dim::two;
 constexpr Dim dimension=Dim::three;
 
-// the integration timestep for the constant timestep leapfrog integrator
-constexpr f1_t timestep=0.0002;
-
 // enable / disable self gravity (gravitational constant is 1)
 #define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
 #define ENABLE_SPH
 
+// -------------------
+// time integration
+
+// kick drift kick leapfrog using fixed timestep
+// density and deviatoric stress are updated during drift step
+#define FIXED_TIMESTEP_LEAPFROG
+constexpr f1_t timestep=0.0002; // timestep for fixed timestep leapfrog integrator
+
+// kick drift kick leapfrog using variable timestep
+// density and deviatoric stress are updated during drift step
+//#define VARIABLE_TIMESTEP_LEAPFROG
+constexpr f1_t initial_timestep=0.0002;
+constexpr f1_t min_timestep=0.000002;
+constexpr f1_t max_timestep=0.02;
 
 //--------------------
 // initial conditions
@@ -155,12 +166,18 @@ using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_BA
 // DO NOT MODIFY BELOW HERE
 // check if options are valid...
 
+#if defined(FIXED_TIMESTEP_LEAPFROG) && defined(VARIABLE_TIMESTEP_LEAPFROG)
+    #error "Choose only one integration method!"
+#elif !defined(FIXED_TIMESTEP_LEAPFROG) && !defined(VARIABLE_TIMESTEP_LEAPFROG)
+    #error "Choose an integration method!"
+#endif
+
 #if (defined(READ_FROM_FILE) && defined(ROTATING_UNIFORM_SPHERE)) || (defined(READ_FROM_FILE) && defined(ROTATING_PLUMMER_SPHERE)) || (defined(ROTATING_UNIFORM_SPHERE) && defined(ROTATING_PLUMMER_SPHERE))
     #error "Choose only one input method!"
 #endif
 
 #if defined(PLASTICITY_MIESE) && defined(PLASTICITY_MC)
-    #error "Choose one plasticity model, not both!"
+    #error "Choose up to one plasticity model, not both!"
 #endif
 
 #endif //GRASPH2_SETTINGS_H

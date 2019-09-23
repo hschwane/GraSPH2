@@ -30,6 +30,7 @@
 #include "sph/models.h"
 #include "ResultStorageManager.h"
 #include "settings.h"
+#include "integration.h"
 
 // compile setting files into resources
 ADD_RESOURCE(Settings,"settings.h");
@@ -230,58 +231,6 @@ void computeDerivatives(pbT& particleBuffer)
 }
 
 /**
- * @brief perform leapfrog integration on the particles also performs the plasticity calculations
- * @param particles the device copy to the particle buffer that stores the particles
- * @param dt the timestep for the integration
- * @param not_first_step set false for the first integration step of the simulation
- * @param tanfr tangens of the internal friction angle
- */
-struct integrateLeapfrog
-{
-    using load_type = Particle<POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>; //!< particle attributes to load from main memory
-    using store_type = Particle<POS,VEL,DENSITY,DSTRESS>; //!< particle attributes to store to main memory
-    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-
-    //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
-    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
-    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, f1_t dt, bool not_first_step)
-    {
-        //   calculate velocity a_t
-        p.vel = p.vel + p.acc * (dt * 0.5_ft);
-
-        // we could now change delta t here
-
-        // calculate velocity a_t+1/2
-        p.vel = p.vel + p.acc * (dt * 0.5_ft) * not_first_step;
-
-        // calculate position r_t+1
-#if defined(XSPH) && defined(ENABLE_SPH)
-        p.pos = p.pos + (p.vel + xsph_factor*p.xvel) * dt;
-#else
-        p.pos = p.pos + p.vel * dt;
-#endif
-
-#if defined(ENABLE_SPH)
-        // density
-        p.density = p.density + p.density_dt * dt;
-        if(p.density < 0.0_ft)
-            p.density = 0.0_ft;
-
-        // deviatoric stress
-        p.dstress += p.dstress_dt * dt;
-
-    #if defined(PLASTICITY_MC)
-        plasticity(p.dstress, mohrCoulombYieldStress( tanfr,eos::murnaghan(p.density,rho0, BULK, dBULKdP),cohesion));
-    #elif defined(PLASTICITY_MIESE)
-        plasticity(p.dstress,Y);
-    #endif
-
-#endif
-        return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
-    }
-};
-
-/**
  * @brief decides if file is hdf5 or text file and adds it to a particle generator
  * @tparam LoadParticleType The type of particles expected in the file
  * @param filename the path to the file to load
@@ -457,7 +406,7 @@ int main()
 
     // start simulating
     computeDerivatives(pb);
-    do_for_each<integrateLeapfrog>(pb,timestep,false);
+    integrate(pb,false);
 
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
@@ -473,7 +422,7 @@ int main()
 
             // run simulation
             computeDerivatives(pb);
-            do_for_each<integrateLeapfrog>(pb,timestep,true);
+            integrate(pb,true);
 
             simulatedTime += timestep;
 
