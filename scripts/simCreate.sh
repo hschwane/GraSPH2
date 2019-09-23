@@ -95,6 +95,11 @@ do
     esac
 done
 
+if [ -z $OUT_PATH ] ; then
+    echo "you need to provide a path to put your folders using the --path/-p option"
+    exit
+fi
+
 # initialize folders as necessary
 if [ "$INIT" = true ] ; then
 
