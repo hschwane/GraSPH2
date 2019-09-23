@@ -66,6 +66,8 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.6.0 --- 23.09.2019
+- better error message for simCreate script
 - add edge highlighting to visualization
 - better opengl visualization with real looking spheres
 - change output filenames for windows
