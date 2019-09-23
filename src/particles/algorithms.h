@@ -161,20 +161,6 @@ void do_for_each_pair_fast(deviceBuffer& pb, Ts...args);
 
 namespace detail {
 
-    template<typename ParticleType, typename buffer>
-    struct load_helper;
-
-    template<typename ...Args, typename buffer>
-    struct load_helper<Particle<Args...>, buffer>
-    {
-        CUDAHOSTDEV static auto load(const buffer &pb, size_t i)
-        {
-            return pb.template loadParticle<Args...>(i);
-        }
-    };
-
-
-
     template<typename job, typename deviceReference, typename ... Ts>
     __global__ void do_for_each_impl(deviceReference pb, Ts ... args)
     {
@@ -201,7 +187,7 @@ void do_for_each(hostBuffer& pb, Ts...args)
         job job_i;
 
         typename job::pi_type pi{};
-        pi = detail::load_helper< typename job::load_type, hostBuffer>::load(pb, i, args...);
+        pi = load_helper< typename job::load_type, hostBuffer>::load(pb, i, args...);
 
         typename job::store_type result = job_i.do_for_each(pi, i, args...);
         pb.storeParticle( i, result);
@@ -225,13 +211,13 @@ namespace detail {
             job job_i;
 
             typename job::pi_type pi{};
-            pi = detail::load_helper< typename job::load_type, deviceReference>::load(pb,i);
+            pi = load_helper< typename job::load_type, deviceReference>::load(pb,i);
 
             job_i.do_before( pi, i, args...);
 
             for(int j = 0; j < pb.size(); j++)
             {
-                const auto pj = detail::load_helper< typename job::pj_type, deviceReference>::load(pb,j);
+                const auto pj = load_helper< typename job::pj_type, deviceReference>::load(pb,j);
                 job_i.do_for_each_pair( pi, pj, args...);
 
             }
@@ -253,13 +239,13 @@ void do_for_each_pair(hostBuffer& pb, Ts...args)
         job job_i;
 
         typename job::pi_type pi{};
-        pi = detail::load_helper< typename job::load_type, hostBuffer>::load(pb,i);
+        pi = load_helper< typename job::load_type, hostBuffer>::load(pb,i);
 
         job_i.do_before( pi, i, args...);
 
         for(int j = 0; j < pb.size(); j++)
         {
-            const auto pj = detail::load_helper< typename job::pj_type, hostBuffer>::load(pb,j);
+            const auto pj = load_helper< typename job::pj_type, hostBuffer>::load(pb,j);
             job_i.do_for_each_pair( pi, pj, args...);
         }
 
@@ -291,7 +277,7 @@ namespace detail {
         {
             job job_i;
             typename job::pi_type pi{};
-            pi = detail::load_helper< typename job::load_type, deviceReference>::load(pb,i);
+            pi = load_helper< typename job::load_type, deviceReference>::load(pb,i);
 
             // do code before
             job_i.do_before( pi, i, args...);
@@ -303,21 +289,20 @@ namespace detail {
                 int loadIndex = tile*tileSize+threadIdx.x;
                 if( loadIndex < pb.size())
                 {
-                    const auto p = detail::load_helper< typename job::pj_type, deviceReference>::load(pb,loadIndex);
+                    const auto p = load_helper< typename job::pj_type, deviceReference>::load(pb,loadIndex);
                     shared.storeParticle(threadIdx.x,p);
                 }
                 __syncthreads();
 
                 for(int j = 0; j < thisTileSize && (j+remain < thisTileSize || tile < numTiles); j++)
                 {
-                    const auto pj = detail::load_helper< typename job::pj_type, SharedType>::load(shared,j);
+                    const auto pj = load_helper< typename job::pj_type, SharedType>::load(shared,j);
                     job_i.do_for_each_pair( pi, pj, args...);
                 }
                 __syncthreads();
             }
 
             typename job::store_type result = job_i.do_after( pi, args...);
-
 
             pb.storeParticle( i, result);
         }

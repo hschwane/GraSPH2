@@ -131,6 +131,10 @@ public:
     Particle(const Particle<T...> &b) : Args(ext_base_cast<Args>(b))... {} //!< construct a particle from another particle with different attributes
 
     template <typename... T>
+    CUDAHOSTDEV
+    Particle(Particle<T...> &b) : Args(ext_base_cast<Args>(b))... {} //!< construct a particle from another particle with different attributes
+
+    template <typename... T>
     CUDAHOSTDEV Particle<Args...>& operator=(const Particle<T...> &b)
     {
         int t[] = {0, ((void)Args::operator=(ext_base_cast<Args>(b)),1)...};
@@ -140,7 +144,7 @@ public:
 };
 
 //!< particle containing all possible attributes (avoid using if at all possible)
-using full_particle = mpu::instantiate_from_tuple_t<Particle,particle_base_order >;
+using full_particle = mpu::instantiate_from_tuple_t<Particle,particle_bases >;
 
 //-------------------------------------------------------------------
 // create particle in a save way
@@ -204,6 +208,24 @@ auto make_particle(ConstrArgs && ... args)
  */
 template <typename ...Args>
 using make_particle_t = decltype(make_particle<Args...>());
+
+//-------------------------------------------------------------------
+// load particles
+
+/**
+ * @brief loadHelper::load allows to load particle attributes from a particle buffer based on the attributes of ParticleType
+ */
+template<typename ParticleType, typename buffer>
+struct load_helper;
+
+template<typename ...Args, typename buffer>
+struct load_helper<Particle<Args...>, buffer>
+{
+    CUDAHOSTDEV static auto load(const buffer &pb, size_t i)
+    {
+        return pb.template loadParticle<Args...>(i);
+    }
+};
 
 //-------------------------------------------------------------------
 // merge multiple particles
