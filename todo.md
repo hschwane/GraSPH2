@@ -33,6 +33,7 @@
 - add python script support to generate initials
 
 ### particle management
+- add cpu host reference
 - enhance compile time when using particle templates
 - have attributes that are the same for all particles in constant memory
 - better storage for long data types like matrices

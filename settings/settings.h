@@ -41,12 +41,12 @@ constexpr Dim dimension=Dim::three;
 
 // kick drift kick leapfrog using fixed timestep
 // density and deviatoric stress are updated during drift step
-#define FIXED_TIMESTEP_LEAPFROG
-constexpr f1_t timestep=0.0002; // timestep for fixed timestep leapfrog integrator
+//#define FIXED_TIMESTEP_LEAPFROG
+constexpr f1_t fixed_timestep=0.0002; // timestep for fixed timestep leapfrog integrator
 
 // kick drift kick leapfrog using variable timestep
 // density and deviatoric stress are updated during drift step
-//#define VARIABLE_TIMESTEP_LEAPFROG
+#define VARIABLE_TIMESTEP_LEAPFROG
 constexpr f1_t initial_timestep=0.0002;
 constexpr f1_t min_timestep=0.000002;
 constexpr f1_t max_timestep=0.02;
@@ -153,8 +153,10 @@ constexpr f1_t xsph_factor = 0.5_ft;
 // advanced options
 // (only change this if you know what you are doing)
 
-// cuda block size
+// cuda tuning params
 constexpr size_t BLOCK_SIZE = 256;
+constexpr size_t INTEG_BS = BLOCK_SIZE; // integration blocksize
+constexpr size_t INTEG_PPT = 1; // particles handled per integration thread
 
 // types for particle buffer. you can remove things you don't need to save memory
 using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;

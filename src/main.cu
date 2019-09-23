@@ -217,6 +217,12 @@ struct cdB
         pi.acc.y += -2*cw_n * pi.vel.x;
         pi.acc.z += -cw_n*cw_n * pi.pos.z;
 #endif
+
+#if defined(VARIABLE_TIMESTEP_LEAPFROG)
+        if(threadIdx.x == 0 && blockIdx.x == 0)
+            nextTS = std::numeric_limits<f1_t>::infinity();
+#endif
+
         return pi;
     }
 };
@@ -288,7 +294,11 @@ void printSettings(mpu::Log& log)
     log.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
                                    << "Integration:"
                                    << "Leapfrog"
-                                   << "Timestep: constant, " << timestep << "\n"
+                                   #if defined(FIXED_TIMESTEP_LEAPFROG)
+                                   << "Timestep: constant, " << fixed_timestep << "\n"
+                                   #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
+                                   << "Timestep: variable \n"
+                                   #endif
                                    << "Initial Conditions:\n"
                                    #if defined(READ_FROM_FILE)
                                    << "Data is read from: " << FILENAME << "\n"
@@ -398,6 +408,9 @@ int main()
     // upload particles
     pb = hpb;
 
+    // get current timestep from integrator
+    float timestep = getCurrentTimestep();
+
 #if defined(STORE_RESULTS)
     // print timestep 0
     storage.printToFile(pb,0);
@@ -424,6 +437,7 @@ int main()
             computeDerivatives(pb);
             integrate(pb,true);
 
+            timestep = getCurrentTimestep();
             simulatedTime += timestep;
 
 #if defined(STORE_RESULTS)
