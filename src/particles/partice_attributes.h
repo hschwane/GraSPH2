@@ -98,13 +98,14 @@ MAKE_PARTICLE_ATTRIB(DENSITY,density,f1_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(DENSITY_DT,density_dt,f1_t, DENSITY);
 MAKE_PARTICLE_ATTRIB(DSTRESS,dstress,m3_t, deriv_of_nothing);
 MAKE_PARTICLE_ATTRIB(DSTRESS_DT,dstress_dt,m3_t, DSTRESS);
+MAKE_PARTICLE_ATTRIB(MAXVSIG,max_vsig,f1_t, deriv_of_nothing);
 
 // add a new call to make_particle_attrib here to add new particle attributes
 // then also add the attribute to the list below to define the desired order of particle attributes
 
-using particle_bases = std::tuple<POS,MASS,VEL,ACC,BALSARA,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>;
-using particle_references = std::tuple<rPOS,rMASS,rVEL,rACC,rBALSARA,rXVEL,rDENSITY,rDENSITY_DT,rDSTRESS,rDSTRESS_DT>;
+using particle_bases = std::tuple<POS,MASS,VEL,ACC,BALSARA,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT,MAXVSIG>;
+using particle_references = std::tuple<rPOS,rMASS,rVEL,rACC,rBALSARA,rXVEL,rDENSITY,rDENSITY_DT,rDSTRESS,rDSTRESS_DT,rMAXVSIG>;
 using particle_base_order = std::tuple<POS,rPOS,MASS,rMASS,VEL,rVEL,ACC,rACC,BALSARA,rBALSARA,XVEL,rXVEL,
-                                       DENSITY,rDENSITY,DENSITY_DT,rDENSITY_DT,DSTRESS,rDSTRESS,DSTRESS_DT,rDSTRESS_DT>;
+                                       DENSITY,rDENSITY,DENSITY_DT,rDENSITY_DT,DSTRESS,rDSTRESS,DSTRESS_DT,rDSTRESS_DT,MAXVSIG,rMAXVSIG>;
 
 #endif //GRASPH2_PARTICE_ATTRIBUTES_H

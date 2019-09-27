@@ -34,7 +34,7 @@ constexpr Dim dimension=Dim::three;
 #define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
-//#define ENABLE_SPH
+#define ENABLE_SPH
 
 // -------------------
 // time integration
@@ -46,11 +46,15 @@ constexpr f1_t fixed_timestep=0.0002; // timestep for fixed timestep leapfrog in
 
 // kick drift kick leapfrog using variable timestep
 // density and deviatoric stress are updated during drift step
+// timestep is adjusted based on particle velocity or acceleration, if both criterions are used the minimum is taken
 #define VARIABLE_TIMESTEP_LEAPFROG
 constexpr f1_t initial_timestep=0.002;
-constexpr f1_t min_timestep=0.00003; // smallest allowed timestep
-constexpr f1_t max_timestep=0.05; // biggest allowed timestep
-constexpr f1_t grav_accuracy = 0.04; // the bigger this number the larger timesteps are allowed based on the acceleration criterion
+constexpr f1_t min_timestep=0.00002; // smallest allowed timestep
+constexpr f1_t max_timestep=0.02; // biggest allowed timestep
+#define ACCELERATION_CRITERION
+constexpr f1_t accel_accuracy = 0.04; // the bigger this number the larger timesteps are allowed based on the acceleration criterion
+#define VELOCITY_CRITERION
+constexpr f1_t velocity_accuracy = 0.3; // the bigger this number the larger timesteps are allowed based on the velocity criterion
 
 //--------------------
 // initial conditions
@@ -94,8 +98,8 @@ constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
 
 // parameters of the equation of state
 constexpr f1_t rho0 = tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
-constexpr f1_t BULK = 92; // the materials bulk modulus
-constexpr f1_t dBULKdP = 16; // the materials change of the bulk modulus with pressure
+constexpr f1_t BULK = 1024; // the materials bulk modulus
+constexpr f1_t dBULKdP = 1; // the materials change of the bulk modulus with pressure
 constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
 
 // parameters for solid bodys
@@ -160,8 +164,8 @@ constexpr size_t INTEG_BS = BLOCK_SIZE; // integration blocksize
 constexpr size_t INTEG_PPT = 1; // particles handled per integration thread
 
 // types for particle buffer. you can remove things you don't need to save memory
-using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT>;
-using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT>;
+using DeviceParticlesType = DeviceParticleBuffer<DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT,DEV_MAXVSIG>;
+using HostParticlesType = HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT,HOST_MAXVSIG>;
 
 
 // DO NOT MODIFY BELOW HERE

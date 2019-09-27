@@ -226,6 +226,22 @@ CUDAHOSTDEV inline auto deviatoric_stress_dt_impl::load(const type & v) { return
 template<typename T> CUDAHOSTDEV inline void deviatoric_stress_dt_impl::store(type &v, const T &p) {}
 template<> CUDAHOSTDEV inline void deviatoric_stress_dt_impl::store<DSTRESS_DT>(type & v, const DSTRESS_DT& p) {v=p.dstress_dt;}
 
+//-------------------------------------------------------------------
+// balsara switch value
+struct maxvsig_impl : pb_impl
+{
+    using type = f1_t;
+    static constexpr type defaultValue = {0};
+    using particleType = Particle<MAXVSIG>;
+
+    CUDAHOSTDEV static auto load(const type & v);
+    template <typename T> CUDAHOSTDEV static void store(type & v, const T& p);
+};
+
+CUDAHOSTDEV inline auto maxvsig_impl::load(const type & v) { return particleType(v); }
+template<typename T> CUDAHOSTDEV inline void maxvsig_impl::store(type &v, const T &p) {}
+template<> CUDAHOSTDEV inline void maxvsig_impl::store<MAXVSIG>(type & v, const MAXVSIG& p) {v=p.max_vsig;}
+
 
 //-------------------------------------------------------------------
 // generate the aliases for different types of buffers and define the order of attributes
@@ -241,10 +257,11 @@ MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DENSITY,density_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DENSITY_DT,density_dt_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DSTRESS,deviatoric_stress_impl);
 MAKE_PARTICLE_BUFFER_IMPLEMENTATION(DSTRESS_DT,deviatoric_stress_dt_impl);
+MAKE_PARTICLE_BUFFER_IMPLEMENTATION(MAXVSIG,maxvsig_impl);
 
-using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT >;
-using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT >;
-using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM,DREF_VEL,DREF_ACC,DREF_BALSARA,DREF_XVEL,DREF_DENSITY,DREF_DENSITY_DT,DREF_DSTRESS,DREF_DSTRESS_DT >;
-using shared_base_order = std::tuple<SHARED_POS<0>,SHARED_MASS<0>,SHARED_POSM<0>,SHARED_VEL<0>,SHARED_ACC<0>,SHARED_BALSARA<0>,SHARED_XVEL<0>,SHARED_DENSITY<0>,SHARED_DENSITY_DT<0>,SHARED_DSTRESS<0>,SHARED_DSTRESS_DT<0> >;
+using host_base_order = std::tuple<HOST_POS,HOST_MASS,HOST_POSM,HOST_VEL,HOST_ACC,HOST_BALSARA,HOST_XVEL,HOST_DENSITY,HOST_DENSITY_DT,HOST_DSTRESS,HOST_DSTRESS_DT,HOST_MAXVSIG >;
+using device_base_order = std::tuple<DEV_POS,DEV_MASS,DEV_POSM,DEV_VEL,DEV_ACC,DEV_BALSARA,DEV_XVEL,DEV_DENSITY,DEV_DENSITY_DT,DEV_DSTRESS,DEV_DSTRESS_DT,DEV_MAXVSIG>;
+using dref_base_order = std::tuple<DREF_POS,DREF_MASS,DREF_POSM,DREF_VEL,DREF_ACC,DREF_BALSARA,DREF_XVEL,DREF_DENSITY,DREF_DENSITY_DT,DREF_DSTRESS,DREF_DSTRESS_DT,DREF_MAXVSIG>;
+using shared_base_order = std::tuple<SHARED_POS<0>,SHARED_MASS<0>,SHARED_POSM<0>,SHARED_VEL<0>,SHARED_ACC<0>,SHARED_BALSARA<0>,SHARED_XVEL<0>,SHARED_DENSITY<0>,SHARED_DENSITY_DT<0>,SHARED_DSTRESS<0>,SHARED_DSTRESS_DT<0>,SHARED_MAXVSIG<0>>;
 
 #endif //GRASPH2_PARTICLE_BUFFER_IMPL_H

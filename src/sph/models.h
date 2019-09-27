@@ -53,6 +53,31 @@ CUDAHOSTDEV inline f1_t artificialViscosity(f1_t alpha,
                                         f1_t  balsara_i=1.0f, f1_t balsara_j=1.0f);
 
 /**
+ * @brief calculates II, the viscosity factor for artificial viscosity after Monaghan 1997.
+ *          Viscosity vanishes if particles move away from each other. To remove shear viscosity
+ *          use an additional balsara switch.
+ * @param maxVsig if the new signal velocity if bigger then maxVsig, maxVsig is set to the new signal velocity
+ * @param alpha the strength of the viscosity should be between 0 and 1
+ * @param density_i the density of particle i
+ * @param density_j the density of particle j
+ * @param vij the relative velocity of the particles
+ * @param rij the relative position of the particles
+ * @param r the length of rij
+ * @param ci the speed of sound of particle i
+ * @param cj the speed of sound of particle j
+ * @param balsara_i balsara-switch value of particle i
+ * @param balsara_j balsara-switch value of particle j
+ * @return returns the viscosity factor II
+ */
+CUDAHOSTDEV inline f1_t artificialViscosity(f1_t &maxVsig,
+                                            f1_t alpha,
+                                            f1_t density_i, f1_t density_j,
+                                            const f3_t& vij,  const f3_t& rij,
+                                            f1_t r,
+                                            f1_t ci, f1_t cj,
+                                            f1_t  balsara_i=1.0f, f1_t balsara_j=1.0f);
+
+/**
  * @brief computes the balsara switch value for a particle. (See Balsara 1995)
  * @param divv divergence of the velocity field
  * @param curlv curl of the velocity field
@@ -131,6 +156,21 @@ f1_t artificialViscosity(const f1_t alpha, const f1_t density_i, const f1_t dens
         const f1_t vsig = f1_t(ci + cj - 3.0_ft * wij);
         const f1_t rhoij = (density_i + density_j) * f1_t(0.5_ft);
         II = -0.25_ft * (balsara_i + balsara_j) * alpha * wij * vsig / rhoij;
+    }
+    return II;
+}
+
+f1_t artificialViscosity(f1_t &maxVsig, const f1_t alpha, const f1_t density_i, const f1_t density_j, const f3_t &vij, const f3_t &rij,
+                         const f1_t r, const f1_t ci, const f1_t cj, const f1_t balsara_i, const f1_t balsara_j)
+{
+    const f1_t wij = dot(rij, vij) / r;
+    f1_t II = 0.0_ft;
+    if(wij < 0.0_ft)
+    {
+        const f1_t vsig = f1_t(ci + cj - 3.0_ft * wij);
+        const f1_t rhoij = (density_i + density_j) * f1_t(0.5_ft);
+        II = -0.25_ft * (balsara_i + balsara_j) * alpha * wij * vsig / rhoij;
+        maxVsig = max(maxVsig,vsig);
     }
     return II;
 }

@@ -110,7 +110,7 @@ struct cdB
 {
     // define particle attributes to use
     using load_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
-    using store_type = Particle<ACC,XVEL>; //!< particle attributes to store to main memory
+    using store_type = Particle<ACC,XVEL,MAXVSIG>; //!< particle attributes to store to main memory
     using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
     using pj_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< the particle attributes to load from main memory of all the interaction partners j
     //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
@@ -193,7 +193,11 @@ struct cdB
     #if defined(ARTIFICIAL_VISCOSITY)
                 // acceleration from artificial viscosity
                 pi.acc -= pj.mass *
-                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED
+                          artificialViscosity(
+        #if defined(BALSARA_SWITCH)
+                                  pi.max_vsig,
+        #endif
+                                  alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED
         #if defined(BALSARA_SWITCH)
                                   , pi.balsara, pj.balsara
         #endif

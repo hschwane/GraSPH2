@@ -82,23 +82,26 @@ template<size_t blocksize, typename  DevParticleRefType>
 __global__ void variableTsLeapfrog_getNewTimestep(DevParticleRefType pb)
 {
     const f1_t dt = currentTS;
-    f1_t mindt = std::numeric_limits<f1_t>::infinity(); // smallest needed timestep is stored here during reduction
+    f1_t mindt = max_timestep; // smallest needed timestep is stored here during reduction
 
     for(const auto i : mpu::gridStrideRange(pb.size()))
     {
         // read the particle
-        Particle<VEL,ACC> p{};
-        p = pb.template loadParticle<VEL,ACC>(i);
+        Particle<VEL,ACC,MAXVSIG> p{};
+        p = pb.template loadParticle<VEL,ACC,MAXVSIG>(i);
 
         //   calculate velocity a_t and store
         p.vel = p.vel + p.acc * (dt * 0.5_ft);
         pb.storeParticle(i, Particle<VEL>(p));
 
-        // collisionless criterium
-        const f1_t cldt = sqrt(2*grav_accuracy*H) / length(p.acc);
+        // calculate new timestep
+#if defined(ACCELERATION_CRITERION)
+        mindt = min( mindt, sqrt(accel_accuracy*H / length(p.acc)) );
+#endif
+#if defined(VELOCITY_CRITERION)
+        mindt = min( mindt, velocity_accuracy * H / p.max_vsig);
+#endif
 
-        f1_t newdt = cldt;
-        mindt = (newdt < mindt) ? newdt : mindt;
     }
 
     // setup a cub::warpreduce and reduce each warp
