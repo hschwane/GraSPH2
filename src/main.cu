@@ -220,7 +220,7 @@ struct cdB
 
 #if defined(VARIABLE_TIMESTEP_LEAPFROG)
         if(threadIdx.x == 0 && blockIdx.x == 0)
-            nextTS = std::numeric_limits<f1_t>::infinity();
+            nextTS = max_timestep;
 #endif
 
         return pi;

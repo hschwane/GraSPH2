@@ -94,8 +94,10 @@ __global__ void variableTsLeapfrog_getNewTimestep(DevParticleRefType pb)
         p.vel = p.vel + p.acc * (dt * 0.5_ft);
         pb.storeParticle(i, Particle<VEL>(p));
 
-        // somehow calculate the new dt
-        f1_t newdt = dt;
+        // collisionless criterium
+        const f1_t cldt = sqrt(2*grav_accuracy*H) / length(p.acc);
+
+        f1_t newdt = cldt;
         mindt = (newdt < mindt) ? newdt : mindt;
     }
 
@@ -109,7 +111,7 @@ __global__ void variableTsLeapfrog_getNewTimestep(DevParticleRefType pb)
     if ( threadIdx.x % warpSize == 0)
 #if defined(SINGLE_PRECISION)
         atomicMin( reinterpret_cast<int*>(&nextTS), *reinterpret_cast<int*>(&mindt));
-#elif defined(SINGLE_PRECISION)
+#elif defined(DOUBLE_PRECISION)
         atomicMin( reinterpret_cast<long long int*>(&nextTS), *reinterpret_cast<long long int*>(&mindt));
 #endif
 };
@@ -118,7 +120,7 @@ template<typename  DevParticleRefType>
 __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 {
     // read the new timestep and set it as current
-    const f1_t dt = nextTS;
+    f1_t dt = (nextTS < min_timestep) ? min_timestep : nextTS;
     if(threadIdx.x == 0 && blockIdx.x == 0)
         currentTS = dt;
 

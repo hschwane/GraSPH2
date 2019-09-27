@@ -34,7 +34,7 @@ constexpr Dim dimension=Dim::three;
 #define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
-#define ENABLE_SPH
+//#define ENABLE_SPH
 
 // -------------------
 // time integration
@@ -47,9 +47,10 @@ constexpr f1_t fixed_timestep=0.0002; // timestep for fixed timestep leapfrog in
 // kick drift kick leapfrog using variable timestep
 // density and deviatoric stress are updated during drift step
 #define VARIABLE_TIMESTEP_LEAPFROG
-constexpr f1_t initial_timestep=0.0002;
-constexpr f1_t min_timestep=0.000002;
-constexpr f1_t max_timestep=0.02;
+constexpr f1_t initial_timestep=0.002;
+constexpr f1_t min_timestep=0.00003; // smallest allowed timestep
+constexpr f1_t max_timestep=0.05; // biggest allowed timestep
+constexpr f1_t grav_accuracy = 0.04; // the bigger this number the larger timesteps are allowed based on the acceleration criterion
 
 //--------------------
 // initial conditions
