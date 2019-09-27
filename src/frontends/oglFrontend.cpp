@@ -109,6 +109,7 @@ mpu::gph::Camera &camera()
 // timing
 double delta{0};
 double time{0};
+double lastSimTime{0};
 int frames{0};
 
 // input
@@ -278,11 +279,13 @@ bool handleFrontend(double t)
     static mpu::DeltaTimer timer;
     delta = timer.getDeltaTime();
 
+
     time+=delta;
     frames++;
     if(time > printIntervall)
     {
-        logINFO("openGL Frontend") << "Simulated Time: " << t << " fps: " << frames / time << " ms/f: " << time/frames * 1000;
+        logINFO("openGL Frontend") << "SimTime: " << t << " | f/s: " << frames / time << " | ms/f: " << time/frames * 1000 << " | timestep: " << (t-lastSimTime)/frames << " | SimTime/s: " << (t-lastSimTime)/time;
+        lastSimTime = t;
         frames=0;
         time=0;
     }
