@@ -60,16 +60,19 @@ struct fixedTsLeapfrog
 #endif
 
 #if defined(ENABLE_SPH)
+    #if defined(INTEGRATE_DENSITY)
         // density
         p.density = p.density + p.density_dt * dt;
         if(p.density < 0.0_ft)
             p.density = 0.0_ft;
-
+    #endif
+    #if defined(SOLIDS)
         // deviatoric stress
         p.dstress += p.dstress_dt * dt;
 
         // execute selected plasticity model
         doPlasticity(p);
+    #endif
 #endif
         return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
     }
@@ -144,16 +147,19 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 #endif
 
 #if defined(ENABLE_SPH)
+    #if defined(INTEGRATE_DENSITY)
         // density
         p.density = p.density + p.density_dt * dt;
         if(p.density < 0.0_ft)
             p.density = 0.0_ft;
-
+    #endif
+    #if defined(SOLIDS)
         // deviatoric stress
         p.dstress += p.dstress_dt * dt;
 
         // execute selected plasticity model
         doPlasticity(p);
+    #endif
 #endif
 
         // store the particle
@@ -164,11 +170,10 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 template <typename pbT>
 void integrate(pbT& particleBuffer, bool notFirstStep)
 {
+    static_assert(mpu::is_instantiation_of< DeviceParticleBuffer,pbT>::value,"Integration is only possible with a device particle buffer");
 #if defined(FIXED_TIMESTEP_LEAPFROG)
     do_for_each<fixedTsLeapfrog>(particleBuffer,notFirstStep);
 #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
-    static_assert(mpu::is_instantiation_of< DeviceParticleBuffer,pbT>::value,"Integration is only possible with a device particle buffer");
-
     // call first part of leapfrog, which will perform kick and calculate the new timestep only if this is not the first step
     if(notFirstStep)
     {

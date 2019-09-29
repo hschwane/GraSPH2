@@ -2,6 +2,10 @@
 
 ## high priority
 
+### simulation feature
+- add variable smoothing lenght
+- figure out new eos based on molecular physics
+- figure out stress tensor for new  model
 
 ## medium priority
 
@@ -13,16 +17,16 @@
 
 ### simulation management
 - make the compute derivatives function more organized
-- use some system to manage boundary conditions
 - find better solution for 2D simulation
+- make eos and kernel selectable
 
 ### integration
-- variable timestep
+- better structure to different integrators
+- test different integrators
 - automatically integrate what is needed using TMP
 
-### performance
-- somehow automatically adjust particle attributes based on options
-
+### frontends
+- update frontend to new mputils version
 
 ## low priority / ideas / long term projects
 
@@ -31,6 +35,7 @@
 
 ### particle creation
 - add python script support to generate initials
+- just in time compiler to allow runtime settings changes
 
 ### particle management
 - add cpu host reference
@@ -41,12 +46,17 @@
 
 ### simulation management
 - find better solution to switch options on and off
+- overhaul the frontend system 
+- put simulation and integration in apropriate submodules
+- add more interactive features
+- use some system to manage boundary / initial conditions
 
-### integration
-- better structure to different integrators
-- adaptive algorithms
+### initial conditions
+- add old initial condition generator (eg 2d things usw)
+- add python support for initial conditions
 
 ### performance
+- split work among multiple threads for "for each pair"
 - profile and maybe optimize some functions 
 - check out shuffle operations and vote functions
 - add datastructures
@@ -54,18 +64,31 @@
 - MPI support
 - share load between CPU and GPU
 - better memory alignment for matrices
+- somehow automatically adjust particle attributes based on options
+- fix the timestep download
 
 ### simulation features
-- add collisional merging simulation
+- some kind of particle merging
 - different materials (using recursive kernel launches)
+- internal energy
+- pcisph or similar
 
 ### output data handling
 - provide python script to generate (3d html) plots USE: ipyvolume
 
-
+### visualization
+- allow playback of old simulations
+- volume renderer
+- ssao / better depth hints
+- better transfer function
+- more interactivity eg show parameters of particle etc
 
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
+
+- add option to turn off solids extension (deviatoric stress)
+- add density summation
+- add variable timestep leapfrog 
 
 --- v0.6.0 --- 23.09.2019
 - better error message for simCreate script

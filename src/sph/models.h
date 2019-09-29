@@ -113,10 +113,19 @@ CUDAHOSTDEV inline f1_t mohrCoulombYieldStress(f1_t tanFrictionAngle, f1_t press
  *         the acceleration is the sum of the artificial stress for both particles multiplied by pow( W(r)/W(mpd)  ,n)
  *         Where n is a material property and mpd the mean particle seperation.
  * @param mateps a material property, typically between 0.2 and 0.4
- * @param sigOverRho the deviatoric stress sigma of a particle divided by the square of its density
+ * @param sigOverRho the stress sigma of a particle divided by the square of its density
  * @return the influence of one particles stress to the artificial pressure during an interaction
  */
 CUDAHOSTDEV inline m3_t artificialStress(f1_t mateps, const m3_t& sigOverRho);
+
+/**
+ * @brief Calculates the artificial pressure for one partical.
+ *          Like artificial stress, but for pressure only (when not using deviatoric stress)
+ * @param mateps a material property, typically between 0.2 and 0.4
+ * @param sigOverRho the pressure sigma of a particle divided by the square of its density
+ * @return the influence of one particles pressure to the artificial pressure during an interaction
+ */
+CUDAHOSTDEV inline f1_t artificialPressure(f1_t mateps, f1_t sigOverRho);
 
 /**
  * @brief Adds the influence of the interaction between particle i and j to the strain rate and rotation rate tensors
@@ -206,6 +215,11 @@ m3_t artificialStress(const f1_t mateps, const m3_t &sigOverRho)
     for(size_t e = 0; e < 9; e++)
         arts(e) = ((sigOverRho(e) > 0) ? (-mateps * sigOverRho(e)) : 0.0_ft);
     return arts;
+}
+
+f1_t artificialPressure(const f1_t mateps, const f1_t sigOverRho)
+{
+    return ((sigOverRho > 0) ? (-mateps * sigOverRho) : 0.0_ft);
 }
 
 void addStrainRateAndRotationRate(m3_t &edot, m3_t &rdot, const f1_t mass_j, const f1_t density_j, const f3_t &vij,
