@@ -30,6 +30,48 @@ CUDAHOSTDEV inline void doPlasticity(Particle<DENSITY,rDSTRESS> p)
 #endif
 }
 
+CUDAHOSTDEV inline void handleBoundaryConditions(Particle<rPOS,rVEL> p)
+{
+#if defined(SIMPLE_BOX_BOUNDARY)
+
+    const f1_t velMultiplyer = 1.0_ft +  simple_box_bound_reflectiveness;
+    if(p.pos.x > simple_box_bound_max.x)
+    {
+        p.pos.x = simple_box_bound_max.x;
+        p.vel.x -= velMultiplyer*p.vel.x;
+    }
+    else if(p.pos.x < simple_box_bound_min.x)
+    {
+        p.pos.x = simple_box_bound_min.x;
+        p.vel.x -= velMultiplyer*p.vel.x;
+    }
+    if(p.pos.y > simple_box_bound_max.y)
+    {
+        p.pos.y = simple_box_bound_max.y;
+        p.vel.y -= velMultiplyer*p.vel.y;
+    }
+    else if(p.pos.y < simple_box_bound_min.y)
+    {
+        p.pos.y = simple_box_bound_min.y;
+        p.vel.y -= velMultiplyer*p.vel.y;
+    }
+
+    if(dimension == Dim::three)
+    {
+        if(p.pos.z > simple_box_bound_max.z)
+        {
+            p.pos.z = simple_box_bound_max.z;
+            p.vel.z -= velMultiplyer*p.vel.z;
+        }
+        else if(p.pos.z < simple_box_bound_min.z)
+        {
+            p.pos.z = simple_box_bound_min.z;
+            p.vel.z -= velMultiplyer*p.vel.z;
+        }
+    }
+#endif
+}
+
 /**
  * @brief perform fixed timestep, kick drift kick leapfrog integration on the particles also performs the plasticity calculations
  *          density and deviatoric stress are updated during drift step
@@ -74,6 +116,10 @@ struct fixedTsLeapfrog
         doPlasticity(p);
     #endif
 #endif
+
+        // handle boundary conditions
+        handleBoundaryConditions(p);
+
         return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
     }
 };
@@ -161,6 +207,9 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
         doPlasticity(p);
     #endif
 #endif
+
+        // handle boundary conditions
+        handleBoundaryConditions(p);
 
         // store the particle
         pb.storeParticle(i, Particle<POS,VEL,DENSITY,DSTRESS>(p));

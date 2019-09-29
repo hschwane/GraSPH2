@@ -31,15 +31,15 @@
 constexpr Dim dimension=Dim::three;
 
 // enable / disable self gravity (gravitational constant is 1)
-#define ENABLE_SELF_GRAVITY
+//#define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
 #define ENABLE_SPH
 
 // SPH settings
-#define INTEGRATE_DENSITY // integrate the continuum equation instead of
-//#define DEAL_WITH_NO_PARTNERS // particles without interaction partners will get a set density of rho0/100 when not integrating density
-#define SOLIDS // enable solid body physics (stress tensor)
+//#define INTEGRATE_DENSITY // integrate the continuum equation instead of
+#define DEAL_WITH_NO_PARTNERS // particles without interaction partners will get a set density of rho0/100 when not integrating density
+//#define SOLIDS // enable solid body physics (stress tensor)
 
 // -------------------
 // time integration
@@ -57,9 +57,9 @@ constexpr f1_t initial_timestep=0.002;
 constexpr f1_t min_timestep=0.00002; // smallest allowed timestep
 constexpr f1_t max_timestep=0.02; // biggest allowed timestep
 #define ACCELERATION_CRITERION
-constexpr f1_t accel_accuracy = 0.04; // the bigger this number the larger timesteps are allowed based on the acceleration criterion
+constexpr f1_t accel_accuracy = 0.01; // the bigger this number the larger timesteps are allowed based on the acceleration criterion
 #define VELOCITY_CRITERION
-constexpr f1_t velocity_accuracy = 0.3; // the bigger this number the larger timesteps are allowed based on the velocity criterion
+constexpr f1_t velocity_accuracy = 0.09; // the bigger this number the larger timesteps are allowed based on the velocity criterion
 
 //--------------------
 // initial conditions
@@ -95,16 +95,16 @@ constexpr f3_t angVel=f3_t{0,0,0}; // angular velocity of the cloud omega
 // set a value for the smoothing length H
 // you can also define a radius for a single particle
 constexpr f1_t compressesd_radius = 0.1_ft;// all mass of your simulation compressed into a sphere, radius of that sphere
-constexpr f1_t pradius = compressesd_radius * gcem::pow(particle_count,-1.0_ft/3.0_ft); // "radius" of a particle
-constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
+constexpr f1_t pradius = 0.04;//compressesd_radius * gcem::pow(particle_count,-1.0_ft/3.0_ft); // "radius" of a particle
+constexpr f1_t H = pradius*3.5_ft; // the smoothing length H of a particle
 
 // --------------------
 // Material settings
 
 // parameters of the equation of state
-constexpr f1_t rho0 = tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
-constexpr f1_t BULK = 8192; // the materials bulk modulus
-constexpr f1_t dBULKdP = 4; // the materials change of the bulk modulus with pressure
+constexpr f1_t rho0 = 1.0/(4.0/3.0 * M_PI); // tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
+constexpr f1_t BULK = 10; // the materials bulk modulus
+constexpr f1_t dBULKdP = 1; // the materials change of the bulk modulus with pressure
 constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
 
 // parameters for solid bodys
@@ -136,12 +136,24 @@ constexpr f1_t cohesion = 0.0_ft; // the materials cohesion
 //#define CLOHESSY_WILTSHIRE
 constexpr f1_t cw_n = gcem::sqrt( 1.0_ft / 3.0_ft);
 
+// add acceleration to particles every timeframe (constant in time and space)
+// eg, use to add downwards gravity
+#define CONSTANT_ACCELERATION
+constexpr f3_t constant_acceleration = {0, -1,0};
+
+// constrain particles in a box (square for 2d)
+// does not implement proper density / pressure correction on the boundary
+#define SIMPLE_BOX_BOUNDARY
+constexpr f3_t simple_box_bound_min = {-1.2,-1.2,-1.2};
+constexpr f3_t simple_box_bound_max = {1.2,1.2,1.2};
+constexpr f1_t simple_box_bound_reflectiveness = 0.5_ft;
+
 //--------------------
 // artificial correction
 
 // use artificial viscosity
 #define ARTIFICIAL_VISCOSITY
-constexpr f1_t alpha = 1.0_ft; // strength of artificial viscosity
+constexpr f1_t alpha = 0.2_ft; // strength of artificial viscosity
 
 // enable / disable the balsara switch
 //#define BALSARA_SWITCH

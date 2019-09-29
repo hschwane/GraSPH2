@@ -28,6 +28,25 @@ constexpr f1_t dW_prefactor = kernel::dsplinePrefactor<dimension>(H); //!< splin
 constexpr f1_t W_prefactor = kernel::splinePrefactor<dimension>(H); //!< spline kernel prefactor
 
 /**
+ * @brief add acceleration based on environment
+ */
+CUDAHOSTDEV inline f3_t environmentAcceleration(const f3_t& position, const f1_t& mass, const f3_t& velocity, f3_t& acceleration)
+{
+    // acceleration due to tidal forces (clohessy wiltshire model)
+#if defined(CLOHESSY_WILTSHIRE)
+    acceleration += 3*cw_n*cw_n * position.x + 2*cw_n* velocity.y;
+    acceleration += -2*cw_n * velocity.x;
+    acceleration += -cw_n*cw_n * position.z;
+#endif
+
+#if defined(CONSTANT_ACCELERATION)
+    acceleration += constant_acceleration;
+#endif
+
+    return acceleration;
+}
+
+/**
  * @brief calculates density using the sph method
  */
 struct calcDensity
@@ -281,11 +300,8 @@ struct calcAcceleration
     //!< This function will be called for particle i after the interactions with the other particles are computed.
     CUDAHOSTDEV store_type do_after(pi_type& pi)
     {
-#if defined(CLOHESSY_WILTSHIRE)
-        pi.acc.x += 3*cw_n*cw_n * pi.pos.x + 2*cw_n* pi.vel.y;
-        pi.acc.y += -2*cw_n * pi.vel.x;
-        pi.acc.z += -cw_n*cw_n * pi.pos.z;
-#endif
+        // acceleration based on environmental settings
+        environmentAcceleration(pi.pos, pi.mass, pi.vel, pi.acc);
 
 #if defined(VARIABLE_TIMESTEP_LEAPFROG)
         if(threadIdx.x == 0 && blockIdx.x == 0)

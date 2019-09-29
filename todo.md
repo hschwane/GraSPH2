@@ -2,10 +2,6 @@
 
 ## high priority
 
-### boundary
-- box boundary
-- constant gravity
-
 ### simulation feature
 - add variable smoothing lenght
 - figure out new eos based on molecular physics
@@ -90,6 +86,9 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+- add option to keep particles in a simple box boundary  
+- add option for constant acceleration (like gravity)
+- clean out main a bit and add more structure to the simulation code
 - add option to turn off solids extension (deviatoric stress)
 - add density summation
 - add variable timestep leapfrog 
