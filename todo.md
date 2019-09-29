@@ -2,6 +2,10 @@
 
 ## high priority
 
+### boundary
+- box boundary
+- constant gravity
+
 ### simulation feature
 - add variable smoothing lenght
 - figure out new eos based on molecular physics

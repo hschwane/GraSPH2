@@ -382,8 +382,29 @@ void printSettings(mpu::Log& log)
 
     // print some important settings to the console
     log.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
-                                   << "Integration:"
-                                   << "Leapfrog"
+
+
+                                   # if defined (ENABLE_SELF_GRAVITY)
+                                   << "Self Gravity: enabled\n"
+                                   #else
+                                   << "Self Gravity: disabledņ\n"
+                                   #endif
+                                   # if defined (ENABLE_SPH)
+                                   << "SPH: enabled "
+                                       #if defined(INTEGRATE_DENSITY)
+                                       << "with density integration "
+                                       #else
+                                       << "with density summation "
+                                       #endif
+                                       #if defined(SOLIDS)
+                                       << " and stress tensor support "
+                                       #endif
+                                   << "\n"
+                                   #else
+                                   << "SPH: disabledņ\n"
+                                   #endif
+                                    << "Integration:"
+                                   << "Leapfrog\n"
                                    #if defined(FIXED_TIMESTEP_LEAPFROG)
                                    << "Timestep: constant, " << fixed_timestep << "\n"
                                    #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
