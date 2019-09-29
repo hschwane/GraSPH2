@@ -298,7 +298,7 @@ struct calcAcceleration
     }
 
     //!< This function will be called for particle i after the interactions with the other particles are computed.
-    CUDAHOSTDEV store_type do_after(pi_type& pi)
+    __device__ store_type do_after(pi_type& pi)
     {
         // acceleration based on environmental settings
         environmentAcceleration(pi.pos, pi.mass, pi.vel, pi.acc);
