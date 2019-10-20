@@ -57,7 +57,9 @@ glm::vec3 lightAmbient = {0.1,0.1,0.1};
 bool renderFlatDisks = false;
 bool flatFalloff = false;
 bool enableEdgeHighlights = false;
-
+float fieldOfFiew = 45.0f; // field of view in degrees
+float near = 0.001f;
+float far = 20;
 //--------------------
 
 // internal global variables
@@ -81,86 +83,127 @@ constexpr int POS_BUFFER_BINDING = 0;
 constexpr int VEL_BUFFER_BINDING = 1;
 constexpr int DENSITY_BUFFER_BINDING = 2;
 
+// graphics helper objects
 mpu::gph::Window &window()
 {
-    static mpu::gph::Window _interalWindow(SIZE.x, SIZE.y, TITLE);
-    return _interalWindow;
+    static mpu::gph::Window _internalWindow(SIZE.x, SIZE.y, TITLE);
+    return _internalWindow;
 }
-
-std::function<void(bool)> pauseHandler; //!< function to be called when the simulation needs to be paused
-std::function<void(const std::string&)> dropHandler; //!< function is called when a file is dropped onto the window
-
-// opengl buffer
-size_t particleCount{0};
-mpu::gph::Buffer positionBuffer(nullptr);
-mpu::gph::Buffer velocityBuffer(nullptr);
-mpu::gph::Buffer densityBuffer(nullptr);
-mpu::gph::VertexArray vao(nullptr);
-mpu::gph::ShaderProgram shader(nullptr);
-
-// camera
-mpu::gph::ModelViewProjection mvp;
 mpu::gph::Camera &camera()
 {
-    static mpu::gph::Camera _internalCamera(std::make_shared<mpu::gph::SimpleWASDController>(&window(),10,2));
+    static mpu::gph::Camera _internalCamera;
     return _internalCamera;
 }
+glm::mat4 projection;
+
+// opengl objects
+size_t particleCount{0};
+std::unique_ptr<mpu::gph::Buffer<vecType>> positionBuffer;
+std::unique_ptr<mpu::gph::Buffer<vecType>> velocityBuffer;
+std::unique_ptr<mpu::gph::Buffer<fType>> densityBuffer;
+std::unique_ptr<mpu::gph::VertexArray> vao;
+std::unique_ptr<mpu::gph::ShaderProgram> shader;
+
+// other
+std::function<void(bool)> pauseHandler; //!< function to be called when the simulation needs to be paused
 
 // timing
-double delta{0};
 double time{0};
 double lastSimTime{0};
 int frames{0};
 
-// input
-bool wasCpressed=false;
-bool wasZpressed=false;
-bool wasHpressed=false;
-bool wasUpressed=false;
-bool wasJpressed=false;
-bool wasTpressed=false;
-bool needInfoPrintingUpper=false;
-bool needInfoPrintingLower=false;
-bool needInfoPrintingSize=false;
-
 //--------------------
+// some helping functions
 
-void recompileShader()
+void compileShader()
 {
-    std::vector<mpu::gph::glsl::Definition> definitions;
-
-    shader.rebuild({{FRAG_SHADER_PATH},{VERT_SHADER_PATH},{GEOM_SHADER_PATH}},definitions);
-    shader.uniform1f("sphereRadius", particleRadius);
-    shader.uniformMat4("view", glm::mat4(1.0f));
-    shader.uniformMat4("model", glm::mat4(1.0f));
-    shader.uniformMat4("projection", glm::mat4(1.0f));
-    shader.uniform3f("defaultColor",particleColor);
-    shader.uniform1f("materialAlpha",particleAlpha);
-    shader.uniform1f("materialShininess",materialShininess);
-    shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
-    shader.uniform1f("upperBound",upperBound);
-    shader.uniform1f("lowerBound",lowerBound);
-    shader.uniform3f("light.position",lightPosition);
-    shader.uniform3f("light.diffuse",lightDiffuse);
-    shader.uniform3f("light.specular",lightSpecular);
-    shader.uniform3f("ambientLight",lightAmbient);
-    shader.uniform1b("lightInViewSpace",linkLightToCamera);
-    shader.uniform1b("renderFlatDisks",renderFlatDisks);
-    shader.uniform1b("flatFalloff",flatFalloff);
-    shader.uniform1b("enableEdgeHighlights",enableEdgeHighlights);
+    shader = std::unique_ptr<mpu::gph::ShaderProgram>(new mpu::gph::ShaderProgram({{FRAG_SHADER_PATH},{VERT_SHADER_PATH},{GEOM_SHADER_PATH}}));
+    shader->uniform1f("sphereRadius", particleRadius);
+    shader->uniformMat4("view", glm::mat4(1.0f));
+    shader->uniformMat4("model", glm::mat4(1.0f));
+    shader->uniformMat4("projection", glm::mat4(1.0f));
+    shader->uniform3f("defaultColor",particleColor);
+    shader->uniform1f("materialAlpha",particleAlpha);
+    shader->uniform1f("materialShininess",materialShininess);
+    shader->uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
+    shader->uniform1f("upperBound",upperBound);
+    shader->uniform1f("lowerBound",lowerBound);
+    shader->uniform3f("light.position",lightPosition);
+    shader->uniform3f("light.diffuse",lightDiffuse);
+    shader->uniform3f("light.specular",lightSpecular);
+    shader->uniform3f("ambientLight",lightAmbient);
+    shader->uniform1b("lightInViewSpace",linkLightToCamera);
+    shader->uniform1b("renderFlatDisks",renderFlatDisks);
+    shader->uniform1b("flatFalloff",flatFalloff);
+    shader->uniform1b("enableEdgeHighlights",enableEdgeHighlights);
 }
 
-void window_drop_callback(GLFWwindow * w, int count, const char ** c)
+void addKeybindings()
 {
-    pauseHandler(true);
-    dropHandler(std::string(c[0]));
+    using namespace mpu::gph;
+    // camera
+    camera().addInputs();
+    Input::mapKeyToInput("CameraMoveSideways",GLFW_KEY_D,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
+    Input::mapKeyToInput("CameraMoveSideways",GLFW_KEY_A,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
+    Input::mapKeyToInput("CameraMoveForwardBackward",GLFW_KEY_W,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
+    Input::mapKeyToInput("CameraMoveForwardBackward",GLFW_KEY_S,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
+    Input::mapKeyToInput("CameraMoveUpDown",GLFW_KEY_Q,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
+    Input::mapKeyToInput("CameraMoveUpDown",GLFW_KEY_E,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
+
+    Input::mapCourserToInput("CameraPanHorizontal", Input::AxisOrientation::horizontal,Input::AxisBehavior::negative,0, "EnablePan");
+    Input::mapCourserToInput("CameraPanVertical", Input::AxisOrientation::vertical,Input::AxisBehavior::positive,0, "EnablePan");
+    Input::mapScrollToInput("CameraZoom");
+
+    Input::mapMouseButtonToInput("EnablePan", GLFW_MOUSE_BUTTON_MIDDLE);
+    Input::mapKeyToInput("EnablePan", GLFW_KEY_LEFT_ALT);
+
+    Input::mapCourserToInput("CameraRotateHorizontal", Input::AxisOrientation::horizontal,Input::AxisBehavior::negative,0, "EnableRotation");
+    Input::mapCourserToInput("CameraRotateVertical", Input::AxisOrientation::vertical,Input::AxisBehavior::negative,0, "EnableRotation");
+
+    Input::mapMouseButtonToInput("EnableRotation", GLFW_MOUSE_BUTTON_LEFT);
+    Input::mapKeyToInput("EnableRotation", GLFW_KEY_LEFT_CONTROL);
+
+    Input::mapKeyToInput("CameraMovementSpeed",GLFW_KEY_RIGHT_BRACKET,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
+    Input::mapKeyToInput("CameraMovementSpeed",GLFW_KEY_SLASH,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
+    Input::mapKeyToInput("CameraToggleMode",GLFW_KEY_R);
+    Input::mapKeyToInput("CameraSlowMode",GLFW_KEY_LEFT_SHIFT,Input::ButtonBehavior::whenDown);
+    Input::mapKeyToInput("CameraFastMode",GLFW_KEY_SPACE,Input::ButtonBehavior::whenDown);
+
+
+    // pause / run simulation
+    Input::addButton("PauseSim","Pauses the simulation.",[](mpu::gph::Window&){pauseHandler(true);});
+    Input::addButton("ResumeSim","Resume the simulation.",[](mpu::gph::Window&){pauseHandler(false);});
+    Input::mapKeyToInput("PauseSim",GLFW_KEY_2);
+    Input::mapKeyToInput("ResumeSim",GLFW_KEY_1);
+
+    // change coloring mode
+    Input::addButton("ChangeColorMode","Toggles between all coloring modes.",[](mpu::gph::Window&)
+    {
+        colorMode = static_cast<ColorMode>( (static_cast<int>(colorMode) + 1) % numColorModes);
+        shader->uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
+        logINFO("openGL Frontend") << "Color Mode: " << colorModeToString[static_cast<unsigned int>(colorMode)];
+    });
+    Input::mapKeyToInput("ChangeColorMode",GLFW_KEY_F);
+
+    // particle size
+    Input::addAxis("ParticleSize","Changes the drawn size of the particles.",[](mpu::gph::Window&,double v)
+    {
+        particleRadius += (particleRadius + std::numeric_limits<float>::min()) * 0.025f *  float(v);
+        shader->uniform1f("sphereRadius", particleRadius);
+    });
+    Input::mapKeyToInput("ParticleSize",GLFW_KEY_T,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
+    Input::mapKeyToInput("ParticleSize",GLFW_KEY_G,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
+    Input::addButton("PrintParticleSize","Prints the current particle size to the console.",[](mpu::gph::Window&)
+    {
+        logINFO("openGL Frontend") << "Rendered Particle Size: " << particleRadius;
+    });
+    Input::mapKeyToInput("PrintParticleSize",GLFW_KEY_T,Input::ButtonBehavior::onRelease);
+    Input::mapKeyToInput("PrintParticleSize",GLFW_KEY_G,Input::ButtonBehavior::onRelease);
 }
 
-void window_size_callback(GLFWwindow* window, int width, int height)
+void drawRendererSettingsWindow()
 {
-    glViewport(0,0,width,height);
-    camera().setAspect( float(width) / height);
-    SIZE={width,height};
+
 }
 
 void setBlending(bool additive)
@@ -186,24 +229,29 @@ void initializeFrontend()
 {
     using namespace oglFronted;
 
-    window().setSizeCallback(window_size_callback);
+    window().addFBSizeCallback([](int width, int height)
+    {
+        glViewport(0,0,width,height);
+        projection = glm::perspective( glm::radians(fieldOfFiew), float(width) / float(height), near, far);
+        shader->uniformMat4("projection", projection);
+        SIZE={width,height};
+    });
 
-    mpu::gph::addShaderIncludePath(MPU_LIB_SHADER_PATH);
-    mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
+    ImGui::create(window());
 
     mpu::gph::enableVsync(enableVsync);
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
-    glEnable(GL_PROGRAM_POINT_SIZE);
     setBlending(additiveBlending);
 
-    vao.recreate();
+    vao = std::make_unique<mpu::gph::VertexArray>();
+    mpu::gph::addShaderIncludePath(MPU_LIB_SHADER_PATH"/include");
+    mpu::gph::addShaderIncludePath(PROJECT_SHADER_PATH);
+    compileShader();
 
-    shader.recreate();
-    recompileShader();
+    projection = glm::perspective( glm::radians(fieldOfFiew), float(SIZE.x) / float(SIZE.y), near, far);
+    shader->uniformMat4("projection", projection);
 
-    camera().setMVP(&mvp);
-    camera().setClip(0.001,20);
-    camera().setFOV(45);
+    addKeybindings();
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }
@@ -220,11 +268,10 @@ uint32_t getPositionBuffer(size_t n)
     else
         particleCount = n;
 
-    positionBuffer.recreate();
-    positionBuffer.allocate<vecType>(n);
-    vao.addAttributeBufferArray(POS_BUFFER_BINDING,positionBuffer,0, sizeof(vecType),4,0,glType);
+    positionBuffer = std::make_unique<mpu::gph::Buffer<vecType>>(n);
+    vao->addAttributeBufferArray(POS_BUFFER_BINDING,POS_BUFFER_BINDING,*positionBuffer,0, sizeof(vecType),4,0,glType);
 
-    return positionBuffer;
+    return *positionBuffer;
 }
 
 uint32_t getVelocityBuffer(size_t n)
@@ -240,11 +287,10 @@ uint32_t getVelocityBuffer(size_t n)
         particleCount = n;
 
 
-    velocityBuffer.recreate();
-    velocityBuffer.allocate<vecType>(particleCount);
-    vao.addAttributeBufferArray(VEL_BUFFER_BINDING,velocityBuffer,0, sizeof(vecType),4,0,glType);
+    velocityBuffer = std::make_unique<mpu::gph::Buffer<vecType>>(n);
+    vao->addAttributeBufferArray(VEL_BUFFER_BINDING,VEL_BUFFER_BINDING,*velocityBuffer,0, sizeof(vecType),4,0,glType);
 
-    return velocityBuffer;
+    return *velocityBuffer;
 }
 
 uint32_t getDensityBuffer(size_t n)
@@ -260,27 +306,27 @@ uint32_t getDensityBuffer(size_t n)
         particleCount = n;
 
 
-    densityBuffer.recreate();
-    densityBuffer.allocate<fType>(particleCount);
-    vao.addAttributeBufferArray(DENSITY_BUFFER_BINDING,densityBuffer,0, sizeof(fType),4,0,glType);
+    densityBuffer = std::make_unique<mpu::gph::Buffer<fType>>(n);
+    vao->addAttributeBufferArray(DENSITY_BUFFER_BINDING,DENSITY_BUFFER_BINDING,*densityBuffer,0, sizeof(fType),4,0,glType);
 
-    return densityBuffer;
+    return *densityBuffer;
 }
 
 void setPauseHandler(std::function<void(bool)> f)
 {
     using namespace oglFronted;
-    pauseHandler = f;
+    pauseHandler = std::move(f);
 }
 
 bool handleFrontend(double t)
 {
     using namespace oglFronted;
-    static mpu::DeltaTimer timer;
-    delta = timer.getDeltaTime();
 
+    if(!window().frameBegin())
+        return false;
+    mpu::gph::Input::update();
 
-    time+=delta;
+    time += mpu::gph::Input::deltaTime();
     frames++;
     if(time > printIntervall)
     {
@@ -290,158 +336,36 @@ bool handleFrontend(double t)
         time=0;
     }
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//    camera().showDebugWindow();
+    camera().update();
 
-    camera().update(delta);
-
-    vao.bind();
-    shader.use();
-    shader.uniformMat4("view", mvp.getView());
-    shader.uniformMat4("projection", mvp.getProj());
+    // render
+    vao->bind();
+    shader->use();
+    shader->uniformMat4("view", camera().viewMatrix());
     glDrawArrays(GL_POINTS, 0, particleCount);
 
-    if(window().getKey(GLFW_KEY_1))
-        pauseHandler(false);
-    if(window().getKey(GLFW_KEY_2))
-        pauseHandler(true);
-
-    // handle change of coloring mode
-    bool key_c = window().getKey(GLFW_KEY_C);
-    if( key_c && !wasCpressed)
-    {
-        colorMode = static_cast<ColorMode>( (static_cast<int>(colorMode) + 1) % numColorModes);
-        shader.uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
-        logINFO("openGL Frontend") << "Color Mode: " << colorModeToString[static_cast<unsigned int>(colorMode)];
-        wasCpressed=true;
-    }
-    else if( !key_c && wasCpressed)
-        wasCpressed = false;
-
-    if(window().getKey(GLFW_KEY_V))
-    {
-        upperBound += (upperBound+0.1)*0.5f*delta;
-        shader.uniform1f("upperBound",upperBound);
-        needInfoPrintingUpper = true;
-    }
-    else if(window().getKey(GLFW_KEY_X))
-    {
-        upperBound -= (upperBound+0.1) * 0.5f*delta;
-        upperBound = (upperBound < 0) ? 0 : upperBound;
-        shader.uniform1f("upperBound",upperBound);
-        needInfoPrintingUpper = true;
-    }
-    else if(needInfoPrintingUpper)
-    {
-        logINFO("openGL Frontend") << "Transfer function lower bound: " << lowerBound << " upper bound: " << upperBound;
-        needInfoPrintingUpper = false;
-    }
-
-    if(window().getKey(GLFW_KEY_B))
-    {
-        lowerBound += (lowerBound+std::numeric_limits<float>::min())*0.5f*delta;
-        shader.uniform1f("lowerBound",lowerBound);
-        needInfoPrintingLower = true;
-
-    } else if(window().getKey(GLFW_KEY_Z))
-    {
-        lowerBound -= (lowerBound+std::numeric_limits<float>::min()) * 0.5f*delta;
-        lowerBound = (lowerBound < 0) ? 0 : lowerBound;
-        shader.uniform1f("lowerBound",lowerBound);
-        needInfoPrintingLower = true;
-    }
-    else if(needInfoPrintingLower)
-    {
-        logINFO("openGL Frontend") << "Transfer function lower bound: " << lowerBound << " upper bound: " << upperBound;
-        needInfoPrintingLower = false;
-    }
-
-    // handle changes of particle size
-    if(window().getKey(GLFW_KEY_R))
-    {
-        particleRadius += (particleRadius + std::numeric_limits<float>::min()) * 0.5f * delta;
-        shader.uniform1f("sphereRadius", particleRadius);
-        needInfoPrintingSize=true;
-
-    } else if(window().getKey(GLFW_KEY_F))
-    {
-        particleRadius -= (particleRadius + std::numeric_limits<float>::min()) * 0.5f * delta;
-        particleRadius = (particleRadius < 0) ? 0 : particleRadius;
-        shader.uniform1f("sphereRadius", particleRadius);
-        needInfoPrintingSize=true;
-    }
-    else if(needInfoPrintingSize)
-    {
-        logINFO("openGL Frontend") << "Rendered Particle Size: " << particleRadius;
-        needInfoPrintingSize = false;
-    }
-
-    bool key_y=window().getKey(GLFW_KEY_Y);
-    if( key_y && !wasZpressed)
-    {
-        additiveBlending = !additiveBlending;
-        setBlending(additiveBlending);
-        wasZpressed=true;
-    }
-    else if(!key_y && wasZpressed)
-        wasZpressed = false;
-
-    bool key_h=window().getKey(GLFW_KEY_H);
-    if( key_h && !wasHpressed)
-    {
-        linkLightToCamera = !linkLightToCamera;
-        shader.uniform1b("lightInViewSpace",linkLightToCamera);
-        wasHpressed=true;
-    }
-    else if(!key_h && wasHpressed)
-        wasHpressed = false;
-
-    bool key_u=window().getKey(GLFW_KEY_U);
-    if( key_u && !wasUpressed)
-    {
-        renderFlatDisks = !renderFlatDisks;
-        shader.uniform1b("renderFlatDisks",renderFlatDisks);
-        wasUpressed=true;
-    }
-    else if(!key_u && wasUpressed)
-        wasUpressed = false;
-
-
-    bool key_j=window().getKey(GLFW_KEY_J);
-    if( key_j && !wasJpressed)
-    {
-        flatFalloff = !flatFalloff;
-        shader.uniform1b("flatFalloff",flatFalloff);
-        wasJpressed=true;
-    }
-    else if(!key_j && wasJpressed)
-        wasJpressed = false;
-
-    bool key_t=window().getKey(GLFW_KEY_T);
-    if( key_t && !wasTpressed)
-    {
-        flatFalloff = !flatFalloff;
-        shader.uniform1b("enableEdgeHighlights",enableEdgeHighlights);
-        wasTpressed=true;
-    }
-    else if(!key_t && wasTpressed)
-        wasTpressed = false;
-
-
-    return window().update();
+    window().frameEnd();
+    return true;
 }
 
 void setParticleSize(float pradius)
 {
     using namespace oglFronted;
     particleRadius = pradius;
-    shader.uniform1f("sphereRadius", particleRadius);
+    shader->uniform1f("sphereRadius", particleRadius);
 }
 
 void setDropHandler(std::function<void(std::string)> f)
 {
     using namespace oglFronted;
-    dropHandler = f;
-    window().setDropCallbac(window_drop_callback);
+    mpu::gph::Input::addDropCallback([f](mpu::gph::Window& wnd,const std::vector<std::string>& files)
+    {
+       if(&window() == &wnd)
+       {
+           f(files[0]);
+       }
+    });
 }
 
 }

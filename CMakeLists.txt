@@ -20,7 +20,7 @@ endif()
 enable_language(CXX)
 enable_language(CUDA)
 enable_language(C)
-find_package(mpUtils 0.10.2 REQUIRED)
+find_package(mpUtils 0.11.1 REQUIRED)
 find_package(HDF5)
 
 # -------------------------------------------------------------
@@ -154,11 +154,6 @@ if (USE_FAST_MATH)
     target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
     target_compile_definitions(GraSPH2 PRIVATE "USING_CUDA_FAST_MATH")
 endif ()
-
-# force c++17 if using opengl
-if(OPENGL_FRONTEND)
-    set_target_properties(GraSPH2 PROPERTIES CXX_STANDARD 17)
-endif()
 
 if(HDF5_FOUND)
     target_compile_definitions(GraSPH2 PRIVATE "HDF5_AVAILABLE")

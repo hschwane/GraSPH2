@@ -170,13 +170,13 @@ int main()
         mpu::Resource settings = LOAD_RESOURCE(Settings);
         std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
         settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
-                        << std::string(headlessSettings.data(), headlessSettings.size())
+                        << std::string(headlessSettings.signedData(), headlessSettings.size())
                         << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
-                        << std::string(precisionSettings.data(), precisionSettings.size())
+                        << std::string(precisionSettings.signedData(), precisionSettings.size())
                         << "\n\n\n//////////////////////////\n// outputSettings.h \n//////////////////////////\n\n"
-                        << std::string(outputSettings.data(), outputSettings.size())
+                        << std::string(outputSettings.signedData(), outputSettings.size())
                         << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
-                        << std::string(settings.data(), settings.size());
+                        << std::string(settings.signedData(), settings.size());
     }
 #endif
 
@@ -237,8 +237,8 @@ int main()
 #endif
 
     // start simulating
-    computeDerivatives(pb);
-    integrate(pb,false);
+//    computeDerivatives(pb);
+//    integrate(pb,false);
 
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
