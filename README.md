@@ -24,7 +24,7 @@ To compile GraSPH2 yourself you will need:
 - CUDA 9
 - gcc 6.4
 - cmake 3.8 or higher
-- [mpUtils v0.10.1](http://www.github.com/hschwane/mpUtils)
+- [mpUtils v0.11.1](http://www.github.com/hschwane/mpUtils)
 
 If you want to use real time simulation / visualization you will additionally need:
 
@@ -32,7 +32,6 @@ If you want to use real time simulation / visualization you will additionally ne
 - glfw3
 - glew
 - graphics drivers supporting some OpenGL version (preferably 4.5+)
-- a c++ 17 compatible compiler eg gcc7+
 - make sure mpUtils was compiled with graphics features enabled
 
 After installing the third party dependencies, go to the
@@ -85,13 +84,12 @@ the initial conditions. You can load also load a tsv or hdf5 file by dragging it
 Press "1" on your keyboard to start the simulation. You can pause it again at any time using the "2"
 key. The Camera can be moved using "W", "A", "S" and "D", like in a video  game.
 To fly up and down use "Q" and "E". "+" and "-" can be used to change the cameras movement speed.
+Hold the left mouse button to look around. Use "R" to switch the camera rotation to a "trackball" style mode.
+In Trackball mode you can Zoom using your mouse wheel and pan by holding the middle mouse button. 
 The console will display some timing information.
-Press "C" to switch between different color visualization modes.
-Use "X" and "V" to scale the transfer function and "Y"and "B" to set the starting value.
-Keys "R" and "F" control the size of the rendered particles.
-Use "Z" to turn additive blending on and off. "H" toggles the link between lights position and camera movement.
-"U" switches from spheres to flat disks and "J" toggles on a brightness falloff in disk mode. "T" toggles edge highlighting.
-Beware "Z" and "Y" will be swapped if you are on an english keyboard.
+Press "F" to switch between different color visualization modes.
+Keys "T" and "G" control the size of the rendered particles.
+Pressing "V" will show a UI-Window containing display settings for the visualization
 
 ### settings
 

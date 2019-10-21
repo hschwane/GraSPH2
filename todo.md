@@ -72,6 +72,8 @@
 - different materials (using recursive kernel launches)
 - internal energy
 - pcisph or similar
+- surface forces for water
+- proper boundary conditions
 
 ### output data handling
 - provide python script to generate (3d html) plots USE: ipyvolume
@@ -86,6 +88,9 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.7.0 --- 21.10.2019
+- add simple UI for graphics settings
+- make compatible with new mpUtils
 - add option to keep particles in a simple box boundary  
 - add option for constant acceleration (like gravity)
 - clean out main a bit and add more structure to the simulation code
