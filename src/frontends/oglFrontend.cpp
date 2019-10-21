@@ -186,10 +186,20 @@ void addKeybindings()
 
     Input::mapKeyToInput("CameraMovementSpeed",GLFW_KEY_RIGHT_BRACKET,Input::ButtonBehavior::whenDown,Input::AxisBehavior::positive);
     Input::mapKeyToInput("CameraMovementSpeed",GLFW_KEY_SLASH,Input::ButtonBehavior::whenDown,Input::AxisBehavior::negative);
-    Input::mapKeyToInput("CameraToggleMode",GLFW_KEY_R);
+//    Input::mapKeyToInput("CameraToggleMode",GLFW_KEY_R);
     Input::mapKeyToInput("CameraSlowMode",GLFW_KEY_LEFT_SHIFT,Input::ButtonBehavior::whenDown);
     Input::mapKeyToInput("CameraFastMode",GLFW_KEY_SPACE,Input::ButtonBehavior::whenDown);
 
+    Input::addButton("CameraToggleModeAndReset","Changes the camera mode and resets target when mode is switched to trackball.",[](mpu::gph::Window&)
+    {
+        if(camera().getMode()==mpu::gph::Camera::fps)
+        {
+            camera().setMode(mpu::gph::Camera::trackball);
+            camera().setTarget({0, 0, 0});
+        } else
+            camera().setMode(mpu::gph::Camera::fps);
+    });
+    Input::mapKeyToInput("CameraToggleModeAndReset",GLFW_KEY_R);
 
     // pause / run simulation
     Input::addButton("PauseSim","Pauses the simulation.",[](mpu::gph::Window&){pauseHandler(true);});
@@ -360,6 +370,11 @@ void initializeFrontend()
     shader->uniformMat4("projection", projection);
 
     addKeybindings();
+
+    camera().setPosition({0,0,4});
+    camera().setTarget({0,0,0});
+    camera().setRotationSpeedFPS(0.0038);
+    camera().setRotationSpeedTB(0.012);
 
     logINFO("openGL Frontend") << "Initialization of openGL frontend successful. Have fun with real time visualization!";
 }
