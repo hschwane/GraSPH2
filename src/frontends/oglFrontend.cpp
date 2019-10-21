@@ -46,6 +46,7 @@ ColorMode colorMode = ColorMode::CONSTANT;
 float upperBound = 1;   // upper bound of density / velocity transfer function
 float lowerBound = 0.001;   // lower bound of density / velocity transfer function
 glm::vec3 particleColor     = {1.0,1.0,1.0}; // color used when color mode is set to constant
+float brightness = 1.0f; // additional brightness for the particles, gets multiplied with color
 float particleAlpha = 1.0f;
 float materialShininess = 4.0f;
 double printIntervall = 4.0;
@@ -112,6 +113,10 @@ double time{0};
 double lastSimTime{0};
 int frames{0};
 
+// UI
+bool showRenderingWindow{false};
+bool showCameraDebugWindow{false};
+
 //--------------------
 // some helping functions
 
@@ -123,6 +128,7 @@ void compileShader()
     shader->uniformMat4("model", glm::mat4(1.0f));
     shader->uniformMat4("projection", glm::mat4(1.0f));
     shader->uniform3f("defaultColor",particleColor);
+    shader->uniform1f("brightness",brightness);
     shader->uniform1f("materialAlpha",particleAlpha);
     shader->uniform1f("materialShininess",materialShininess);
     shader->uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
@@ -136,6 +142,21 @@ void compileShader()
     shader->uniform1b("renderFlatDisks",renderFlatDisks);
     shader->uniform1b("flatFalloff",flatFalloff);
     shader->uniform1b("enableEdgeHighlights",enableEdgeHighlights);
+}
+
+void setBlending(bool additive)
+{
+    if(additive)
+    {
+        glBlendFunc(GL_ONE, GL_ONE);
+        glEnable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+    }
+    else
+    {
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+    }
 }
 
 void addKeybindings()
@@ -199,26 +220,113 @@ void addKeybindings()
     });
     Input::mapKeyToInput("PrintParticleSize",GLFW_KEY_T,Input::ButtonBehavior::onRelease);
     Input::mapKeyToInput("PrintParticleSize",GLFW_KEY_G,Input::ButtonBehavior::onRelease);
+
+    // UI
+    Input::addButton("ToggleRendererWindow","Toggle visibility of the renderer settings window.",[](mpu::gph::Window&)
+    {
+        showRenderingWindow = ! showRenderingWindow;
+    });
+    Input::mapKeyToInput("ToggleRendererWindow",GLFW_KEY_V);
+
+    Input::addButton("ToggleCamDebugWindow","Toggle visibility of the camera debug window.",[](mpu::gph::Window&)
+    {
+        showCameraDebugWindow = ! showCameraDebugWindow;
+    });
+    Input::mapKeyToInput("ToggleCamDebugWindow",GLFW_KEY_C);
 }
 
-void drawRendererSettingsWindow()
+void drawRendererSettingsWindow(bool* show = nullptr)
 {
-
-}
-
-void setBlending(bool additive)
-{
-    if(additive)
+    using namespace mpu::gph;
+    if(ImGui::Begin("Rendering",show))
     {
-        glBlendFunc(GL_ONE, GL_ONE);
-        glEnable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
+        ImGui::PushID("RenderingMode");
+        if(ImGui::CollapsingHeader("Rendering Mode"))
+        {
+            if(ImGui::Checkbox("Additive Blending", &additiveBlending))
+                setBlending(additiveBlending);
+
+            if(ImGui::RadioButton("Sphere", !renderFlatDisks))
+            {
+                renderFlatDisks = false;
+                shader->uniform1b("renderFlatDisks", renderFlatDisks);
+            }
+            ImGui::SameLine();
+            if(ImGui::RadioButton("Disk", renderFlatDisks))
+            {
+                renderFlatDisks = true;
+                shader->uniform1b("renderFlatDisks", renderFlatDisks);
+            }
+
+            if(renderFlatDisks)
+            {
+                if(ImGui::Checkbox("Falloff", &flatFalloff))
+                    shader->uniform1b("flatFalloff", flatFalloff);
+            }
+
+            if(ImGui::Checkbox("Edge Highlights",&enableEdgeHighlights))
+                shader->uniform1b("enableEdgeHighlights",enableEdgeHighlights);
+        }
+
+        ImGui::PopID();
+        ImGui::PushID("ParticleProperties");
+
+        if(ImGui::CollapsingHeader("Particle properties"))
+        {
+            if(ImGui::SliderFloat("Size", &particleRadius, 0.00001, 1, "%.5f",2.0f))
+                shader->uniform1f("sphereRadius", particleRadius);
+
+            const char* modes[] = {"constant","velocity","speed","density"};
+            int selected = static_cast<int>(colorMode);
+            if(ImGui::Combo("Color Mode", &selected, modes,numColorModes))
+            {
+                colorMode = static_cast<ColorMode>(selected);
+                shader->uniform1ui("colorMode",static_cast<unsigned int>(colorMode));
+            }
+
+            if(colorMode == ColorMode::CONSTANT)
+            {
+
+                if(ImGui::ColorEdit3("Color", glm::value_ptr(particleColor)))
+                    shader->uniform3f("defaultColor", particleColor);
+            } else if(colorMode != ColorMode::VELOCITY)
+            {
+                if(ImGui::DragFloat("Upper Bound",&upperBound,0.01,0.0f,0.0f,"%.5f"))
+                    shader->uniform1f("upperBound",upperBound);
+                if(ImGui::DragFloat("Lower Bound",&lowerBound,0.01,0.0f,0.0f,"%.5f"))
+                    shader->uniform1f("lowerBound",lowerBound);
+            }
+
+            if(ImGui::SliderFloat("Brightness", &brightness, 0, 1, "%.4f", 4.0f))
+                shader->uniform1f("brightness", brightness);
+
+            if(ImGui::SliderFloat("Shininess", &materialShininess, 0, 50))
+                shader->uniform1f("materialShininess", materialShininess);
+        }
+
+        ImGui::PopID();
+        ImGui::PushID("LightProperties");
+
+        if(ImGui::CollapsingHeader("Light properties"))
+        {
+            if(ImGui::Checkbox("Move Light with Camera", &linkLightToCamera))
+                shader->uniform1b("lightInViewSpace", linkLightToCamera);
+
+            if(ImGui::DragFloat3("Position", glm::value_ptr(lightPosition)))
+                shader->uniform3f("light.position", lightPosition);
+
+            if(ImGui::ColorEdit3("Diffuse", glm::value_ptr(lightDiffuse)))
+                shader->uniform3f("light.diffuse", lightDiffuse);
+
+            if(ImGui::ColorEdit3("Specular", glm::value_ptr(lightSpecular)))
+                shader->uniform3f("light.specular", lightSpecular);
+
+            if(ImGui::ColorEdit3("Ambient", glm::value_ptr(lightAmbient)))
+                shader->uniform3f("ambientLight", lightAmbient);
+        }
+        ImGui::PopID();
     }
-    else
-    {
-        glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
-    }
+    ImGui::End();
 }
 
 }
@@ -336,7 +444,12 @@ bool handleFrontend(double t)
         time=0;
     }
 
-//    camera().showDebugWindow();
+    // UI
+    if(showRenderingWindow)
+        drawRendererSettingsWindow(&showRenderingWindow);
+    if(showCameraDebugWindow)
+        camera().showDebugWindow(&showCameraDebugWindow);
+
     camera().update();
 
     // render

@@ -7,6 +7,7 @@ layout(location=1) in vec3 input_velocity; // vector field for color
 layout(location=2) in float input_density; // scalar field for color
 
 uniform vec3 defaultColor; // particle color in color mode 5
+uniform float brightness; // additional brightness control
 uniform uint colorMode; // 1: color by vector field direction, 2: color by vector field magnitude, 3: color by scalar field, 0: constant color
 uniform float upperBound; // highest value of scalar field / vector field magnitude
 uniform float lowerBound; // lowest value of scalar field / vector field magnitude
@@ -46,4 +47,6 @@ void main()
         sphereColor = defaultColor;
         break;
     }
+
+    sphereColor *= brightness;
 }
