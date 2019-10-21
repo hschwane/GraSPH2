@@ -31,28 +31,28 @@
 constexpr Dim dimension=Dim::three;
 
 // enable / disable self gravity (gravitational constant is 1)
-#define ENABLE_SELF_GRAVITY
+//#define ENABLE_SELF_GRAVITY
 
 // enable / disable SPH simulation
 #define ENABLE_SPH
 
 // SPH settings
-#define INTEGRATE_DENSITY // integrate the continuum equation instead of
-//#define DEAL_WITH_NO_PARTNERS // particles without interaction partners will get a set density of rho0/100 when not integrating density
-#define SOLIDS // enable solid body physics (stress tensor)
+//#define INTEGRATE_DENSITY // integrate the continuum equation instead of
+#define DEAL_WITH_NO_PARTNERS // particles without interaction partners will get a set density of rho0/100 when not integrating density
+//#define SOLIDS // enable solid body physics (stress tensor)
 
 // -------------------
 // time integration
 
 // kick drift kick leapfrog using fixed timestep
 // density and deviatoric stress are updated during drift step
-//#define FIXED_TIMESTEP_LEAPFROG
+#define FIXED_TIMESTEP_LEAPFROG
 constexpr f1_t fixed_timestep=0.002; // timestep for fixed timestep leapfrog integrator
 
 // kick drift kick leapfrog using variable timestep
 // density and deviatoric stress are updated during drift step
 // timestep is adjusted based on particle velocity or acceleration, if both criterions are used the minimum is taken
-#define VARIABLE_TIMESTEP_LEAPFROG
+//#define VARIABLE_TIMESTEP_LEAPFROG
 constexpr f1_t initial_timestep=0.002;
 constexpr f1_t min_timestep=0.00002; // smallest allowed timestep
 constexpr f1_t max_timestep=0.02; // biggest allowed timestep
@@ -90,20 +90,20 @@ constexpr f1_t plummer_radius = 1.0_ft; // plummer core radius
 // parameter for generated initial conditions
 constexpr f1_t tmass = 1.0_ft; // total mass of the sphere
 constexpr size_t particle_count=1<<14; // number of particles
-constexpr f3_t angVel=f3_t{0,0,1}; // angular velocity of the cloud omega
+constexpr f3_t angVel=f3_t{0,0,0}; // angular velocity of the cloud omega
 
 // set a value for the smoothing length H
 // you can also define a radius for a single particle
 constexpr f1_t compressesd_radius = 0.1_ft;// all mass of your simulation compressed into a sphere, radius of that sphere
-constexpr f1_t pradius = compressesd_radius * gcem::pow(particle_count,-1.0_ft/3.0_ft); // "radius" of a particle
-constexpr f1_t H = pradius*2.5_ft; // the smoothing length H of a particle
+constexpr f1_t pradius = 0.04;//compressesd_radius * gcem::pow(particle_count,-1.0_ft/3.0_ft); // "radius" of a particle
+constexpr f1_t H = pradius*3.5_ft; // the smoothing length H of a particle
 
 // --------------------
 // Material settings
 
 // parameters of the equation of state
-constexpr f1_t rho0 = tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
-constexpr f1_t BULK = 1024; // the materials bulk modulus
+constexpr f1_t rho0 = 0.9/(4.0/3.0 * M_PI); // tmass /particle_count / (4.0_ft/3.0_ft * pradius * pradius * pradius * M_PI); // the materials rest density
+constexpr f1_t BULK = 10; // the materials bulk modulus
 constexpr f1_t dBULKdP = 1; // the materials change of the bulk modulus with pressure
 constexpr f1_t SOUNDSPEED = gcem::sqrt(BULK / rho0); // speed of sound in material
 
@@ -138,12 +138,12 @@ constexpr f1_t cw_n = gcem::sqrt( 1.0_ft / 3.0_ft);
 
 // add acceleration to particles every timeframe (constant in time and space)
 // eg, use to add downwards gravity
-//#define CONSTANT_ACCELERATION
+#define CONSTANT_ACCELERATION
 constexpr f3_t constant_acceleration = {0, -1,0};
 
 // constrain particles in a box (square for 2d)
 // does not implement proper density / pressure correction on the boundary
-//#define SIMPLE_BOX_BOUNDARY
+#define SIMPLE_BOX_BOUNDARY
 constexpr f3_t simple_box_bound_min = {-1.2,-1.2,-1.2};
 constexpr f3_t simple_box_bound_max = {1.2,1.2,1.2};
 constexpr f1_t simple_box_bound_reflectiveness = 0.5_ft;
@@ -153,21 +153,21 @@ constexpr f1_t simple_box_bound_reflectiveness = 0.5_ft;
 
 // use artificial viscosity
 #define ARTIFICIAL_VISCOSITY
-constexpr f1_t alpha = 1.0_ft; // strength of artificial viscosity
+constexpr f1_t alpha = 0.2_ft; // strength of artificial viscosity
 
 // enable / disable the balsara switch
-#define BALSARA_SWITCH
+//#define BALSARA_SWITCH
 
 // artificial stress to prevent particle clumps
 // not needed for most simulations
-//#define ARTIFICIAL_STRESS
+#define ARTIFICIAL_STRESS
 constexpr f1_t mateps = 0.4_ft;
 constexpr f1_t matexp = 4.0_ft;
 constexpr f1_t normalsep = H*0.3_ft;
 
 // enable XSPH, a technique to smooth the velocity field
 // currently broken (can be used but not recommended)
-//#define XSPH
+#define XSPH
 constexpr f1_t xsph_factor = 0.5_ft;
 
 
