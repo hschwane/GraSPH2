@@ -202,8 +202,8 @@ void addKeybindings()
     Input::mapKeyToInput("CameraToggleModeAndReset",GLFW_KEY_R);
 
     // pause / run simulation
-    Input::addButton("PauseSim","Pauses the simulation.",[](mpu::gph::Window&){pauseHandler(true);});
-    Input::addButton("ResumeSim","Resume the simulation.",[](mpu::gph::Window&){pauseHandler(false);});
+    Input::addButton("PauseSim","Pauses the simulation.",[](mpu::gph::Window&){pauseHandler(true); mpu::gph::enableVsync(true);});
+    Input::addButton("ResumeSim","Resume the simulation.",[](mpu::gph::Window&){pauseHandler(false); mpu::gph::enableVsync(enableVsync);});
     Input::mapKeyToInput("PauseSim",GLFW_KEY_2);
     Input::mapKeyToInput("ResumeSim",GLFW_KEY_1);
 
@@ -357,7 +357,7 @@ void initializeFrontend()
 
     ImGui::create(window());
 
-    mpu::gph::enableVsync(enableVsync);
+    mpu::gph::enableVsync(true);
     glClearColor(BG_COLOR.x,BG_COLOR.y,BG_COLOR.z,BG_COLOR.w);
     setBlending(additiveBlending);
 
