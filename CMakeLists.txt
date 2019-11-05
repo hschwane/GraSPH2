@@ -20,7 +20,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 # -------------------------------------------------------------
 enable_language(CXX)
 enable_language(CUDA)
-find_package(mpUtils 0.10.2 REQUIRED)
+find_package(mpUtils 0.11.2 REQUIRED)
 find_package(TBB REQUIRED)
 
 

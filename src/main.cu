@@ -95,11 +95,17 @@ constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
 constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
-constexpr int maxLeafParticles = 16;
-constexpr int maxCriticalParticles = 256;
-constexpr int stackSizePerThread = 4096;
-constexpr int interactionListSize = 8* 1000;
-constexpr int nodeListSize = 8* 1000;
+constexpr int maxLeafParticles = 16; // max number of particles in a leaf
+constexpr int maxCriticalParticles = 128; // max number of particles in a critical node (critical nodes traverse the tree together)
+
+// gpu settings
+constexpr int gpuBlockSize = 256; // size of one cuda block
+constexpr int stackSizePerBlock = 4096; // global memory available to each thread block to use as a stack
+
+// cpu settings
+constexpr int stackSizePerThreadCPU = 4096;
+constexpr int interactionListSizeCPU = 8 * 1000;
+constexpr int nodeListSizeCPU = 8 * 1000;
 //#define DEBUG_PRINTS
 /////////////////
 
@@ -113,7 +119,7 @@ public:
     TreeDownlink(unsigned int nchildren, unsigned int childid, bool isLeaf) : m_data(((unsigned int)(isLeaf) << leafShift) | ((nchildren-1) << numShift) | (childid & firstMask)) {}
     CUDAHOSTDEV void setData(unsigned int nchildren, unsigned int childid, bool isLeaf) {m_data = ((unsigned int)(isLeaf) << leafShift) | ((nchildren-1) << numShift) | (childid & firstMask); }
     CUDAHOSTDEV void setIsLeaf(bool isLeaf) { m_data = (m_data & ~(leafMask)) | ((unsigned int)(isLeaf) << leafShift);}
-    CUDAHOSTDEV void setNChildren(unsigned int nchildren) { m_data = (m_data & ~(numMask)) | ((nchildren-1) << numShift);} //!< if you put in a number outside of [1,16] the universe will explode!
+    CUDAHOSTDEV void setNChildren(unsigned int nchildren) { m_data = (m_data & ~(numMask)) | ((nchildren-1) << numShift);} //!< if you put in a number outside of [1,16] the universe might explode!
     CUDAHOSTDEV void setFirstChild(unsigned int childid) { m_data = (m_data & ~(firstMask)) | (childid & firstMask);}
 
     CUDAHOSTDEV unsigned int firstChild() const { return (m_data & firstMask); }
@@ -135,14 +141,14 @@ struct MPU_ALIGN(16) NodeOpeningData
     f1_t od2;
 };
 
-struct CriticalNode
+struct MPU_ALIGN(16) CriticalNode
 {
     int firstParticle;
     int nParticles;
     int nodeId;
 };
 
-f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
+CUDAHOSTDEV f1_t calcOpeningDistance2(const f3_t& com, const f3_t& min, const f3_t& max)
 {
     f3_t l3d = max - min;
     f1_t l = fmax(fmax(l3d.x,l3d.y),l3d.z);
@@ -160,6 +166,15 @@ CUDAHOSTDEV f3_t calcInteraction( f1_t massj, f1_t r2, f3_t rij)
     const f1_t invDist = rsqrt(distSqr);
     const f1_t invDistCube = invDist * invDist * invDist;
     return -rij * massj * invDistCube;
+}
+
+// TODO: fix distance calculation
+CUDAHOSTDEV f1_t minDistanceSquare(f3_t min, f3_t max, f3_t point)
+{
+    const f3_t dmin = fabs(min-point);
+    const f3_t dmax = fabs(max-point);
+    const f3_t mdv = fmin(dmin,dmax);
+    return dot(mdv,mdv);
 }
 
 class HostTree
@@ -186,11 +201,11 @@ public:
     {
         mpu::HRStopwatch sw;
 
-        for(int i = layerId.size()-2; i >= 0; i-- )
+        for(int i = m_layerId.size() - 2; i >= 0; i-- )
         {
             // for each layer loop over all nodes in it
-            int layerStart = layerId[i];
-            int layerEnd = layerId[i+1];
+            int layerStart = m_layerId[i];
+            int layerEnd = m_layerId[i + 1];
             for(int n = layerStart; n < layerEnd; n++)
             {
                 // for each node go over all leafs to calculate com, total mass and bounding box
@@ -199,9 +214,9 @@ public:
                 f3_t com{0,0,0};
                 f1_t mass=0;
 
-                if(links[n].isLeaf())
+                if(m_links[n].isLeaf())
                 {
-                    for(int c = links[n].firstChild(); c < links[n].firstChild() + links[n].nChildren(); c++)
+                    for(int c = m_links[n].firstChild(); c < m_links[n].firstChild() + m_links[n].nChildren(); c++)
                     {
                         auto p = pb.template loadParticle<POS,MASS>(c);
                         min = fmin(min, p.pos);
@@ -210,22 +225,22 @@ public:
                         mass += p.mass;
                     }
                 } else{
-                    for(int c = links[n].firstChild(); c < links[n].firstChild() + links[n].nChildren(); c++)
+                    for(int c = m_links[n].firstChild(); c < m_links[n].firstChild() + m_links[n].nChildren(); c++)
                     {
-                        min = fmin(min, aabbmin[c]);
-                        max = fmax(max, aabbmax[c]);
-                        com += openingData[c].com * nodeMass[c];
-                        mass += nodeMass[c];
+                        min = fmin(min, m_aabbmin[c]);
+                        max = fmax(max, m_aabbmax[c]);
+                        com += m_openingData[c].com * m_nodeMass[c];
+                        mass += m_nodeMass[c];
                     }
                 }
 
                 // store the results
                 com /= mass;
-                aabbmin[n] = min;
-                aabbmax[n] = max;
-                nodeMass[n] = mass;
-                openingData[n].com = com;
-                openingData[n].od2 = calcOpeningDistance2(com, min, max);
+                m_aabbmin[n] = min;
+                m_aabbmax[n] = max;
+                m_nodeMass[n] = mass;
+                m_openingData[n].com = com;
+                m_openingData[n].od2 = calcOpeningDistance2(com, min, max);
 
             }
         }
@@ -236,33 +251,48 @@ public:
 
     void print(int startNode = 0, int count = 0, bool printGeneralInfo = true)
     {
-        int tc=0;
-        int endNode = (count == 0) ? links.size() : startNode + count;
+        int endNode = (count == 0) ? m_links.size() : startNode + count;
         std::cout << "printing nodes " << startNode << " to " << endNode << std::endl;
         for(int i = startNode; i < endNode; ++i)
         {
-            auto const & l = links[i];
+            auto const & l = m_links[i];
             std::cout << "Node " << i << " is leaf: " << l.isLeaf() << " first child: " << l.firstChild()
-                      << " num children: " << l.nChildren() << " com: " << openingData[i].com << " mass: " << nodeMass[i] << std::endl;
+                      << " num children: " << l.nChildren() << " com: " << m_openingData[i].com << " mass: " << m_nodeMass[i] << std::endl;
         }
 
         if(printGeneralInfo)
         {
             // check how many children there are
-            for(const auto &l : links)
+
+            int tc=0;
+            int minp =std::numeric_limits<int>::max();
+            int maxp =0;
+            for(const auto &l : m_links)
                 if(l.isLeaf())
-                    tc+=l.nChildren();
+                {
+                    tc += l.nChildren();
+                    minp = std::min(int(l.nChildren()), minp);
+                    maxp = std::max(int(l.nChildren()), maxp);
+                }
 
             int ncnp=0;
-            for(const auto &node : criticalNodes)
+            int ncnmin =std::numeric_limits<int>::max();
+            int ncnmax =0;
+            for(const auto &node : m_criticalNodes)
             {
                 ncnp += node.nParticles;
+                ncnmin = std::min(node.nParticles, ncnmin);
+                ncnmax = std::max(node.nParticles, ncnmax);
             }
 
             // print some gerneral information
-            std::cout << "Number of leafs: " << leafs.size() << " with total " << tc << " children" << std::endl;
-            std::cout << "Total number of nodes: " << links.size() << " in " << layerId.size()-1 << " layers" << std::endl;
-            std::cout << "Number of Critical Nodes: " << criticalNodes.size() << " with total of " << ncnp << " particles" << std::endl;
+            std::cout << "Number of leafs: " << m_leafs.size() << " with total of " << tc << " particles" << " and min/max/average of " << minp << "/" << maxp << "/" << float(tc) / float(m_leafs.size()) << " particles per leaf" << std::endl;
+            std::cout << "Total number of nodes: " << m_links.size() << " in " << m_layerId.size() - 1 << " layers" << std::endl;
+            for(int i = 0; i < m_layerId.size()-1; i++)
+            {
+                std::cout << "\t Layer " << i << " with " << m_layerId[i+1] - m_layerId[i] << " nodes" << std::endl;
+            }
+            std::cout << "Number of Critical Nodes: " << m_criticalNodes.size() << " with total of " << ncnp << " particles" << " and min/max/average of " << ncnmin << "/" << ncnmax << "/" << float(ncnp) / float(m_criticalNodes.size()) << " particles per critical node" << std::endl;
         }
     }
 
@@ -270,11 +300,11 @@ public:
     void computeForces(BufferType& pb)
     {
         mpu::HRStopwatch sw;
-        tbb::parallel_for( tbb::blocked_range<size_t>(0, criticalNodes.size()), [&](const auto &range)
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, m_criticalNodes.size()), [&](const auto &range)
         {
             for (auto i = range.begin(); i != range.end(); ++i)
             {
-                this->traverseTree(criticalNodes[i],pb, &buffer1.local()[0], &buffer2.local()[0], &ilist.local()[0], &nlist.local()[0]);
+                this->traverseTree(m_criticalNodes[i], pb, &buffer1.local()[0], &buffer2.local()[0], &ilist.local()[0], &nlist.local()[0]);
             }
         });
 
@@ -282,29 +312,54 @@ public:
         std::cout << "Computing forces took " << sw.getSeconds() *1000 << "ms" << std::endl;
     }
 
+    template <typename BufferType>
+    void computeForcesGPU(BufferType& pb)
+    {
+        mpu::HRStopwatch sw;
+
+        typename BufferType::deviceType devpb(pb.size());
+
+        sw.pause();
+        std::cout << "GPU Memory allocation " << sw.getSeconds() *1000 << "ms" << std::endl;
+        sw.reset();
+
+        devpb = pb;
+
+        sw.pause();
+        std::cout << "Data upload took " << sw.getSeconds() *1000 << "ms" << std::endl;
+        sw.reset();
+
+        assert_cuda( cudaDeviceSynchronize());
+
+        sw.pause();
+        std::cout << "Computing forces took " << sw.getSeconds() *1000 << "ms" << std::endl;
+        sw.reset();
+
+    }
+
 private:
-    std::vector<TreeDownlink> links; //!< information about the children of a tree node
-    std::vector<NodeOpeningData> openingData; //!< data needed to check if node should be opened
-    std::vector<f1_t> nodeMass; //!< total mass of nodes
+    std::vector<TreeDownlink> m_links; //!< information about the children of a tree node
+    std::vector<NodeOpeningData> m_openingData; //!< data needed to check if node should be opened
+    std::vector<f1_t> m_nodeMass; //!< total mass of nodes
 
-    std::vector<CriticalNode> criticalNodes; //!< nodes that will traverse the tree
+    std::vector<CriticalNode> m_criticalNodes; //!< nodes that will traverse the tree
 
-    std::vector<f3_t> aabbmin; //!< max corner of this nodes axis aligned bounding box
-    std::vector<f3_t> aabbmax; //!< min corner of this nodes axis aligned bounding box
-    std::vector<int> uplinks; //!< links to a nodes parent for backwards traversal
-    std::vector<int> leafs; //!< ids of leaf nodes for backwards traversal
-    std::vector<spaceKey> nodeKeys; //!< masked morton keys of nodes
-    std::vector<int> nodeLayer; //!< layer of each node
-    std::vector<int> layerId; //!< node id where layer x starts
+    std::vector<f3_t> m_aabbmin; //!< max corner of this nodes axis aligned bounding box
+    std::vector<f3_t> m_aabbmax; //!< min corner of this nodes axis aligned bounding box
+    std::vector<int> m_uplinks; //!< links to a nodes parent for backwards traversal
+    std::vector<int> m_leafs; //!< ids of leaf nodes for backwards traversal
+    std::vector<spaceKey> m_nodeKeys; //!< masked morton keys of nodes
+    std::vector<int> m_nodeLayer; //!< layer of each node
+    std::vector<int> m_layerId; //!< node id where layer x starts
 
-    std::vector<spaceKey> mKeys; //!< morten code
-    std::vector<unsigned int> perm; //!< permutation list for sorting
+    std::vector<spaceKey> m_mKeys; //!< morten code
+    std::vector<unsigned int> m_perm; //!< permutation list for sorting
 
     // per thread buffer used during traversal only
-    tbb::enumerable_thread_specific<std::array<int, stackSizePerThread>> buffer1;
-    tbb::enumerable_thread_specific<std::array<int, stackSizePerThread>> buffer2;
-    tbb::enumerable_thread_specific<std::array<int, interactionListSize>> ilist;
-    tbb::enumerable_thread_specific<std::array<int, nodeListSize>> nlist;
+    tbb::enumerable_thread_specific<std::array<int, stackSizePerThreadCPU>> buffer1;
+    tbb::enumerable_thread_specific<std::array<int, stackSizePerThreadCPU>> buffer2;
+    tbb::enumerable_thread_specific<std::array<int, interactionListSizeCPU>> ilist;
+    tbb::enumerable_thread_specific<std::array<int, nodeListSizeCPU>> nlist;
 
     template <typename BufferType>
     void calcMortonCodes(const BufferType& pb)
@@ -312,14 +367,14 @@ private:
         mpu::HRStopwatch sw;
 
         // generate morton keys for all particles
-        mKeys.resize(pb.size());
+        m_mKeys.resize(pb.size());
         const f3_t domainFactor = 1.0_ft / (domainMax - domainMin);
         tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
         {
             for (auto i = range.begin(); i != range.end(); ++i)
             {
                 Particle<POS> p = pb.template loadParticle<POS>(i);
-                mKeys[i] = calculatePositionKey(p.pos,domainMin,domainFactor);
+                m_mKeys[i] = calculatePositionKey(p.pos, domainMin, domainFactor);
             }
         });
 
@@ -345,9 +400,9 @@ private:
         // sort particles by morton key
 
         // create and sort the permutation vector
-        perm.resize(pb.size());
-        std::iota(perm.begin(),perm.end(),0);
-        tbb::parallel_sort(perm.begin(),perm.end(), [keysPtr=mKeys.data()](const int idx1, const int idx2) {
+        m_perm.resize(pb.size());
+        std::iota(m_perm.begin(), m_perm.end(), 0);
+        tbb::parallel_sort(m_perm.begin(), m_perm.end(), [keysPtr=m_mKeys.data()](const int idx1, const int idx2) {
             return keysPtr[idx1] < keysPtr[idx2];
         });
 
@@ -358,13 +413,13 @@ private:
         {
             for (auto i = range.begin(); i != range.end(); ++i)
             {
-                const auto pi = pb.loadParticle(perm[i]);
+                const auto pi = pb.loadParticle(m_perm[i]);
                 sorted.storeParticle(i,pi);
-                sortedKeys[i] = mKeys[perm[i]];
+                sortedKeys[i] = m_mKeys[m_perm[i]];
             }
         });
         pb = std::move(sorted);
-        mKeys = std::move(sortedKeys);
+        m_mKeys = std::move(sortedKeys);
 
         sw.pause();
         std::cout << "Sorting codes took " << sw.getSeconds() *1000 << "ms" << std::endl;
@@ -380,17 +435,17 @@ private:
     template <typename BufferType>
     void generateNodes(const BufferType& pb)
     {
-        links.clear();
-        layerId.clear();
-        nodeLayer.clear();
-        nodeKeys.clear();
-        criticalNodes.clear();
+        m_links.clear();
+        m_layerId.clear();
+        m_nodeLayer.clear();
+        m_nodeKeys.clear();
+        m_criticalNodes.clear();
 
         mpu::HRStopwatch sw;
-        links.emplace_back(); // root node
-        layerId.push_back(0);
-        nodeLayer.push_back(0);
-        nodeKeys.push_back(0);
+        m_links.emplace_back(); // root node
+        m_layerId.push_back(0);
+        m_nodeLayer.push_back(0);
+        m_nodeKeys.push_back(0);
 
         // temp storage
         std::vector<bool> isInLeaf(pb.size(),false);
@@ -404,7 +459,7 @@ private:
             bool isInBlock=false; // are we currently inside a block of particles  with the same masked key?
 
             // node id where next layer starts
-            layerId.push_back(links.size());
+            m_layerId.push_back(m_links.size());
 
             std::vector<int> compactedList;
 
@@ -415,21 +470,21 @@ private:
                 if(!isInLeaf[i])
                 {
                     // form regions of particles with same masked keys
-                    spaceKey cell = (mKeys[i] & mask);
+                    spaceKey cell = (m_mKeys[i] & mask);
                     if( !isInBlock)
                     {
                         // put i as start of next section
                         prevCell=cell;
                         isInBlock = true;
                         compactedList.push_back(i);
-                        nodeKeys.push_back(cell);
+                        m_nodeKeys.push_back(cell);
 
                     } else if(prevCell != cell)
                     {
                         // end section and start a new one
                         prevCell=cell;
                         compactedList.push_back(i);
-                        nodeKeys.push_back(cell);
+                        m_nodeKeys.push_back(cell);
                         compactedList.push_back(i);
                     }
 
@@ -465,7 +520,7 @@ private:
                 // do we need to make a critical node?
                 if(particlesInNode <= maxCriticalParticles && !isInCritical[id1])
                 {
-                    criticalNodes.push_back(CriticalNode{id1,particlesInNode, static_cast<int>(links.size())});
+                    m_criticalNodes.push_back(CriticalNode{id1, particlesInNode, static_cast<int>(m_links.size())});
                     for(int j=id1; j<id2; j++)
                         isInCritical[j]=true;
                 }
@@ -477,12 +532,12 @@ private:
                     std::cout << "Leaf" <<std::endl;
 #endif
                     link.setData(particlesInNode, id1, true);
-                    leafs.push_back(links.size());
+                    m_leafs.push_back(m_links.size());
                     for(int j=id1; j<id2; j++)
                         isInLeaf[j]=true;
                 }
-                links.push_back(link);
-                nodeLayer.push_back(layer);
+                m_links.push_back(link);
+                m_nodeLayer.push_back(layer);
             }
             layer++;
         }
@@ -490,11 +545,11 @@ private:
         assert_critical(layer<=21,"Octree","layer limit reached during node creation")
 
         // resize all the buffers
-        uplinks.resize(links.size());
-        aabbmin.resize(links.size());
-        aabbmax.resize(links.size());
-        nodeMass.resize(links.size());
-        openingData.resize(links.size());
+        m_uplinks.resize(m_links.size());
+        m_aabbmin.resize(m_links.size());
+        m_aabbmax.resize(m_links.size());
+        m_nodeMass.resize(m_links.size());
+        m_openingData.resize(m_links.size());
 
         // add the end of the node list to the layer list (not needed, this is already done implicitly by the algorithm above)
         // layerId.push_back(links.size());
@@ -502,7 +557,7 @@ private:
         sw.pause();
         std::cout << "Generate nodes took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
-        assert_true(links.size() == nodeLayer.size() && links.size() == nodeKeys.size(),"Octree","array sizes do not match after construction")
+        assert_true(m_links.size() == m_nodeLayer.size() && m_links.size() == m_nodeKeys.size(), "Octree", "array sizes do not match after construction")
 
 #ifdef DEBUG_PRINTS
         int tc=0;
@@ -531,35 +586,35 @@ private:
         mpu::HRStopwatch sw;
 
         int lastParent = -1;
-        for(int i=1; i < links.size(); i++)
+        for(int i=1; i < m_links.size(); i++)
         {
             // for each node see on which level the parent is and get some information
-            const int parentLayer = nodeLayer[i]-1;
-            int parent = (lastParent >= layerId[parentLayer]) ? lastParent : layerId[parentLayer]; // a parent can have up to 8 children, so start testing with the old parent if it is in the correct layer
+            const int parentLayer = m_nodeLayer[i] - 1;
+            int parent = (lastParent >= m_layerId[parentLayer]) ? lastParent : m_layerId[parentLayer]; // a parent can have up to 8 children, so start testing with the old parent if it is in the correct layer
 
             // masking this nodes key with the mask of the parents layer results in a masked key which is equal to the parents
             const spaceKey parentMask =  ~0llu << (63u-(parentLayer*3u));
-            const spaceKey thisMaskedKey = (nodeKeys[i] & parentMask);
+            const spaceKey thisMaskedKey = (m_nodeKeys[i] & parentMask);
 
             // get the the key of the current parent candidate
-            spaceKey parentMaskedKey = nodeKeys[parent];
+            spaceKey parentMaskedKey = m_nodeKeys[parent];
 
             // if last nodes parent is not this nodes parent, high chances are it will be close, so do linear search instead of binary
             while(parentMaskedKey != thisMaskedKey)
-                parentMaskedKey = nodeKeys[++parent];
+                parentMaskedKey = m_nodeKeys[++parent];
 
-            assert_true( parent < layerId[parentLayer+1] && parent >= layerId[parentLayer], "Octree", "parent assumed in wrong layer")
-            assert_true( nodeKeys[parent] == thisMaskedKey, "Octree", "Wrong parent assumed during linking.")
+            assert_true(parent < m_layerId[parentLayer + 1] && parent >= m_layerId[parentLayer], "Octree", "parent assumed in wrong layer")
+            assert_true(m_nodeKeys[parent] == thisMaskedKey, "Octree", "Wrong parent assumed during linking.")
 
             // parent is now the parent, so link it. But first we need to know if we are the first child
             if(lastParent != parent)
-                links[parent].setFirstChild(i);
+                m_links[parent].setFirstChild(i);
                 // links start with NChildren == 1
             else
-                links[parent].setNChildren( links[parent].nChildren()+1);
+                m_links[parent].setNChildren(m_links[parent].nChildren() + 1);
 
             // uplink
-            uplinks[i] = parent;
+            m_uplinks[i] = parent;
 
             // update last parent id
             lastParent = parent;
@@ -581,14 +636,6 @@ private:
 
     }
 
-    f1_t minDistanceSquare(f3_t min, f3_t max, f3_t point) const
-    {
-        const f3_t dmin = fabs(min-point);
-        const f3_t dmax = fabs(max-point);
-        const f3_t mdv = fmin(dmin,dmax);
-        return dot(mdv,mdv);
-    }
-
     template <typename BufferType>
     void traverseTree(const CriticalNode& group, BufferType& pb, int *stackWrite, int *stackRead, int *particleInteractionList, int* nodeInteractionList) const
     {
@@ -599,7 +646,7 @@ private:
         int *nilStart= nodeInteractionList;
 
         // add children of root
-        for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
+        for(int child = m_links[0].firstChild(); child < m_links[0].firstChild() + m_links[0].nChildren(); child++)
             *(stackWrite++) = child;
 
         // swap stacks
@@ -607,8 +654,8 @@ private:
         stackWrite = stackEndRead;
         std::swap(stackEndRead,stackEndWrite);
 
-        const f3_t min = aabbmin[group.nodeId];
-        const f3_t max = aabbmax[group.nodeId];
+        const f3_t min = m_aabbmin[group.nodeId];
+        const f3_t max = m_aabbmax[group.nodeId];
 
         // traversal finished when this stack is empty directly after swapping
         while(stackRead != stackEndRead)
@@ -623,16 +670,16 @@ private:
                     continue;
 
                 // check if node needs to be opened
-                const f1_t r2 = minDistanceSquare(min,max,openingData[id].com);
-                if(r2 <= openingData[id].od2)
+                const f1_t r2 = minDistanceSquare(min, max, m_openingData[id].com);
+                if(r2 <= m_openingData[id].od2)
                 {
                     // it needs to be opened, for leafs interact with all particles, for nodes add them to the next level stack
-                    if(links[id].isLeaf())
+                    if(m_links[id].isLeaf())
                     {
-                        for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
+                        for(int child = m_links[id].firstChild(); child < m_links[id].firstChild() + m_links[id].nChildren(); child++)
                             *(particleInteractionList++) = child;
                     } else
-                        for(int child = links[id].firstChild(); child < links[id].firstChild() + links[id].nChildren(); child++)
+                        for(int child = m_links[id].firstChild(); child < m_links[id].firstChild() + m_links[id].nChildren(); child++)
                             *(stackWrite++) = child;
                 } else
                 {
@@ -644,9 +691,9 @@ private:
             stackRead = stackWrite;
             stackWrite = stackEndRead;
             std::swap(stackEndRead,stackEndWrite);
-            assert_critical(stackRead-stackEndRead < stackSizePerThread,"TREE","stack overflow during tree travers")
-            assert_critical(particleInteractionList-pilStart < interactionListSize,"TREE","particle interaction list overflow")
-            assert_critical(nodeInteractionList-nilStart < interactionListSize,"TREE","node interaction list overflow")
+            assert_critical(stackRead-stackEndRead < stackSizePerThreadCPU, "TREE", "stack overflow during tree travers")
+            assert_critical(particleInteractionList-pilStart < interactionListSizeCPU, "TREE", "particle interaction list overflow")
+            assert_critical(nodeInteractionList-nilStart < interactionListSizeCPU, "TREE", "node interaction list overflow")
         }
 
 //        std::cout << "particle list size: " << particleInteractionList - pilStart
@@ -661,8 +708,8 @@ private:
             for(int index = 0; index < nodeInteractionList - nilStart; index++)
             {
                 int j = nilStart[index];
-                f3_t rij = pi.pos - openingData[j].com;
-                pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+                f3_t rij = pi.pos - m_openingData[j].com;
+                pi.acc += calcInteraction(m_nodeMass[j], dot(rij, rij), rij);
             }
 
             // with particles in same group:
@@ -684,8 +731,245 @@ private:
             pb.template storeParticle(i,Particle<ACC>(pi));
         }
     }
-
 };
+
+template <typename DeviceBufferReference>
+__global__ void traverseTreeGPU(DeviceBufferReference pb,
+                                CriticalNode* critNodes,
+                                f3_t* aabbMin,
+                                f3_t* aabbMax,
+                                TreeDownlink* links,
+                                NodeOpeningData* openingData,
+                                int* globalStack)
+{
+    // setup cub
+    typedef cub::BlockScan<int, gpuBlockSize> BlockScan;
+    typedef cub::BlockRadixSort<int, gpuBlockSize, 1, int> BlockRadixSort;
+    typedef cub::BlockDiscontinuity<int, gpuBlockSize> BlockDiscontinuity;
+    __shared__ union
+    {
+        typename BlockScan::TempStorage blockScan;
+        typename BlockRadixSort::TempStorage radixSort;
+        typename BlockDiscontinuity::TempStorage discontinutiy;
+    } cubTempData;
+
+    // allocate shared memory
+    constexpr int pilSize = gpuBlockSize * 16;
+    constexpr int sharedStackSize = gpuBlockSize * 8;
+    constexpr int nilSize = gpuBlockSize;
+
+    enum OpeningType
+    {
+        self = 3,
+        particleInteraction = 2,
+        nodeInteraction = 1,
+        nodeToStack = 0
+    };
+
+    // shared memory for temporary interaction list and stack storage
+    __shared__ int pil[pilSize];                                      // blockSize * 16 * 4 = 16384 byte
+    __shared__ int sharedStack[sharedStackSize];                      // blockSize * 8 * 4 = 8192 byte
+    __shared__ int nil[nilSize];                                      // blockSize * 4 = 1024
+    __shared__ int* bufferPointer[3];
+    __shared__ int entryCounts[3];
+
+    // shared memory for acceleration of interaction
+    SharedParticles<gpuBlockSize,SHARED_POSM> sharedParticleData; // blockSize * 16 = 4096 + ?
+
+    // stack pointer management
+    // TODO: this could also be local variables, maybe faster?
+    __shared__ int* stackWriteEnd;
+    __shared__ int* stackReadEnd;
+    __shared__ int* stackWrite;
+    __shared__ int* stackRead;
+
+    // data about our group
+    __shared__ CriticalNode group;                   // 16
+    __shared__ f3_t groupMin;                        // 16
+    __shared__ f3_t groupMax;                        // 16
+
+    // load values for this critical node / this thread group
+    if(threadIdx.x == 0)
+    {
+        group = critNodes[blockIdx.x];
+        groupMin = aabbMin[group.nodeId];
+        groupMax = aabbMax[group.nodeId];
+
+        entryCounts[0] = 0;
+        entryCounts[1] = 0;
+        entryCounts[2] = 0;
+
+        bufferPointer[OpeningType::particleInteraction] = &pil[0];
+        bufferPointer[OpeningType::nodeInteraction] = &nil[0];
+        bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+
+        stackReadEnd = &globalStack[blockIdx.x * stackSizePerBlock];
+        stackWriteEnd = stackReadEnd + stackSizePerBlock / 2;
+
+        stackWrite = stackWriteEnd;
+        stackRead = stackReadEnd;
+
+        // load children of root into stack
+        for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
+            *(stackWrite++) = child;
+        // TODO: initialize stack more efficient and with more nodes or do it before and store in constant memory (eg start at second level)
+
+        // swap stack pointer
+        stackRead = stackWrite;
+        stackWrite = stackReadEnd;
+        stackReadEnd = stackWriteEnd;
+        stackWriteEnd = stackWrite;
+    }
+    __syncthreads();
+
+    // load this threads particle
+    Particle<POS,MASS,ACC> pi;
+    if(threadIdx.x < group.nParticles)
+        pi = pb.template loadParticle<POS,MASS>(group.firstParticle + threadIdx.x); // cuda block size size MUST be bigger than the critical node size
+
+    // each loop iteration processes one tree layer
+    // traverse is finished when read stack is empty directly after stack swapping
+    while(stackRead != stackReadEnd)
+    {
+        // each loop iteration processes block size elements on the stack
+        // until stack is empty
+        for(int i : mpu::blockStrideRange(stackRead - stackReadEnd))
+        {
+            // load the node id from the stack (in global memory)
+            const int id = *(stackRead - i);
+
+            // figure out type of interaction
+            const NodeOpeningData od = openingData[id];
+            const TreeDownlink link = links[id];
+            const f1_t r2 = minDistanceSquare(groupMin, groupMax, od.com);
+            OpeningType opening = (group.nodeId == id) ? OpeningType::self
+                                                       : (r2 > openingData[id].od2) ? OpeningType::nodeInteraction
+                                                                                    : (link.isLeaf())
+                                                                                      ? OpeningType::particleInteraction
+                                                                                      : OpeningType::nodeToStack;
+
+            // sort depending on opening type
+            BlockRadixSort(cubTempData.radixSort).Sort(opening, id, 0, 4);
+
+            // use prefix sum to determin where to write in shared memory
+            int numToWrite = (opening == OpeningType::self) ? 0
+                                                            : (opening == OpeningType::nodeInteraction) ? 1
+                                                                                                        : link.nChildren();
+            int writeID;
+            int agg;
+            BlockScan(cubTempData.blockScan).ExclusiveSum(numToWrite, writeID, agg);
+
+            // we also need to know how many entries of each opening type will be in storage
+            int flag;
+            BlockDiscontinuity(cubTempData.discontinutiy).FlagHeads(flag, opening);
+            if(flag == 1 && threadIdx.x > 0)
+            {
+                entryCounts[opening - 1] = writeID;
+            }
+            __syncthreads();
+
+            // handle stack if needed
+            int currentSharedStacksize = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+            if(entryCounts[OpeningType::nodeToStack] + currentSharedStacksize > sharedStackSize )
+            {
+                for(int j : mpu::blockStrideRange(currentSharedStacksize))
+                {
+                    *(stackWrite+j) = sharedStack[j];
+                }
+
+                if(threadIdx.x == 0)
+                {
+                    stackWrite += currentSharedStacksize;
+                    bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+                }
+            }
+
+            // handle node interations if needed
+            int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
+            if(entryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
+            {
+                // TODO: process interactions to empty the interaction list
+            }
+
+            // handle particle interations if needed
+            int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
+            if(entryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
+            {
+                // TODO: process interactions to empty the interaction list
+            }
+
+            // --------------------------------------
+            // now write the data to the intermediate buffers
+
+            // figure out memory adresss where to write
+            int* write = bufferPointer[opening] + (writeID - ((opening - 1 < 0) ? 0 : entryCounts[opening - 1]));
+            __syncthreads();
+
+            // write
+            int data = (opening == nodeToStack) ? id : link.firstChild();
+            for(int j = 0; j < numToWrite; j++)
+            {
+                write[j] = data+j;
+            }
+
+            // update the buffer pointer for next iteration
+            if(threadIdx.x <3)
+            {
+                bufferPointer[threadIdx.x] += entryCounts[threadIdx.x];
+                entryCounts[threadIdx.x] = 0;
+            }
+        }
+
+        // store remaining items from shared memory stack to the global memory stack
+        int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+        for(int i : mpu::blockStrideRange(stackCopyCount))
+        {
+            *(stackWrite+i) = sharedStack[i];
+        }
+
+        if(threadIdx.x == 0)
+        {
+            stackWrite += stackCopyCount;
+            bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+
+        }
+
+        // swap stack
+        if(threadIdx.x == 0)
+        {
+            stackRead = stackWrite;
+            stackWrite = stackReadEnd;
+            stackReadEnd = stackWriteEnd;
+            stackWriteEnd = stackWrite;
+        }
+        __syncthreads();
+    }
+
+
+    // --------------------------------------
+    // traverse is done, handle all interactions left in shared memory buffers
+
+    // handle left over interactions with particles
+    // TODO: process interactions to empty the interaction list
+
+    // handle left over interactions with nodes
+    // TODO: process interactions to empty the interaction list
+
+    // handle self interactions inside the group
+    sharedParticleData.storeParticle(threadIdx.x, pi);
+    __syncthreads();
+    for(int j = 0; j < group.nParticles; j++)
+    {
+        auto pj = sharedParticleData.loadParticle<POS,MASS>(j);
+        f3_t rij = pi.pos - pj.pos;
+        pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+    }
+
+    // --------------------------------------
+    // store acceleration (for now discard results of threads with no particle)
+    if(threadIdx.x < group.nParticles)
+        pb.storeParticle( group.firstParticle + threadIdx.x, Particle<ACC>(pi));
+}
 
 void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
@@ -728,6 +1012,19 @@ std::pair<f1_t,f1_t> calcError(const HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_
 
 
     return std::pair<f1_t,f1_t>(median,mean);
+}
+
+f3_t calcTrueCom(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
+{
+    f3_t com{};
+    f1_t tmass=0;
+    for(int i = 0; i < pb.size(); i++)
+    {
+        auto pi = pb.loadParticle<POS, MASS>(i);
+        com += pi.pos * pi.mass;
+        tmass += pi.mass;
+    }
+    return com/tmass;
 }
 
 //!< calculate gravity naive on the gpu
@@ -790,9 +1087,6 @@ void computeForcesNaiveOnGPU(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb
 }
 
 
-// TODO: fix distance calculation
-
-
 int main()
 {
 //    spaceKey k = 7llu << 61u;
@@ -825,9 +1119,11 @@ int main()
     std::cout << "\n-------------------------------------------\n CONSTRUCTION" << std::endl;
 
     myTree.construct(pb);
+    myTree.update(pb);
 
     std::cout << "\n-------------------------------------------\n TREE INFO" << std::endl;
     myTree.print(0,1);
+    std::cout << "True center of mass: " << calcTrueCom(pb) << std::endl;
 
     std::cout << "\n-------------------------------------------\n CPU" << std::endl;
     myTree.update(pb);
@@ -862,406 +1158,3 @@ int main()
     std::cout << "Median error: " << error.first << std::endl;
     std::cout << "Mean error: " << error.second << std::endl;
 }
-
-
-
-
-///**
-// * @brief first pass of derivative computation
-// */
-//struct cdA
-//{
-//    // define particle attributes to use
-//    using load_type = Particle<POS,MASS,VEL,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
-//    using store_type = Particle<BALSARA,DENSITY_DT,DSTRESS_DT>; //!< particle attributes to store to main memory
-//    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-//    using pj_type = Particle<POS,MASS,VEL,DENSITY>; //!< the particle attributes to load from main memory of all the interaction partners j
-//    //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
-//    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_DENSITY>;
-//
-//    // setup some variables we need before during and after the pair interactions
-//    m3_t edot{0}; // strain rate tensor (edot)
-//    m3_t rdot{0}; // rotation rate tensor
-//    f1_t divv{0}; // velocity divergence
-//
-//    //!< This function is executed for each particle before the interactions are computed.
-//    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
-//    {
-//    }
-//
-//    //!< This function will be called for each pair of particles.
-//    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
-//    {
-//        const f3_t rij = pi.pos-pj.pos;
-//        const f1_t r2 = dot(rij,rij);
-//        if(r2 <= H2 && r2>0)
-//        {
-//            // get the kernel gradient
-//            f1_t r = sqrt(r2);
-//            const f1_t dw = kernel::dWspline(r, H, dW_prefactor);
-//            const f3_t gradw = (dw / r) * rij;
-//
-//            // strain rate tensor (edot) and rotation rate tensor (rdot)
-//            const f3_t vij = pi.vel - pj.vel;
-//            addStrainRateAndRotationRate(edot,rdot,pj.mass,pj.density,vij,gradw);
-//            divv -= (pj.mass / pj.density) * dot(vij, gradw);
-//        }
-//    }
-//
-//    //!< This function will be called for particle i after the interactions with the other particles are computed.
-//    CUDAHOSTDEV store_type do_after(pi_type& pi)
-//    {
-//        // deviatoric stress time derivative
-//        pi.dstress_dt = dstress_dt(edot,rdot,pi.dstress,shear);
-//
-//        // density time derivative
-//        pi.density_dt = -pi.density * divv;
-//
-//#if defined(BALSARA_SWITCH)
-//        // get curl from edot and compute the balsara switch value
-//        const f3_t curlv = f3_t{-2*rdot[1][2], -2*rdot[2][0], -2*rdot[0][1] };
-//        pi.balsara = balsaraSwitch(divv, curlv, SOUNDSPEED, H);
-//#endif
-//
-//        return pi;
-//    }
-//};
-//
-///**
-// * @brief second pass of derivative computation
-// */
-//struct cdB
-//{
-//    // define particle attributes to use
-//    using load_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< particle attributes to load from main memory
-//    using store_type = Particle<ACC,XVEL>; //!< particle attributes to store to main memory
-//    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-//    using pj_type = Particle<POS,MASS,VEL,BALSARA,DENSITY,DSTRESS>; //!< the particle attributes to load from main memory of all the interaction partners j
-//    //!< when using do_for_each_pair_fast a SharedParticles object must be specified which can store all the attributes of particle j
-//    template<size_t n> using shared = SharedParticles<n,SHARED_POSM,SHARED_VEL,SHARED_BALSARA,SHARED_DENSITY,SHARED_DSTRESS>;
-//
-//    // setup some variables we need before during and after the pair interactions
-//#if defined(ENABLE_SPH)
-//    m3_t sigOverRho_i; // stress over density square used for acceleration
-//    #if defined(ARTIFICIAL_STRESS)
-//        m3_t arts_i; // artificial stress from i
-//    #endif
-//#endif
-//
-//    //!< This function is executed for each particle before the interactions are computed.
-//    CUDAHOSTDEV void do_before(pi_type& pi, size_t id)
-//    {
-//#if defined(ENABLE_SPH)
-//        // build stress tensor for particle i using deviatoric stress and pressure
-//        m3_t sigma_i = pi.dstress;
-//        const f1_t pres_i = eos::murnaghan( pi.density, rho0, BULK, dBULKdP);
-//        sigma_i[0][0] -= pres_i;
-//        sigma_i[1][1] -= pres_i;
-//        sigma_i[2][2] -= pres_i;
-//
-//        sigOverRho_i = sigma_i / (pi.density*pi.density);
-//
-//    #if defined(ARTIFICIAL_STRESS)
-//        // artificial stress from i
-//        m3_t arts_i = artificialStress(mateps, sigOverRho_i);
-//    #endif
-//#endif
-//    }
-//
-//    //!< This function will be called for each pair of particles.
-//    CUDAHOSTDEV void do_for_each_pair(pi_type& pi, const pj_type pj)
-//    {
-//        const f3_t rij = pi.pos-pj.pos;
-//        const f1_t r2 = dot(rij,rij);
-//        if(r2>0)
-//        {
-//
-//#if defined(ENABLE_SELF_GRAVITY)
-//            // gravity
-//            const f1_t distSqr = r2 + H2;
-//            const f1_t invDist = rsqrt(distSqr);
-//            const f1_t invDistCube = invDist * invDist * invDist;
-//            pi.acc -= rij * pj.mass * invDistCube;
-//#endif
-//
-//#if defined(ENABLE_SPH)
-//            if(r2 <= H2)
-//            {
-//                // get the kernel gradient
-//                f1_t r = sqrt(r2);
-//                const f1_t dw = kernel::dWspline(r, H, dW_prefactor);
-//                const f3_t gradw = (dw / r) * rij;
-//
-//                // stress and pressure of j
-//                m3_t sigma_j = pj.dstress;
-//                const f1_t pres_j = eos::murnaghan(pj.density, rho0, BULK, dBULKdP);
-//                sigma_j[0][0] -= pres_j;
-//                sigma_j[1][1] -= pres_j;
-//                sigma_j[2][2] -= pres_j;
-//
-//                m3_t sigOverRho_j = sigma_j / (pj.density * pj.density);
-//
-//                // stress from the interaction
-//                m3_t stress = sigOverRho_i + sigOverRho_j;
-//
-//                const f3_t vij = pi.vel - pj.vel;
-//    #if defined(ARTIFICIAL_STRESS)
-//                // artificial stress
-//                const f1_t f = pow(kernel::Wspline(r, H, W_prefactor) / kernel::Wspline(normalsep, H, W_prefactor) , matexp;
-//                stress += f*(arts_i + artificialStress(mateps, sigOverRho_j));
-//    #endif
-//
-//                // acceleration from stress
-//                pi.acc += pj.mass * (stress * gradw);
-//
-//    #if defined(ARTIFICIAL_VISCOSITY)
-//                // acceleration from artificial viscosity
-//                pi.acc -= pj.mass *
-//                          artificialViscosity(alpha, pi.density, pj.density, vij, rij, r, SOUNDSPEED, SOUNDSPEED
-//        #if defined(BALSARA_SWITCH)
-//                                  , pi.balsara, pj.balsara
-//        #endif
-//                          ) * gradw;
-//    #endif
-//
-//    #if defined(XSPH)
-//                // xsph
-//                pi.xvel += 2 * pj.mass / (pi.density + pj.density) * (pj.vel - pi.vel) * kernel::Wspline<dimension>(r, H);
-//    #endif
-//            }
-//#endif // ENABLE_SPH
-//        }
-//    }
-//
-//    //!< This function will be called for particle i after the interactions with the other particles are computed.
-//    CUDAHOSTDEV store_type do_after(pi_type& pi)
-//    {
-//#if defined(CLOHESSY_WILTSHIRE)
-//        pi.acc.x += 3*cw_n*cw_n * pi.pos.x + 2*cw_n* pi.vel.y;
-//        pi.acc.y += -2*cw_n * pi.vel.x;
-//        pi.acc.z += -cw_n*cw_n * pi.pos.z;
-//#endif
-//        return pi;
-//    }
-//};
-//
-//template <typename pbT>
-//void computeDerivatives(pbT& particleBuffer)
-//{
-//#if defined(ENABLE_SPH)
-//    do_for_each_pair_fast<cdA>(particleBuffer);
-//#endif
-//    do_for_each_pair_fast<cdB>(particleBuffer);
-//}
-//
-///**
-// * @brief perform leapfrog integration on the particles also performs the plasticity calculations
-// * @param particles the device copy to the particle buffer that stores the particles
-// * @param dt the timestep for the integration
-// * @param not_first_step set false for the first integration step of the simulation
-// * @param tanfr tangens of the internal friction angle
-// */
-//struct integrateLeapfrog
-//{
-//    using load_type = Particle<POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>; //!< particle attributes to load from main memory
-//    using store_type = Particle<POS,VEL,DENSITY,DSTRESS>; //!< particle attributes to store to main memory
-//    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
-//
-//    //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
-//    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
-//    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, f1_t dt, bool not_first_step)
-//    {
-//        //   calculate velocity a_t
-//        p.vel = p.vel + p.acc * (dt * 0.5_ft);
-//
-//        // we could now change delta t here
-//
-//        // calculate velocity a_t+1/2
-//        p.vel = p.vel + p.acc * (dt * 0.5_ft) * not_first_step;
-//
-//        // calculate position r_t+1
-//#if defined(XSPH) && defined(ENABLE_SPH)
-//        p.pos = p.pos + (p.vel + xsph_factor*p.xvel) * dt;
-//#else
-//        p.pos = p.pos + p.vel * dt;
-//#endif
-//
-//#if defined(ENABLE_SPH)
-//        // density
-//        p.density = p.density + p.density_dt * dt;
-//        if(p.density < 0.0_ft)
-//            p.density = 0.0_ft;
-//
-//        // deviatoric stress
-//        p.dstress += p.dstress_dt * dt;
-//
-//    #if defined(PLASTICITY_MC)
-//        plasticity(p.dstress, mohrCoulombYieldStress( tanfr,eos::murnaghan(p.density,rho0, BULK, dBULKdP),cohesion));
-//    #elif defined(PLASTICITY_MIESE)
-//        plasticity(p.dstress,Y);
-//    #endif
-//
-//#endif
-//        return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
-//    }
-//};
-//
-///**
-// * @brief The main function of the simulation. Sets up the initial conditions and frontend and then manages running the simulation.
-// *
-// */
-//
-//
-//int main()
-//{
-//    mpu::Log myLog( mpu::LogLvl::ALL, mpu::ConsoleSink());
-//
-//    std::string buildType;
-//#if defined(NDEBUG)
-//    buildType = "Release";
-//#else
-//    buildType = "Debug";
-//#endif
-//
-//#if defined(STORE_RESULTS)
-//    // set up file saving engine
-//    ResultStorageManager storage(RESULT_FOLDER,RESULT_PREFIX,maxJobs);
-//    // setup log output file
-//    myLog.addSinks(mpu::FileSink( std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_log.txt"));
-//    // collect all settings and print them into a file
-//    {
-//        mpu::Resource headlessSettings = LOAD_RESOURCE(HeadlessSettings);
-//        mpu::Resource precisionSettings = LOAD_RESOURCE(PrecisionSettings);
-//        mpu::Resource settings = LOAD_RESOURCE(Settings);
-//        std::ofstream settingsOutput(std::string(RESULT_FOLDER) + std::string(RESULT_PREFIX) + storage.getStartTime() + "_settings.txt");
-//        settingsOutput << "//////////////////////////\n// headlessSettigns.h \n//////////////////////////\n\n"
-//                        << std::string(headlessSettings.data(), headlessSettings.size())
-//                        << "\n\n\n//////////////////////////\n// precisionSettings.h \n//////////////////////////\n\n"
-//                        << std::string(precisionSettings.data(), precisionSettings.size())
-//                        << "\n\n\n//////////////////////////\n// settigns.h \n//////////////////////////\n\n"
-//                        << std::string(settings.data(), settings.size());
-//    }
-//#endif
-//
-//    myLog.printHeader("GraSPH2",GRASPH_VERSION,GRASPH_VERSION_SHA,buildType);
-//    logINFO("GraSPH2") << "Welcome to GraSPH2!";
-//#if defined(SINGLE_PRECISION)
-//    logINFO("GraSPH2") << "Running in single precision mode.";
-//#elif defined(DOUBLE_PRECISION)
-//    logINFO("GraSPH2") << "Running in double precision mode.";
-//#endif
-//#if defined(USING_CUDA_FAST_MATH)
-//    logWARNING("GraSPH2") << "Unsafe math optimizations enabled in CUDA code.";
-//#endif
-//    assert_cuda(cudaSetDevice(0));
-//
-//    // print some important settings to the console
-//    myLog.print(mpu::LogLvl::INFO) << "\nSettings for this run:\n========================\n"
-//                        << "Integration:"
-//                        << "Leapfrog"
-//                        << "Timestep: constant, " << timestep << "\n"
-//                        << "Initial Conditions:\n"
-//                #if defined(READ_FROM_FILE)
-//                        << "Data is read from: " << FILENAME << "\n"
-//                #elif defined(ROTATING_UNIFORM_SPHERE)
-//                        << "Using a random uniform sphere with radius " << spawn_radius << "\n"
-//                        << "Total mass: " << tmass << "\n"
-//                        << "Number of particles: " << particle_count << "\n"
-//                        << "additional angular velocity: " << angVel << "\n"
-//                #elif defined(ROTATING_PLUMMER_SPHERE)
-//                        << "Using a Plummer distribution with core radius " << plummer_radius << " and cutoff " << plummer_cutoff << "\n"
-//                        << "Total mass: " << tmass << "\n"
-//                        << "Number of particles: " << particle_count << "\n"
-//                        << "additional angular velocity: " << angVel << "\n"
-//                #endif
-//                        << "Compressed radius set to " << compressesd_radius << "\n"
-//                        << "resulting in particle radius of " << pradius << "\n"
-//                        << "and smoothing length " << H << "\n"
-//                        << "Material Settings:\n"
-//                        << "material density: " << rho0 << "\n"
-//                        << "speed of sound: " << SOUNDSPEED << "\n"
-//                        << "bulk-modulus: " << BULK << "\n"
-//                        << "shear-modulus: " << shear << "\n"
-//                        << "Environment Settings:\n"
-//                #if defined(CLOHESSY_WILTSHIRE)
-//                        << "Clohessy-Wiltshire enabled with n = " << cw_n << "\n";
-//                #else
-//                        << "Clohessy-Wiltshire disabled" << "\n"
-//                #endif
-//                        ;
-//
-//    // set up frontend
-//    fnd::initializeFrontend();
-//    bool simShouldRun = false;
-//    fnd::setPauseHandler([&simShouldRun](bool pause){simShouldRun = !pause;});
-//
-//    // generate some particles depending on options in the settings file
-//    InitGenerator<HostParticlesType> generator;
-//
-//#if defined(READ_FROM_FILE)
-//    generator.addParticles(ps::TextFile<particleToRead>(FILENAME,SEPERATOR));
-//#elif defined(ROTATING_UNIFORM_SPHERE)
-//    generator.addParticles( ps::UniformSphere(particle_count,spawn_radius,tmass,rho0).addAngularVelocity(angVel), true,true );
-//#elif defined(ROTATING_PLUMMER_SPHERE)
-//    generator.addParticles( ps::PlummerSphere(particle_count,plummer_radius,plummer_cutoff,tmass,rho0).addAngularVelocity(angVel), true, true);
-//#endif
-//
-//    auto hpb = generator.generate();
-//
-//    // create cuda buffer
-//    DeviceParticlesType pb(hpb.size());
-//#if defined(FRONTEND_OPENGL)
-//    fnd::setParticleSize(pradius);
-//    pb.registerGLGraphicsResource<DEV_POSM>(fnd::getPositionBuffer(pb.size()));
-//    pb.registerGLGraphicsResource<DEV_VEL>(fnd::getVelocityBuffer(pb.size()));
-//    pb.registerGLGraphicsResource<DEV_DENSITY>(fnd::getDensityBuffer(pb.size()));
-//    pb.mapGraphicsResource();
-//#endif
-//
-//    // upload particles
-//    pb = hpb;
-//
-//#if defined(STORE_RESULTS)
-//    // print timestep 0
-//    storage.printToFile(pb,0);
-//    f1_t timeSinceStore=timestep;
-//#endif
-//
-//    // start simulating
-//    computeDerivatives(pb);
-//    do_for_each<integrateLeapfrog>(pb,timestep,false);
-//
-//    double simulatedTime=timestep;
-//#if defined(READ_FROM_FILE)
-//    simulatedTime += startTime;
-//#endif
-//
-//    pb.unmapGraphicsResource(); // used for frontend stuff
-//    while(fnd::handleFrontend(simulatedTime))
-//    {
-//        if(simShouldRun)
-//        {
-//            pb.mapGraphicsResource(); // used for frontend stuff
-//
-//            // run simulation
-//            computeDerivatives(pb);
-//            do_for_each<integrateLeapfrog>(pb,timestep,true);
-//
-//            simulatedTime += timestep;
-//
-//#if defined(STORE_RESULTS)
-//            timeSinceStore += timestep;
-//            if( timeSinceStore >= store_intervall)
-//            {
-//                storage.printToFile(pb,simulatedTime);
-//                timeSinceStore-=store_intervall;
-//            }
-//#endif
-//
-//            pb.unmapGraphicsResource(); // used for frontend stuff
-//        }
-//    }
-//
-//    return 0;
-//}
-//
