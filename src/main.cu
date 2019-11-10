@@ -93,18 +93,18 @@ CUDAHOSTDEV spaceKey calculatePositionKey(const f3_t& pos, const f3_t& domainMin
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
-constexpr f1_t theta = 0.6_ft;
+constexpr f1_t theta = 0.000001_ft;
 constexpr f1_t eps2 = 0.001_ft;
 constexpr int maxLeafParticles = 16; // max number of particles in a leaf
-constexpr int maxCriticalParticles = 128; // max number of particles in a critical node (critical nodes traverse the tree together)
+constexpr int maxCriticalParticles = 32; // max number of particles in a critical node (critical nodes traverse the tree together)
 
 // gpu settings
-constexpr int gpuBlockSize = 256; // size of one cuda block
+constexpr int gpuBlockSize = 32; // size of one cuda block
 constexpr int stackSizePerBlock = 4096; // global memory available to each thread block to use as a stack
 
 // cpu settings
 constexpr int stackSizePerThreadCPU = 4096;
-constexpr int interactionListSizeCPU = 8 * 1000;
+constexpr int interactionListSizeCPU = 8*64000;
 constexpr int nodeListSizeCPU = 8 * 1000;
 //#define DEBUG_PRINTS
 /////////////////
@@ -175,6 +175,303 @@ CUDAHOSTDEV f1_t minDistanceSquare(f3_t min, f3_t max, f3_t point)
     const f3_t dmax = fabs(max-point);
     const f3_t mdv = fmin(dmin,dmax);
     return dot(mdv,mdv);
+}
+
+template <typename DeviceBufferReference>
+__global__ void traverseTreeGPU(DeviceBufferReference pb,
+                                CriticalNode* critNodes,
+                                f3_t* aabbMin,
+                                f3_t* aabbMax,
+                                TreeDownlink* links,
+                                NodeOpeningData* openingData,
+                                f1_t* nodeMass,
+                                int* globalStack)
+{
+    // setup cub
+    typedef cub::BlockScan<int, gpuBlockSize> BlockScan;
+    typedef cub::BlockRadixSort<unsigned int, gpuBlockSize, 1, int> BlockRadixSort;
+    typedef cub::BlockDiscontinuity<int, gpuBlockSize> BlockDiscontinuity;
+//    __shared__ union
+//    {
+        __shared__ typename BlockScan::TempStorage blockScan;
+        __shared__ typename BlockRadixSort::TempStorage radixSort;
+        __shared__ typename BlockDiscontinuity::TempStorage discontinutiy;
+//    } cubTempData;
+
+    // allocate shared memory
+    constexpr int pilSize = gpuBlockSize * 16;
+    constexpr int sharedStackSize = gpuBlockSize * 8;
+    constexpr int nilSize = gpuBlockSize;
+
+    enum OpeningType : unsigned int
+    {
+        self = 3,
+        particleInteraction = 2,
+        nodeInteraction = 1,
+        nodeToStack = 0
+    };
+
+    // shared memory for temporary interaction list and stack storage
+    __shared__ int pil[pilSize];                                      // blockSize * 16 * 4 = 16384 byte
+    __shared__ int sharedStack[sharedStackSize];                      // blockSize * 8 * 4 = 8192 byte
+    __shared__ int nil[nilSize];                                      // blockSize * 4 = 1024
+    __shared__ int* bufferPointer[4];
+    __shared__ int accumEntryCounts[4];
+
+    // shared memory for acceleration of interaction
+    SharedParticles<gpuBlockSize,SHARED_POSM> sharedParticleData; // blockSize * 16 = 4096 + ?
+
+    // stack pointer management
+    __shared__ int* stackWriteEnd;
+    __shared__ int* stackReadEnd;
+    __shared__ int* stackWrite;
+    __shared__ int* stackRead;
+
+    // data about our group
+    __shared__ CriticalNode group;                   // 16
+    __shared__ f3_t groupMin;                        // 16
+    __shared__ f3_t groupMax;                        // 16
+
+    // load values for this critical node / this thread group
+    if(threadIdx.x == 0)
+    {
+        group = critNodes[blockIdx.x];
+        groupMin = aabbMin[group.nodeId];
+        groupMax = aabbMax[group.nodeId];
+
+        accumEntryCounts[0] = 0;
+        accumEntryCounts[1] = 0;
+        accumEntryCounts[2] = 0;
+        accumEntryCounts[3] = 0;
+
+        bufferPointer[OpeningType::particleInteraction] = &pil[0];
+        bufferPointer[OpeningType::nodeInteraction] = &nil[0];
+        bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+        bufferPointer[OpeningType::self] = nullptr;
+
+        stackReadEnd = &globalStack[blockIdx.x * stackSizePerBlock];
+        stackWriteEnd = stackReadEnd + stackSizePerBlock / 2;
+
+        printf("stack read address: %i \n", stackReadEnd);
+        printf("stack write address: %i \n", stackWriteEnd);
+
+        stackWrite = stackWriteEnd;
+        stackRead = stackReadEnd;
+
+        // load children of root into stack
+        for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
+            *(stackWrite++) = child;
+        // TODO: initialize stack more efficient and with more nodes or do it before and store in constant memory (eg start at second level)
+
+        // swap stack pointer
+        stackRead = stackWrite;
+        stackWrite = stackReadEnd;
+        stackReadEnd = stackWriteEnd;
+        stackWriteEnd = stackWrite;
+    }
+    __syncthreads();
+
+    // load this threads particle
+    Particle<POS,MASS,ACC> pi{};
+    if(threadIdx.x < group.nParticles)
+        pi = pb.template loadParticle<POS,MASS>(group.firstParticle + threadIdx.x); // cuda block size size MUST be bigger than the critical node size
+
+    // each loop iteration processes one tree layer
+    // traverse is finished when read stack is empty directly after stack swapping
+    while(stackRead != stackReadEnd)
+    {
+        // each loop iteration processes block size elements on the stack
+        // until stack is empty
+        const int numNodes = stackRead - stackReadEnd;
+        for(int iteration = 0; iteration < numNodes; iteration+= blockDim.x)
+        {
+            // load the node id from the stack (in global memory)
+            const int i = iteration + threadIdx.x;
+            int id = (i < numNodes) ? *((stackRead - 1) - i) : group.nodeId;
+
+            // figure out type of interaction
+            const NodeOpeningData od = openingData[id];
+            TreeDownlink link = links[id];
+            f1_t r2 = minDistanceSquare(groupMin, groupMax, od.com);
+            OpeningType opening = (group.nodeId == id) ? OpeningType::self
+                                                       : (r2 > openingData[id].od2) ? OpeningType::nodeInteraction
+                                                                                    : (link.isLeaf())
+                                                                                      ? OpeningType::particleInteraction
+                                                                                      : OpeningType::nodeToStack;
+            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
+
+            // sort depending on opening type
+
+            BlockRadixSort(radixSort).Sort( reinterpret_cast<unsigned int (&)[1]>(opening),
+                                            reinterpret_cast<int (&)[1]>(id));
+            link = links[id];
+
+
+//            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
+
+
+            // use prefix sum to determin where to write in shared memory
+            int numToWrite = (opening == OpeningType::self) ? 0
+                                                            : (opening == OpeningType::nodeInteraction) ? 1
+                                                                                                        : link.nChildren();
+            int writeID;
+            BlockScan(blockScan).ExclusiveSum(numToWrite, writeID);
+
+            // we also need to know how many entries of each opening type will be in storage
+            int flag;
+            BlockDiscontinuity(discontinutiy).FlagTails( reinterpret_cast<int (&)[1]>(flag), reinterpret_cast<int (&)[1]>(opening), cub::Inequality());
+
+            printf("i: %i, id: %i, opening: %i, numToWrite: %i, writeID: %i, flag: %i \n", i, id, opening, numToWrite, writeID, flag);
+
+            // TODO: fix this as it is still broken
+            if(flag == 1 && opening < 3)
+            {
+                accumEntryCounts[opening] = writeID+numToWrite;
+            }
+
+            __syncthreads();
+
+            if(threadIdx.x == 0)
+            {
+                printf("accumulated interaction counts for type 0: %i\n", accumEntryCounts[0]);
+                printf("accumulated interaction counts for type 1: %i\n", accumEntryCounts[1]);
+                printf("accumulated interaction counts for type 2: %i\n", accumEntryCounts[2]);
+            }
+
+            // handle stack if needed
+            int currentSharedStacksize = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+            if(accumEntryCounts[OpeningType::nodeToStack] + currentSharedStacksize > sharedStackSize )
+            {
+                for(int j : mpu::blockStrideRange(currentSharedStacksize))
+                {
+                    *(stackWrite+j) = sharedStack[j];
+                }
+
+                if(threadIdx.x == 0)
+                {
+                    stackWrite += currentSharedStacksize;
+                    bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+                }
+            }
+
+            // handle node interations if needed
+            int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
+            if(accumEntryCounts[OpeningType::nodeInteraction] - accumEntryCounts[OpeningType::nodeInteraction-1] + currentNilSize > nilSize)
+            {
+                // TODO: use shared memory for this
+                for(int x : mpu::blockStrideRange(currentNilSize))
+                {
+                    int j = nil[x];
+                    f3_t rij = pi.pos - openingData[j].com;
+                    pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+                }
+            }
+
+            // handle particle interations if needed
+            int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
+            if(accumEntryCounts[OpeningType::particleInteraction] - accumEntryCounts[OpeningType::particleInteraction-1] + currentPilSize > pilSize)
+            {
+                // TODO: use shared memory for this
+                for(int x : mpu::blockStrideRange(currentPilSize))
+                {
+                    auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+                    f3_t rij = pi.pos - pj.pos;
+                    pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+                }
+            }
+
+            // --------------------------------------
+            // now write the data to the intermediate buffers
+
+            // figure out memory adresss where to write
+            int* write = bufferPointer[opening] += (writeID - ((opening == 0) ? 0 : accumEntryCounts[opening - 1]));
+            __syncthreads();
+
+            // write
+            int data = (opening == OpeningType::nodeToStack) ? id : link.firstChild();
+            for(int j = 0; j < numToWrite; j++)
+            {
+                write[j] = data+j;
+            }
+
+            // update the buffer pointer for next iteration
+            if(threadIdx.x <3)
+            {
+                bufferPointer[threadIdx.x] += accumEntryCounts[threadIdx.x];
+                accumEntryCounts[threadIdx.x] = 0;
+            }
+            __syncthreads();
+        }
+
+        // store remaining items from shared memory stack to the global memory stack
+        int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+        for(int i : mpu::blockStrideRange(stackCopyCount))
+        {
+            *(stackWrite+i) = sharedStack[i];
+        }
+
+        if(threadIdx.x == 0)
+        {
+            stackWrite += stackCopyCount;
+            bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
+        }
+
+        // swap stack
+        if(threadIdx.x == 0)
+        {
+            stackRead = stackWrite;
+            stackWrite = stackReadEnd;
+            stackReadEnd = stackWriteEnd;
+            stackWriteEnd = stackWrite;
+        }
+        __syncthreads();
+    }
+
+
+    // --------------------------------------
+    // traverse is done, handle all interactions left in shared memory buffers
+
+    // handle node interations if needed
+    int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
+    if(accumEntryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
+    {
+        // TODO: use shared memory for this
+        for(int x : mpu::blockStrideRange(currentNilSize))
+        {
+            int j = nil[x];
+            f3_t rij = pi.pos - openingData[j].com;
+            pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+        }
+    }
+
+    // handle particle interations if needed
+    int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
+    if(accumEntryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
+    {
+        // TODO: use shared memory for this
+        for(int x : mpu::blockStrideRange(currentPilSize))
+        {
+            auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+            f3_t rij = pi.pos - pj.pos;
+            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+        }
+    }
+
+
+    // handle self interactions inside the group
+    sharedParticleData.storeParticle(threadIdx.x, pi);
+    __syncthreads();
+    for(int j = 0; j < group.nParticles; j++)
+    {
+        auto pj = sharedParticleData.loadParticle<POS,MASS>(j);
+        f3_t rij = pi.pos - pj.pos;
+        pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+    }
+
+    // --------------------------------------
+    // store acceleration (for now discard results of threads with no particle)
+    if(threadIdx.x < group.nParticles)
+        pb.storeParticle( group.firstParticle + threadIdx.x, Particle<ACC>(pi));
 }
 
 class HostTree
@@ -319,21 +616,56 @@ public:
 
         typename BufferType::deviceType devpb(pb.size());
 
+        CriticalNode* gpuCritNodes;
+        f3_t* gpuAabbMin;
+        f3_t* gpuAabbMax;
+        TreeDownlink* gpuTreeLinks;
+        NodeOpeningData* gpuOpeningData;
+        f1_t* gpuNodeMass;
+        int* gpuGloabalStack;
+
+        cudaMalloc(&gpuCritNodes, m_criticalNodes.size() * sizeof(CriticalNode));
+        cudaMalloc(&gpuAabbMin, m_aabbmin.size() * sizeof(f3_t));
+        cudaMalloc(&gpuAabbMax, m_aabbmax.size() * sizeof(f3_t));
+        cudaMalloc(&gpuTreeLinks, m_links.size() * sizeof(TreeDownlink));
+        cudaMalloc(&gpuOpeningData, m_openingData.size() * sizeof(NodeOpeningData));
+        cudaMalloc(&gpuNodeMass, m_nodeMass.size() * sizeof(f1_t));
+        cudaMalloc(&gpuGloabalStack, stackSizePerBlock * m_criticalNodes.size() * sizeof(int));
+
         sw.pause();
         std::cout << "GPU Memory allocation " << sw.getSeconds() *1000 << "ms" << std::endl;
         sw.reset();
 
         devpb = pb;
+        cudaMemcpy(gpuCritNodes,m_criticalNodes.data(), m_criticalNodes.size() * sizeof(CriticalNode), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpuAabbMin,m_aabbmin.data(), m_aabbmin.size() * sizeof(f3_t), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpuAabbMax,m_aabbmax.data(), m_aabbmax.size() * sizeof(f3_t), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpuTreeLinks,m_links.data(), m_links.size() * sizeof(TreeDownlink), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpuOpeningData,m_openingData.data(), m_openingData.size() * sizeof(NodeOpeningData), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpuNodeMass,m_nodeMass.data(), m_nodeMass.size() * sizeof(f1_t), cudaMemcpyHostToDevice);
+        cudaMemset(gpuGloabalStack,0,stackSizePerBlock * m_criticalNodes.size() * sizeof(int));
 
         sw.pause();
         std::cout << "Data upload took " << sw.getSeconds() *1000 << "ms" << std::endl;
         sw.reset();
 
+        traverseTreeGPU<<< 1 /* m_criticalNodes.size() */, gpuBlockSize >>>( devpb.getDeviceReference(),
+                                                                        gpuCritNodes,
+                                                                        gpuAabbMin,
+                                                                        gpuAabbMax,
+                                                                        gpuTreeLinks,
+                                                                        gpuOpeningData,
+                                                                        gpuNodeMass,
+                                                                        gpuGloabalStack);
         assert_cuda( cudaDeviceSynchronize());
 
         sw.pause();
         std::cout << "Computing forces took " << sw.getSeconds() *1000 << "ms" << std::endl;
         sw.reset();
+
+        pb = devpb;
+
+        std::cout << "Particle data download took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
     }
 
@@ -733,244 +1065,6 @@ private:
     }
 };
 
-template <typename DeviceBufferReference>
-__global__ void traverseTreeGPU(DeviceBufferReference pb,
-                                CriticalNode* critNodes,
-                                f3_t* aabbMin,
-                                f3_t* aabbMax,
-                                TreeDownlink* links,
-                                NodeOpeningData* openingData,
-                                int* globalStack)
-{
-    // setup cub
-    typedef cub::BlockScan<int, gpuBlockSize> BlockScan;
-    typedef cub::BlockRadixSort<int, gpuBlockSize, 1, int> BlockRadixSort;
-    typedef cub::BlockDiscontinuity<int, gpuBlockSize> BlockDiscontinuity;
-    __shared__ union
-    {
-        typename BlockScan::TempStorage blockScan;
-        typename BlockRadixSort::TempStorage radixSort;
-        typename BlockDiscontinuity::TempStorage discontinutiy;
-    } cubTempData;
-
-    // allocate shared memory
-    constexpr int pilSize = gpuBlockSize * 16;
-    constexpr int sharedStackSize = gpuBlockSize * 8;
-    constexpr int nilSize = gpuBlockSize;
-
-    enum OpeningType
-    {
-        self = 3,
-        particleInteraction = 2,
-        nodeInteraction = 1,
-        nodeToStack = 0
-    };
-
-    // shared memory for temporary interaction list and stack storage
-    __shared__ int pil[pilSize];                                      // blockSize * 16 * 4 = 16384 byte
-    __shared__ int sharedStack[sharedStackSize];                      // blockSize * 8 * 4 = 8192 byte
-    __shared__ int nil[nilSize];                                      // blockSize * 4 = 1024
-    __shared__ int* bufferPointer[3];
-    __shared__ int entryCounts[3];
-
-    // shared memory for acceleration of interaction
-    SharedParticles<gpuBlockSize,SHARED_POSM> sharedParticleData; // blockSize * 16 = 4096 + ?
-
-    // stack pointer management
-    // TODO: this could also be local variables, maybe faster?
-    __shared__ int* stackWriteEnd;
-    __shared__ int* stackReadEnd;
-    __shared__ int* stackWrite;
-    __shared__ int* stackRead;
-
-    // data about our group
-    __shared__ CriticalNode group;                   // 16
-    __shared__ f3_t groupMin;                        // 16
-    __shared__ f3_t groupMax;                        // 16
-
-    // load values for this critical node / this thread group
-    if(threadIdx.x == 0)
-    {
-        group = critNodes[blockIdx.x];
-        groupMin = aabbMin[group.nodeId];
-        groupMax = aabbMax[group.nodeId];
-
-        entryCounts[0] = 0;
-        entryCounts[1] = 0;
-        entryCounts[2] = 0;
-
-        bufferPointer[OpeningType::particleInteraction] = &pil[0];
-        bufferPointer[OpeningType::nodeInteraction] = &nil[0];
-        bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
-
-        stackReadEnd = &globalStack[blockIdx.x * stackSizePerBlock];
-        stackWriteEnd = stackReadEnd + stackSizePerBlock / 2;
-
-        stackWrite = stackWriteEnd;
-        stackRead = stackReadEnd;
-
-        // load children of root into stack
-        for(int child = links[0].firstChild(); child < links[0].firstChild() + links[0].nChildren(); child++)
-            *(stackWrite++) = child;
-        // TODO: initialize stack more efficient and with more nodes or do it before and store in constant memory (eg start at second level)
-
-        // swap stack pointer
-        stackRead = stackWrite;
-        stackWrite = stackReadEnd;
-        stackReadEnd = stackWriteEnd;
-        stackWriteEnd = stackWrite;
-    }
-    __syncthreads();
-
-    // load this threads particle
-    Particle<POS,MASS,ACC> pi;
-    if(threadIdx.x < group.nParticles)
-        pi = pb.template loadParticle<POS,MASS>(group.firstParticle + threadIdx.x); // cuda block size size MUST be bigger than the critical node size
-
-    // each loop iteration processes one tree layer
-    // traverse is finished when read stack is empty directly after stack swapping
-    while(stackRead != stackReadEnd)
-    {
-        // each loop iteration processes block size elements on the stack
-        // until stack is empty
-        for(int i : mpu::blockStrideRange(stackRead - stackReadEnd))
-        {
-            // load the node id from the stack (in global memory)
-            const int id = *(stackRead - i);
-
-            // figure out type of interaction
-            const NodeOpeningData od = openingData[id];
-            const TreeDownlink link = links[id];
-            const f1_t r2 = minDistanceSquare(groupMin, groupMax, od.com);
-            OpeningType opening = (group.nodeId == id) ? OpeningType::self
-                                                       : (r2 > openingData[id].od2) ? OpeningType::nodeInteraction
-                                                                                    : (link.isLeaf())
-                                                                                      ? OpeningType::particleInteraction
-                                                                                      : OpeningType::nodeToStack;
-
-            // sort depending on opening type
-            BlockRadixSort(cubTempData.radixSort).Sort(opening, id, 0, 4);
-
-            // use prefix sum to determin where to write in shared memory
-            int numToWrite = (opening == OpeningType::self) ? 0
-                                                            : (opening == OpeningType::nodeInteraction) ? 1
-                                                                                                        : link.nChildren();
-            int writeID;
-            int agg;
-            BlockScan(cubTempData.blockScan).ExclusiveSum(numToWrite, writeID, agg);
-
-            // we also need to know how many entries of each opening type will be in storage
-            int flag;
-            BlockDiscontinuity(cubTempData.discontinutiy).FlagHeads(flag, opening);
-            if(flag == 1 && threadIdx.x > 0)
-            {
-                entryCounts[opening - 1] = writeID;
-            }
-            __syncthreads();
-
-            // handle stack if needed
-            int currentSharedStacksize = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
-            if(entryCounts[OpeningType::nodeToStack] + currentSharedStacksize > sharedStackSize )
-            {
-                for(int j : mpu::blockStrideRange(currentSharedStacksize))
-                {
-                    *(stackWrite+j) = sharedStack[j];
-                }
-
-                if(threadIdx.x == 0)
-                {
-                    stackWrite += currentSharedStacksize;
-                    bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
-                }
-            }
-
-            // handle node interations if needed
-            int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
-            if(entryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
-            {
-                // TODO: process interactions to empty the interaction list
-            }
-
-            // handle particle interations if needed
-            int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
-            if(entryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
-            {
-                // TODO: process interactions to empty the interaction list
-            }
-
-            // --------------------------------------
-            // now write the data to the intermediate buffers
-
-            // figure out memory adresss where to write
-            int* write = bufferPointer[opening] + (writeID - ((opening - 1 < 0) ? 0 : entryCounts[opening - 1]));
-            __syncthreads();
-
-            // write
-            int data = (opening == nodeToStack) ? id : link.firstChild();
-            for(int j = 0; j < numToWrite; j++)
-            {
-                write[j] = data+j;
-            }
-
-            // update the buffer pointer for next iteration
-            if(threadIdx.x <3)
-            {
-                bufferPointer[threadIdx.x] += entryCounts[threadIdx.x];
-                entryCounts[threadIdx.x] = 0;
-            }
-        }
-
-        // store remaining items from shared memory stack to the global memory stack
-        int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
-        for(int i : mpu::blockStrideRange(stackCopyCount))
-        {
-            *(stackWrite+i) = sharedStack[i];
-        }
-
-        if(threadIdx.x == 0)
-        {
-            stackWrite += stackCopyCount;
-            bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
-
-        }
-
-        // swap stack
-        if(threadIdx.x == 0)
-        {
-            stackRead = stackWrite;
-            stackWrite = stackReadEnd;
-            stackReadEnd = stackWriteEnd;
-            stackWriteEnd = stackWrite;
-        }
-        __syncthreads();
-    }
-
-
-    // --------------------------------------
-    // traverse is done, handle all interactions left in shared memory buffers
-
-    // handle left over interactions with particles
-    // TODO: process interactions to empty the interaction list
-
-    // handle left over interactions with nodes
-    // TODO: process interactions to empty the interaction list
-
-    // handle self interactions inside the group
-    sharedParticleData.storeParticle(threadIdx.x, pi);
-    __syncthreads();
-    for(int j = 0; j < group.nParticles; j++)
-    {
-        auto pj = sharedParticleData.loadParticle<POS,MASS>(j);
-        f3_t rij = pi.pos - pj.pos;
-        pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
-    }
-
-    // --------------------------------------
-    // store acceleration (for now discard results of threads with no particle)
-    if(threadIdx.x < group.nParticles)
-        pb.storeParticle( group.firstParticle + threadIdx.x, Particle<ACC>(pi));
-}
-
 void computeForcesNaive(HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC>& pb)
 {
     tbb::parallel_for( tbb::blocked_range<size_t>(0, pb.size()), [&](const auto &range)
@@ -1095,7 +1189,11 @@ int main()
 
 //    tbb::task_scheduler_init init(1);
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1<<15);
+    // do some cuda call to remove initialization from timings
+    int* blub;
+    cudaMalloc(&blub, sizeof(int));
+
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1<<10);
 
     std::default_random_engine rng(161214);
     std::uniform_real_distribution<f1_t > dist(-2,2);
@@ -1138,14 +1236,11 @@ int main()
     sw.pause();
     std::cout << "Naive Force computation took " << sw.getSeconds() *1000 << "ms" << std::endl;
 
-//
-//    std::cout << "treecode used " << interactions << " interactions. Naive: " << pb.size()*pb.size() << ". Saved: " << pb.size()*pb.size() - interactions << " relative: " << 1.0_ft*(pb.size()*pb.size() - interactions) / (pb.size()*pb.size())  << std::endl;
-//    std::cout << "average leafs opened: " << 1.0_ft*averageLeafs / pb.size() << std::endl;
-//
-
     std::cout << "\n-------------------------------------------\n GPU Naive" << std::endl;
     computeForcesNaiveOnGPU(pbRefGPU);
 
+    std::cout << "\n-------------------------------------------\n GPU Tree" << std::endl;
+    myTree.computeForcesGPU(pbGPU);
 
     std::cout << "\n-------------------------------------------\n ERORR" << std::endl;
     std::cout << "CPU Tree" << std::endl;
@@ -1155,6 +1250,21 @@ int main()
 
     std::cout << "GPU Naive" << std::endl;
     error = calcError(pbRefCpu, pbRefGPU);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
+
+    std::cout << "GPU Tree" << std::endl;
+    error = calcError(pbRefCpu, pbGPU);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
+
+    std::cout << "GPU Tree vs CPU Tree" << std::endl;
+    error = calcError(pb, pbGPU);
+    std::cout << "Median error: " << error.first << std::endl;
+    std::cout << "Mean error: " << error.second << std::endl;
+
+    std::cout << "GPU Tree vs GPU Naive" << std::endl;
+    error = calcError(pbRefGPU, pbGPU);
     std::cout << "Median error: " << error.first << std::endl;
     std::cout << "Mean error: " << error.second << std::endl;
 }
