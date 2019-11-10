@@ -375,13 +375,17 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
             if(entryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
             {
-//                // TODO: use shared memory for this
-//                for(int x : mpu::blockStrideRange(currentNilSize))
-//                {
-//                    int j = nil[x];
-//                    f3_t rij = pi.pos - openingData[j].com;
-//                    pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
-//                }
+                // TODO: use shared memory for this
+                for(int x : mpu::blockStrideRange(currentNilSize))
+                {
+                    int j = nil[x];
+                    f3_t rij = pi.pos - openingData[j].com;
+                    pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+                }
+                if(threadIdx.x == 0)
+                {
+                    bufferPointer[OpeningType::nodeInteraction] = &nil[0];
+                }
             }
 
             // handle particle interations if needed
@@ -389,12 +393,16 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             if(entryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
             {
                 // TODO: use shared memory for this
-//                for(int x : mpu::blockStrideRange(currentPilSize))
-//                {
-//                    auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
-//                    f3_t rij = pi.pos - pj.pos;
-//                    pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
-//                }
+                for(int x : mpu::blockStrideRange(currentPilSize))
+                {
+                    auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+                    f3_t rij = pi.pos - pj.pos;
+                    pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+                }
+                if(threadIdx.x == 0)
+                {
+                    bufferPointer[OpeningType::particleInteraction] = &pil[0];
+                }
             }
 
             // --------------------------------------
@@ -455,32 +463,25 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     // --------------------------------------
     // traverse is done, handle all interactions left in shared memory buffers
 
-    // handle node interations if needed
+    // handle left over node interations if needed
     int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
-    if(accumEntryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
+    // TODO: use shared memory for this
+    for(int x : mpu::blockStrideRange(currentNilSize))
     {
-        // TODO: use shared memory for this
-//        for(int x : mpu::blockStrideRange(currentNilSize))
-//        {
-//            int j = nil[x];
-//            f3_t rij = pi.pos - openingData[j].com;
-//            pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
-//        }
+        int j = nil[x];
+        f3_t rij = pi.pos - openingData[j].com;
+        pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
     }
 
-    // handle particle interations if needed
+    // handle left over particle interations if needed
     int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
-    if(accumEntryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
+    // TODO: use shared memory for this
+    for(int x : mpu::blockStrideRange(currentPilSize))
     {
-        // TODO: use shared memory for this
-//        for(int x : mpu::blockStrideRange(currentPilSize))
-//        {
-//            auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
-//            f3_t rij = pi.pos - pj.pos;
-//            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
-//        }
+        auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+        f3_t rij = pi.pos - pj.pos;
+        pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
     }
-
 
     // handle self interactions inside the group
     sharedParticleData.storeParticle(threadIdx.x, pi);
