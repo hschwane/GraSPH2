@@ -217,6 +217,7 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     __shared__ int nil[nilSize];                                      // blockSize * 4 = 1024
     __shared__ int* bufferPointer[4];
     __shared__ int accumEntryCounts[4];
+    __shared__ int entryCounts[4];
 
     // shared memory for acceleration of interaction
     SharedParticles<gpuBlockSize,SHARED_POSM> sharedParticleData; // blockSize * 16 = 4096 + ?
@@ -244,10 +245,10 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
         accumEntryCounts[2] = 0;
         accumEntryCounts[3] = 0;
 
+        bufferPointer[OpeningType::self] = nullptr;
         bufferPointer[OpeningType::particleInteraction] = &pil[0];
         bufferPointer[OpeningType::nodeInteraction] = &nil[0];
         bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
-        bufferPointer[OpeningType::self] = nullptr;
 
         stackReadEnd = &globalStack[blockIdx.x * stackSizePerBlock];
         stackWriteEnd = stackReadEnd + stackSizePerBlock / 2;
@@ -278,8 +279,11 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
 
     // each loop iteration processes one tree layer
     // traverse is finished when read stack is empty directly after stack swapping
+    int layer  =1;
     while(stackRead != stackReadEnd)
     {
+        if(threadIdx.x == 0)
+            printf("layer %i ------------------------------------\n----------------------------------------------------\n",layer++);
         // each loop iteration processes block size elements on the stack
         // until stack is empty
         const int numNodes = stackRead - stackReadEnd;
@@ -289,16 +293,18 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             const int i = iteration + threadIdx.x;
             int id = (i < numNodes) ? *((stackRead - 1) - i) : group.nodeId;
 
+            printf("i: %i, id: %i \n", i, id);
+
             // figure out type of interaction
             const NodeOpeningData od = openingData[id];
             TreeDownlink link = links[id];
             f1_t r2 = minDistanceSquare(groupMin, groupMax, od.com);
             OpeningType opening = (group.nodeId == id) ? OpeningType::self
-                                                       : (r2 > openingData[id].od2) ? OpeningType::nodeInteraction
+                                                       : (r2 > od.od2) ? OpeningType::nodeInteraction
                                                                                     : (link.isLeaf())
                                                                                       ? OpeningType::particleInteraction
                                                                                       : OpeningType::nodeToStack;
-            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
+//            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
 
             // sort depending on opening type
 
@@ -321,9 +327,8 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             int flag;
             BlockDiscontinuity(discontinutiy).FlagTails( reinterpret_cast<int (&)[1]>(flag), reinterpret_cast<int (&)[1]>(opening), cub::Inequality());
 
-            printf("i: %i, id: %i, opening: %i, numToWrite: %i, writeID: %i, flag: %i \n", i, id, opening, numToWrite, writeID, flag);
+//            printf("i: %i, id: %i, opening: %i, numToWrite: %i, writeID: %i, flag: %i \n", i, id, opening, numToWrite, writeID, flag);
 
-            // TODO: fix this as it is still broken
             if(flag == 1 && opening < 3)
             {
                 accumEntryCounts[opening] = writeID+numToWrite;
@@ -333,81 +338,100 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
 
             if(threadIdx.x == 0)
             {
+                if(accumEntryCounts[1] == 0)
+                    accumEntryCounts[1] = accumEntryCounts[0];
+                if(accumEntryCounts[2] == 0)
+                    accumEntryCounts[2] = accumEntryCounts[1];
+
+                entryCounts[0] = accumEntryCounts[0];
+                entryCounts[1] = accumEntryCounts[1] - accumEntryCounts[0];
+                entryCounts[2] = accumEntryCounts[2] - accumEntryCounts[1];
+
                 printf("accumulated interaction counts for type 0: %i\n", accumEntryCounts[0]);
                 printf("accumulated interaction counts for type 1: %i\n", accumEntryCounts[1]);
                 printf("accumulated interaction counts for type 2: %i\n", accumEntryCounts[2]);
             }
 
+            __syncthreads();
+
             // handle stack if needed
             int currentSharedStacksize = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
-            if(accumEntryCounts[OpeningType::nodeToStack] + currentSharedStacksize > sharedStackSize )
+            if(entryCounts[OpeningType::nodeToStack] + currentSharedStacksize > sharedStackSize )
             {
-                for(int j : mpu::blockStrideRange(currentSharedStacksize))
+                int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+                for(int j : mpu::blockStrideRange(stackCopyCount))
                 {
-                    *(stackWrite+j) = sharedStack[j];
+                    *(stackWrite + j) = sharedStack[j];
                 }
 
                 if(threadIdx.x == 0)
                 {
-                    stackWrite += currentSharedStacksize;
+                    stackWrite += stackCopyCount;
                     bufferPointer[OpeningType::nodeToStack] = &sharedStack[0];
                 }
             }
 
             // handle node interations if needed
             int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
-            if(accumEntryCounts[OpeningType::nodeInteraction] - accumEntryCounts[OpeningType::nodeInteraction-1] + currentNilSize > nilSize)
+            if(entryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
             {
-                // TODO: use shared memory for this
-                for(int x : mpu::blockStrideRange(currentNilSize))
-                {
-                    int j = nil[x];
-                    f3_t rij = pi.pos - openingData[j].com;
-                    pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
-                }
+//                // TODO: use shared memory for this
+//                for(int x : mpu::blockStrideRange(currentNilSize))
+//                {
+//                    int j = nil[x];
+//                    f3_t rij = pi.pos - openingData[j].com;
+//                    pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+//                }
             }
 
             // handle particle interations if needed
             int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
-            if(accumEntryCounts[OpeningType::particleInteraction] - accumEntryCounts[OpeningType::particleInteraction-1] + currentPilSize > pilSize)
+            if(entryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
             {
                 // TODO: use shared memory for this
-                for(int x : mpu::blockStrideRange(currentPilSize))
-                {
-                    auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
-                    f3_t rij = pi.pos - pj.pos;
-                    pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
-                }
+//                for(int x : mpu::blockStrideRange(currentPilSize))
+//                {
+//                    auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+//                    f3_t rij = pi.pos - pj.pos;
+//                    pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+//                }
             }
 
             // --------------------------------------
             // now write the data to the intermediate buffers
 
             // figure out memory adresss where to write
-            int* write = bufferPointer[opening] += (writeID - ((opening == 0) ? 0 : accumEntryCounts[opening - 1]));
+            __syncthreads();
+            int* write = bufferPointer[opening];
+            write += (writeID - ((opening == 0) ? 0 : accumEntryCounts[opening - 1]));
+
+            printf("i: %i, numToWrite: %i, writeID: %i, write: %p, sharedStack: %p \n", i, numToWrite, writeID, write, &sharedStack[0]);
             __syncthreads();
 
             // write
-            int data = (opening == OpeningType::nodeToStack) ? id : link.firstChild();
+            int data = (opening == OpeningType::nodeInteraction) ? id : link.firstChild();
             for(int j = 0; j < numToWrite; j++)
             {
+                printf("write to shared addr: %p id: %i\n", &write[j], data+j );
                 write[j] = data+j;
             }
 
             // update the buffer pointer for next iteration
             if(threadIdx.x <3)
             {
-                bufferPointer[threadIdx.x] += accumEntryCounts[threadIdx.x];
+                bufferPointer[threadIdx.x] += entryCounts[threadIdx.x];
                 accumEntryCounts[threadIdx.x] = 0;
             }
             __syncthreads();
         }
 
+        __syncthreads();
+
         // store remaining items from shared memory stack to the global memory stack
         int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
-        for(int i : mpu::blockStrideRange(stackCopyCount))
+        for(int j : mpu::blockStrideRange(stackCopyCount))
         {
-            *(stackWrite+i) = sharedStack[i];
+            *(stackWrite + j) = sharedStack[j];
         }
 
         if(threadIdx.x == 0)
@@ -436,12 +460,12 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     if(accumEntryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
     {
         // TODO: use shared memory for this
-        for(int x : mpu::blockStrideRange(currentNilSize))
-        {
-            int j = nil[x];
-            f3_t rij = pi.pos - openingData[j].com;
-            pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
-        }
+//        for(int x : mpu::blockStrideRange(currentNilSize))
+//        {
+//            int j = nil[x];
+//            f3_t rij = pi.pos - openingData[j].com;
+//            pi.acc += calcInteraction(nodeMass[j], dot(rij,rij),rij);
+//        }
     }
 
     // handle particle interations if needed
@@ -449,12 +473,12 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     if(accumEntryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
     {
         // TODO: use shared memory for this
-        for(int x : mpu::blockStrideRange(currentPilSize))
-        {
-            auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
-            f3_t rij = pi.pos - pj.pos;
-            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
-        }
+//        for(int x : mpu::blockStrideRange(currentPilSize))
+//        {
+//            auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
+//            f3_t rij = pi.pos - pj.pos;
+//            pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
+//        }
     }
 
 
