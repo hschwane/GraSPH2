@@ -93,7 +93,7 @@ CUDAHOSTDEV spaceKey calculatePositionKey(const f3_t& pos, const f3_t& domainMin
 /////////////////
 constexpr f3_t domainMin = {-2,-2,-2};
 constexpr f3_t domainMax = {2,2,2};
-constexpr f1_t theta = 0.000001_ft;
+constexpr f1_t theta = 0.6_ft;
 constexpr f1_t eps2 = 0.001_ft;
 constexpr int maxLeafParticles = 16; // max number of particles in a leaf
 constexpr int maxCriticalParticles = 32; // max number of particles in a critical node (critical nodes traverse the tree together)
@@ -253,8 +253,8 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
         stackReadEnd = &globalStack[blockIdx.x * stackSizePerBlock];
         stackWriteEnd = stackReadEnd + stackSizePerBlock / 2;
 
-        printf("stack read address: %i \n", stackReadEnd);
-        printf("stack write address: %i \n", stackWriteEnd);
+//        printf("stack read address: %i \n", stackReadEnd);
+//        printf("stack write address: %i \n", stackWriteEnd);
 
         stackWrite = stackWriteEnd;
         stackRead = stackReadEnd;
@@ -282,8 +282,8 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     int layer  =1;
     while(stackRead != stackReadEnd)
     {
-        if(threadIdx.x == 0)
-            printf("layer %i ------------------------------------\n----------------------------------------------------\n",layer++);
+//        if(threadIdx.x == 0)
+//            printf("layer %i ------------------------------------\n----------------------------------------------------\n",layer++);
         // each loop iteration processes block size elements on the stack
         // until stack is empty
         const int numNodes = stackRead - stackReadEnd;
@@ -293,28 +293,44 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             const int i = iteration + threadIdx.x;
             int id = (i < numNodes) ? *((stackRead - 1) - i) : group.nodeId;
 
-            printf("i: %i, id: %i \n", i, id);
+//            printf("i: %i, id: %i \n", i, id);
 
             // figure out type of interaction
             const NodeOpeningData od = openingData[id];
             TreeDownlink link = links[id];
             f1_t r2 = minDistanceSquare(groupMin, groupMax, od.com);
-            OpeningType opening = (group.nodeId == id) ? OpeningType::self
-                                                       : (r2 > od.od2) ? OpeningType::nodeInteraction
-                                                                                    : (link.isLeaf())
-                                                                                      ? OpeningType::particleInteraction
-                                                                                      : OpeningType::nodeToStack;
+            OpeningType opening;
+//            = (group.nodeId == id) ? OpeningType::self
+//                                                       :  (r2 > od.od2) ? OpeningType::nodeInteraction
+//                                                                                    : (link.isLeaf())
+//                                                                                      ? OpeningType::particleInteraction
+//                                                                                      : OpeningType::nodeToStack;
+
+            if(group.nodeId == id)
+                opening = OpeningType::self;
+            else if(r2 <= od.od2)
+            {
+                if(link.isLeaf())
+                    opening = OpeningType::particleInteraction;
+                else
+                    opening = OpeningType::nodeToStack;
+            }
+            else
+                opening = OpeningType::nodeInteraction;
+
+
 //            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
+//            if(i==1 && id == 6)
+//            {
+//                printf("opening distance: %f, com: %f - %f - %f \n", od.od2, od.com.x, od.com.y, od.com.z);
+//            }
 
             // sort depending on opening type
-
             BlockRadixSort(radixSort).Sort( reinterpret_cast<unsigned int (&)[1]>(opening),
                                             reinterpret_cast<int (&)[1]>(id));
             link = links[id];
 
-
 //            printf("i: %i, id: %i, opening: %i \n", i, id, opening);
-
 
             // use prefix sum to determin where to write in shared memory
             int numToWrite = (opening == OpeningType::self) ? 0
@@ -347,9 +363,9 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
                 entryCounts[1] = accumEntryCounts[1] - accumEntryCounts[0];
                 entryCounts[2] = accumEntryCounts[2] - accumEntryCounts[1];
 
-                printf("accumulated interaction counts for type 0: %i\n", accumEntryCounts[0]);
-                printf("accumulated interaction counts for type 1: %i\n", accumEntryCounts[1]);
-                printf("accumulated interaction counts for type 2: %i\n", accumEntryCounts[2]);
+//                printf("accumulated interaction counts for type 0: %i\n", accumEntryCounts[0]);
+//                printf("accumulated interaction counts for type 1: %i\n", accumEntryCounts[1]);
+//                printf("accumulated interaction counts for type 2: %i\n", accumEntryCounts[2]);
             }
 
             __syncthreads();
@@ -376,7 +392,7 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             if(entryCounts[OpeningType::nodeInteraction] + currentNilSize > nilSize)
             {
                 // TODO: use shared memory for this
-                for(int x : mpu::blockStrideRange(currentNilSize))
+                for(int x = 0; x<currentNilSize; x++)
                 {
                     int j = nil[x];
                     f3_t rij = pi.pos - openingData[j].com;
@@ -393,7 +409,7 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             if(entryCounts[OpeningType::particleInteraction] + currentPilSize > pilSize)
             {
                 // TODO: use shared memory for this
-                for(int x : mpu::blockStrideRange(currentPilSize))
+                for(int x = 0; x<currentPilSize; x++)
                 {
                     auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
                     f3_t rij = pi.pos - pj.pos;
@@ -413,14 +429,14 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
             int* write = bufferPointer[opening];
             write += (writeID - ((opening == 0) ? 0 : accumEntryCounts[opening - 1]));
 
-            printf("i: %i, numToWrite: %i, writeID: %i, write: %p, sharedStack: %p \n", i, numToWrite, writeID, write, &sharedStack[0]);
+//            printf("i: %i, numToWrite: %i, writeID: %i, write: %p, sharedStack: %p \n", i, numToWrite, writeID, write, &sharedStack[0]);
             __syncthreads();
 
             // write
             int data = (opening == OpeningType::nodeInteraction) ? id : link.firstChild();
             for(int j = 0; j < numToWrite; j++)
             {
-                printf("write to shared addr: %p id: %i\n", &write[j], data+j );
+//                printf("write to shared addr: %p id: %i\n", &write[j], data+j );
                 write[j] = data+j;
             }
 
@@ -437,6 +453,10 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
 
         // store remaining items from shared memory stack to the global memory stack
         int stackCopyCount = bufferPointer[OpeningType::nodeToStack] - &sharedStack[0];
+
+//        if(threadIdx.x == 0)
+//            printf("writing %i elments to stack\n",stackCopyCount);
+
         for(int j : mpu::blockStrideRange(stackCopyCount))
         {
             *(stackWrite + j) = sharedStack[j];
@@ -463,10 +483,16 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
     // --------------------------------------
     // traverse is done, handle all interactions left in shared memory buffers
 
+
+//    if(threadIdx.x < group.nParticles)
+//        printf("p %i acc: %f , %f , %f \n", group.firstParticle + threadIdx.x, pi.acc.x, pi.acc.y, pi.acc.z);
+
     // handle left over node interations if needed
     int currentNilSize = bufferPointer[OpeningType::nodeInteraction] - &nil[0];
+//    if(threadIdx.x == 0)
+//        printf("handle %i node interactions \n",currentNilSize);
     // TODO: use shared memory for this
-    for(int x : mpu::blockStrideRange(currentNilSize))
+    for(int x = 0; x<currentNilSize; x++)
     {
         int j = nil[x];
         f3_t rij = pi.pos - openingData[j].com;
@@ -475,8 +501,10 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
 
     // handle left over particle interations if needed
     int currentPilSize = bufferPointer[OpeningType::particleInteraction] - &pil[0];
+//    if(threadIdx.x == 0)
+//        printf("handle %i particle interactions \n",currentPilSize);
     // TODO: use shared memory for this
-    for(int x : mpu::blockStrideRange(currentPilSize))
+    for(int x = 0; x<currentPilSize; x++)
     {
         auto pj = pb.template loadParticle<POS,MASS>(pil[x]);
         f3_t rij = pi.pos - pj.pos;
@@ -492,6 +520,9 @@ __global__ void traverseTreeGPU(DeviceBufferReference pb,
         f3_t rij = pi.pos - pj.pos;
         pi.acc += calcInteraction(pj.mass, dot(rij,rij),rij);
     }
+
+//    if(threadIdx.x < group.nParticles)
+//        printf("p %i acc: %f , %f , %f \n", group.firstParticle + threadIdx.x, pi.acc.x, pi.acc.y, pi.acc.z);
 
     // --------------------------------------
     // store acceleration (for now discard results of threads with no particle)
@@ -674,7 +705,7 @@ public:
         std::cout << "Data upload took " << sw.getSeconds() *1000 << "ms" << std::endl;
         sw.reset();
 
-        traverseTreeGPU<<< 1 /* m_criticalNodes.size() */, gpuBlockSize >>>( devpb.getDeviceReference(),
+        traverseTreeGPU<<< m_criticalNodes.size(), gpuBlockSize >>>( devpb.getDeviceReference(),
                                                                         gpuCritNodes,
                                                                         gpuAabbMin,
                                                                         gpuAabbMax,
@@ -1218,7 +1249,7 @@ int main()
     int* blub;
     cudaMalloc(&blub, sizeof(int));
 
-    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1<<10);
+    HostParticleBuffer<HOST_POSM,HOST_VEL,HOST_ACC> pb(1<<15);
 
     std::default_random_engine rng(161214);
     std::uniform_real_distribution<f1_t > dist(-2,2);
