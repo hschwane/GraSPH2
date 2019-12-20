@@ -88,6 +88,10 @@
 # finished
 for motivation, all finished todo entries are moved here instead of being deleted
 
+--- v0.7.1 --- 20.12.2019
+- use new mpUtils version  
+add file to load modules on cobra for easy installation
+
 --- v0.7.0 --- 21.10.2019
 - add simple UI for graphics settings
 - make compatible with new mpUtils
