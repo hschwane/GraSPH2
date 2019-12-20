@@ -38,6 +38,10 @@ After installing the third party dependencies, go to the
 [github page of mpUtils](http://www.github.com/hschwane/mpUtils) and follow
 the installation instructions there.
 
+###### HINT
+If you happen to run on the "Cobra" HPC system at MPCDF, there is a script `scripts/loadCobraModules.sh` that will load all dependencies
+to run and install mpUtils and GraSPH2. Consider adding `/path/to/this/scrip/loadCobraModules.sh` to your bashrc. 
+
 ### build
 
 After that, use the following commands to download and install the newest
