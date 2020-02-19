@@ -246,8 +246,8 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
         v1 = p.vel+ 0.5 * a0 * dt;
         //a1 = acc(x1,v1, dt/2);
 
-        x2 = p.pos + 0.5 * v1 + dt;
-        v2 = p.vel + 0.5 * a1 + dt;
+        x2 = p.pos + 0.5 * v1 * dt;
+        v2 = p.vel + 0.5 * a1 * dt;
         //a2 = acc(x2,v2,dt/2);
 
         x3 = p.pos + v2 * dt;
@@ -289,33 +289,19 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 };*/
 
 
-
-template <typename pbT>
-void integrate(pbT& particleBuffer, bool notFirstStep)
+rkIntegrateOnce(pbTarget, pbValues, pbDerivatives, dt)
 {
-    static_assert(mpu::is_instantiation_of< DeviceParticleBuffer,pbT>::value,"Integration is only possible with a device particle buffer");
-#if defined(FIXED_TIMESTEP_LEAPFROG)
-    do_for_each<fixedTsLeapfrog>(particleBuffer,notFirstStep);
-#elif defined(VARIABLE_TIMESTEP_LEAPFROG)
-    // call first part of leapfrog, which will perform kick and calculate the new timestep only if this is not the first step
-    if(notFirstStep)
-    {
-        variableTsLeapfrog_getNewTimestep<INTEG_BS> <<< mpu::numBlocks(particleBuffer.size() / INTEG_PPT, INTEG_BS),
-                INTEG_BS >>> (particleBuffer.getDeviceReference());
-        assert_cuda(cudaGetLastError());
-    }
-    else
-    {
-        f1_t its = initial_timestep;
-        assert_cuda( cudaMemcpyToSymbol(nextTS, &its, sizeof(f1_t))); // reset dt on first step
-    }
-
-    // second part which will use the new timestep to perform kick an drift
-    variableTsLeapfrog_useNewTimestep<<< mpu::numBlocks(particleBuffer.size()/INTEG_PPT,INTEG_BS),INTEG_BS >>>( particleBuffer.getDeviceReference());
-    assert_cuda(cudaGetLastError());
-
-#endif
+    pbTarget.value = pbValues.value + pbDerivatives.deriv * dt;
+    ...
 }
+
+rkCompose(pb, pbDev1,pbDev2,pbDev3, dt)
+{
+    pb.value = pb.value +  (dt / 6.0) * (pb.deriv + 2*pbDev1.deriv + 2*pbDev2.deriv + pbDev3.deriv );
+    ...
+}
+
+
 
 f1_t getCurrentTimestep()
 {
