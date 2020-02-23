@@ -216,89 +216,39 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
     }
 };
 
-/**
- * @brief perform Runge-Kutta 4 integration,
- * @param particles the device copy to the particle buffer that stores the particles
- * @param dt the timestep for the integration
- * @param not_first_step set false for the first integration step of the simulation
- */
-/*struct RK4
+//Wie muss das hier sein? void? global void für cuda benutzung?
+template <typename pbT>
+rkIntegrateOnce(pbT& pbTarget, pbT& pbValues, pbT& pbDerivatives, f1_t dt)
 {
-    using load_type = Particle<POS,VEL,ACC,XVEL,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>; //!< particle attributes to load from main memory
-    using store_type = Particle<POS,VEL,DENSITY,DSTRESS>; //!< particle attributes to store to main memory
-    using pi_type = merge_particles_t<load_type,store_type>; //!< the type of particle you want to work with in your job functions
+    pbTarget.VEL = pbValues.VEL + pbDerivatives.ACC * dt;
 
-    //!< This function is executed for each particle. In p the current particle and in id its position in the buffer is given.
-    //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
-    CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, bool not_first_step)
-    {
-        f1_t dt = fixed_timestep;
-
-        //Function evaluations for velocity and acceleration
-        f3_t x0,x1,x2,x3,v0,v1,v2,v3,a0,a1,a2,a3 = 0;
-
-        x0 = p.pos;
-        v0 = p.vel;
-        //FOR RUNGE-KUTTA WE NEED A CALLABLE FUNCTION TO CALCULATE THE ACCELERATION SO THAT WE CAN COMPUTE THE VELOCITY
-        //a0 = acceleration(x0,v0, 0);
-
-        x1 = p.pos + 0.5 * v0 * dt;
-        v1 = p.vel+ 0.5 * a0 * dt;
-        //a1 = acc(x1,v1, dt/2);
-
-        x2 = p.pos + 0.5 * v1 * dt;
-        v2 = p.vel + 0.5 * a1 * dt;
-        //a2 = acc(x2,v2,dt/2);
-
-        x3 = p.pos + v2 * dt;
-        v3 = p.vel + a2 * dt;
-        //a3 = a(x3,v3, dt)
-
-        //   calculate velocity
-        p.pos = p.pos + (dt / 6.0) * (v0 + 2*v1 + 2*v2 + v3);
-        p.vel = p.vel + (dt / 6.0) * (a0 + 2*a1 + 2*a2 + a3);
-
-        // calculate position r_t+1
 #if defined(XSPH) && defined(ENABLE_SPH)
-        p.pos = p.pos + (p.vel + xsph_factor*p.xvel) * dt; // Nor sure if we need this then because of runge-kutta position calculation??
+    pbTarget.POS = pbValues.POS + (pbDerivatives.VEL + xsph_factor*pbDerivatives.XVEL) * dt; //Can we access xvel from the derivatives buffer or should call it from device buffer pbValues?
 #else
-        p.pos = p.pos + p.vel * dt;
+    pbTarget.POS = pbValues.POS + pbDerivatives.VEL * dt;
 #endif
 
 #if defined(ENABLE_SPH)
 #if defined(INTEGRATE_DENSITY)
-        // density
-        p.density = p.density + p.density_dt * dt;
-        if(p.density < 0.0_ft)
-            p.density = 0.0_ft;
+    pbTarget.DENSITY = pbValues.DENSITY + pbDerivatives.DENSITY_DT * dt;
+    //Check if newly calculated density is below zero
+    if(pbTarget.DENSITY < 0.0_ft)
+        pbTarget.DENSITY = 0.0_ft;
 #endif
 #if defined(SOLIDS)
-        // deviatoric stress
-        p.dstress += p.dstress_dt * dt;
-
-        // execute selected plasticity model
-        doPlasticity(p);
+    //Stresstensor
+    pbTarget.DSTRESS = pbValues.DSTRESS + pbDerivatives.DSTRESS_DT * dt;
+    doPlasticity(p);
 #endif
 #endif
-
-        // handle boundary conditions
-        handleBoundaryConditions(p);
-
-        return p; //!< return particle p, all attributes it shares with load_type will be stored in memory
-    }
-};*/
-
-
-rkIntegrateOnce(pbTarget, pbValues, pbDerivatives, dt)
-{
-    pbTarget.value = pbValues.value + pbDerivatives.deriv * dt;
-    ...
 }
-
-rkCompose(pb, pbDev1,pbDev2,pbDev3, dt)
+template <typename pbT>
+rkCompose(pbT& pb, pbT& pbDev1, pbT& pbDev2, pbT& pbDev3, f1_t dt)
 {
-    pb.value = pb.value +  (dt / 6.0) * (pb.deriv + 2*pbDev1.deriv + 2*pbDev2.deriv + pbDev3.deriv );
-    ...
+    pb.POS = pb.POS +  (dt / 6.0) * (pb.VEL + 2*pbDev1.VEL + 2*pbDev2.VEL + pbDev3.VEL );
+    pb.VEL = pb.VEL +  (dt / 6.0) * (pb.ACC + 2*pbDev1.ACC + 2*pbDev2.ACC + pbDev3.ACC );
+    pb.DENSITY = pb.DENSITY +  (dt / 6.0) * (pb.DENSITY_DT + 2*pbDev1.DENSITY_DT + 2*pbDev2.DENSITY_DT + pbDev3.DENSITY_DT );
+    pb.DSTRESS = pb.DSTRESS +  (dt / 6.0) * (pb.DSTRESS_DT + 2*pbDev1.DSTRESS_DT + 2*pbDev2.DSTRESS_DT + pbDev3.DSTRESS_DT );
 }
 
 

@@ -25,8 +25,9 @@
 #include "particles/Particles.h"
 #include "ResultStorageManager.h"
 #include "settings.h"
-#include "integration.h"
-#include "computeDerivatives.h"
+//#include "integration.h"
+//#include "computeDerivatives.h"
+#include "simulation.h"
 
 // compile setting files into resources
 ADD_RESOURCE(Settings,"settings.h");
@@ -239,6 +240,7 @@ int main()
     // start simulating
 //    computeDerivatives(pb);
 //    integrate(pb,false);
+    simulate(pb,false);
 
     double simulatedTime=timestep;
 #if defined(READ_FROM_FILE)
@@ -253,8 +255,9 @@ int main()
             pb.mapGraphicsResource(); // used for frontend stuff
 
             // run simulation
-            computeDerivatives(pb);
-            integrate(pb,true);
+            /*computeDerivatives(pb);
+            integrate(pb,true);*/
+            simulate(pb, true);
 
             timestep = getCurrentTimestep();
             simulatedTime += timestep;
