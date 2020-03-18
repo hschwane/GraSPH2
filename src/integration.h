@@ -89,7 +89,7 @@ struct fixedTsLeapfrog
     //!< All attributes of p that are not in load_type will be initialized to some default (mostly zero)
     CUDAHOSTDEV store_type do_for_each(pi_type p, size_t id, bool not_first_step)
     {
-        f1_t dt = fixed_timestep;
+        f1_t dt = fixed_timestep_lpfrog;
 
         //   calculate velocity a_t+1/2
         p.vel = p.vel + p.acc * (dt * ((not_first_step) ? 1.0_ft : 0.5_ft) );
@@ -218,37 +218,74 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 
 //Wie muss das hier sein? void? global void für cuda benutzung?
 template <typename pbT>
-rkIntegrateOnce(pbT& pbTarget, pbT& pbValues, pbT& pbDerivatives, f1_t dt)
+__global__ void rkIntegrateOnce(pbT& pbTarget, const pbT& pbValues, const pbT& pbDerivatives, f1_t dt)
 {
-    pbTarget.VEL = pbValues.VEL + pbDerivatives.ACC * dt;
+    assert(pbTarget.size() == pbValues.size() && pbTarget.size() == pbDerivatives.size() && "Buffers need to have the same size");
 
-#if defined(XSPH) && defined(ENABLE_SPH)
-    pbTarget.POS = pbValues.POS + (pbDerivatives.VEL + xsph_factor*pbDerivatives.XVEL) * dt; //Can we access xvel from the derivatives buffer or should call it from device buffer pbValues?
-#else
-    pbTarget.POS = pbValues.POS + pbDerivatives.VEL * dt;
-#endif
+    for(const auto i : mpu::gridStrideRange(pbTarget.size()))
+    {
+        // read the particle
+        Particle<POS,VEL,DENSITY,DSTRESS> p{};
+        auto pv = pbValues.template loadParticle<POS,VEL,DENSITY,DSTRESS>(i);
+        auto pd = pbDerivatives.template loadParticle<VEL,ACC,XVEL,DENSITY_DT,DSTRESS_DT>(i);
 
-#if defined(ENABLE_SPH)
-#if defined(INTEGRATE_DENSITY)
-    pbTarget.DENSITY = pbValues.DENSITY + pbDerivatives.DENSITY_DT * dt;
-    //Check if newly calculated density is below zero
-    if(pbTarget.DENSITY < 0.0_ft)
-        pbTarget.DENSITY = 0.0_ft;
-#endif
-#if defined(SOLIDS)
-    //Stresstensor
-    pbTarget.DSTRESS = pbValues.DSTRESS + pbDerivatives.DSTRESS_DT * dt;
-    doPlasticity(p);
-#endif
-#endif
+        p.vel = pv.vel + pd.acc * dt;
+
+        #if defined(XSPH) && defined(ENABLE_SPH)
+                p.pos = pv.pos + (pd.vel + xsph_factor*pd.xvel) * dt;
+        #else
+                p.pos = pv.pos + pd.vel * dt;
+        #endif
+
+        #if defined(ENABLE_SPH)
+            #if defined(INTEGRATE_DENSITY)
+                p.density = pv.density + pd.density_dt * dt;
+                //Check if newly calculated density is below zero
+                if(p.density < 0.0_ft)
+                    p.density = 0.0_ft;
+            #endif
+            #if defined(SOLIDS)
+                //Stresstensor
+                p.dstress = pv.dstress + pd.dstress_dt * dt;
+                doPlasticity(p);
+            #endif
+        #endif
+
+        // store result particle
+        pbTarget.storeParticle(i, p);
+    }
 }
+
 template <typename pbT>
-rkCompose(pbT& pb, pbT& pbDev1, pbT& pbDev2, pbT& pbDev3, f1_t dt)
+__global__ void rkCompose(pbT& pb, const pbT& pbDev1, const pbT& pbDev2, const pbT& pbDev3, f1_t dt)
 {
-    pb.POS = pb.POS +  (dt / 6.0) * (pb.VEL + 2*pbDev1.VEL + 2*pbDev2.VEL + pbDev3.VEL );
-    pb.VEL = pb.VEL +  (dt / 6.0) * (pb.ACC + 2*pbDev1.ACC + 2*pbDev2.ACC + pbDev3.ACC );
-    pb.DENSITY = pb.DENSITY +  (dt / 6.0) * (pb.DENSITY_DT + 2*pbDev1.DENSITY_DT + 2*pbDev2.DENSITY_DT + pbDev3.DENSITY_DT );
-    pb.DSTRESS = pb.DSTRESS +  (dt / 6.0) * (pb.DSTRESS_DT + 2*pbDev1.DSTRESS_DT + 2*pbDev2.DSTRESS_DT + pbDev3.DSTRESS_DT );
+    for(const auto i : mpu::gridStrideRange(pb.size()))
+    {
+        // read the particle
+        auto p = pb.template loadParticle<POS,VEL,ACC,DENSITY,DENSITY_DT,DSTRESS,DSTRESS_DT>(i);
+        auto pd1 = pbDev1.template loadParticle<VEL,ACC,XVEL,DENSITY_DT,DSTRESS_DT>(i);
+        auto pd2 = pbDev2.template loadParticle<VEL,ACC,XVEL,DENSITY_DT,DSTRESS_DT>(i);
+        auto pd3 = pbDev3.template loadParticle<VEL,ACC,XVEL,DENSITY_DT,DSTRESS_DT>(i);
+
+        p.pos = p.pos +  (dt / 6.0_ft) * (p.vel + 2.0_ft*pd1.vel + 2.0_ft*pd2.vel + pd3.vel );
+        p.vel = p.vel +  (dt / 6.0_ft) * (p.acc + 2.0_ft*pd1.acc + 2.0_ft*pd2.acc + pd3.acc );
+
+        #if defined(ENABLE_SPH)
+            #if defined(INTEGRATE_DENSITY)
+                p.density = p.density +  (dt / 6.0_ft) * (p.density_dt + 2.0_ft*pd1.density_dt + 2.0_ft*pd2.density_dt + pd3.density_dt );
+                if(p.density < 0.0_ft)
+                    p.density = 0.0_ft;
+            #endif
+            #if defined(SOLIDS)
+                //Stresstensor
+                p.dstress = p.dstress +  (dt / 6.0_ft) * (p.dstress_dt + 2.0_ft*pd1.dstress_dt + 2.0_ft*pd2.dstress_dt + pd3.dstress_dt );
+                doPlasticity(p);
+            #endif
+        #endif
+
+        // store result particle
+        pb.storeParticle(i, Particle<POS,VEL,DENSITY,DSTRESS>(p));
+    }
 }
 
 
@@ -256,11 +293,13 @@ rkCompose(pbT& pb, pbT& pbDev1, pbT& pbDev2, pbT& pbDev3, f1_t dt)
 f1_t getCurrentTimestep()
 {
 #if defined(FIXED_TIMESTEP_LEAPFROG)
-    return fixed_timestep;
+    return fixed_timestep_lpfrog;
 #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
     static f1_t dt = initial_timestep;
     assert_cuda( cudaMemcpyFromSymbol(&dt,currentTS,sizeof(f1_t)));
     return dt;
+#elif defined(RK4)
+    return fixed_timestep_rk4;
 #endif
 }
 

@@ -13,7 +13,6 @@ uniform float upperBound; // highest value of scalar field / vector field magnit
 uniform float lowerBound; // lowest value of scalar field / vector field magnitude
 uniform mat4 model; // model matrix of the object
 
-
 out vec3 sphereColor;
 
 // see https://github.com/tdd11235813/spheres_shader/tree/master/src/shader

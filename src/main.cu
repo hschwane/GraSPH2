@@ -115,7 +115,7 @@ void printSettings(mpu::Log& log)
                                     << "Integration:"
                                    << "Leapfrog\n"
                                    #if defined(FIXED_TIMESTEP_LEAPFROG)
-                                   << "Timestep: constant, " << fixed_timestep << "\n"
+                                   << "Timestep: constant, " << fixed_timestep_lpfrog << "\n"
                                    #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
                                    << "Timestep: variable \n"
                                    #endif

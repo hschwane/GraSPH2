@@ -20,48 +20,57 @@
  * Function to call Runge-Kutta integration algorithm for one time step
  */
 template <typename pbT>
-void doRK4SimulationStep(pbT& pb,f1_t timestep)
+void doRK4SimulationStep(pbT& pb)
 {
     //Create new buffers with same size as input buffer to store derivatives
     static pbT pb1(pb.size()),pb2(pb.size()),pb3(pb.size());
 
+    auto pbref = pb.getDeviceReference();
+    auto pb1ref = pb1.getDeviceReference();
+    auto pb2ref = pb2.getDeviceReference();
+    auto pb3ref = pb3.getDeviceReference();
+
     //First step: compute derivatives
-    computeDerivatives(pb)
+    computeDerivatives(pb);
 
     //Second Step: Use derivatives from first step to calculate new points pb1 and compute the derivatives...
-    rkIntegrateOnce(pb1,pb,pb,0.5*timestep)
-    computeDerivatives(pb1)
+    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb1ref,pbref,pbref,0.5*fixed_timestep_rk4);
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb1);
 
     //... to use them as input in third step...
-    rkIntegrateOnce(pb2,pb,pb1,0.5*timestep)
-    computeDerivatives(pb2)
+    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb2ref,pbref,pb1ref,0.5*fixed_timestep_rk4);
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb2);
 
     //... and do the same for the last step
-    rkIntegrateOnce(pb3,pb,pb2,timestep)
-    computeDerivatives(pb2)
+    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb3ref,pbref,pb2ref,fixed_timestep_rk4);
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb2);
 
     //Finally, we calculate the final values using the derivatives buffer
-    rkCompose(pb,pb1,pb2,pb3,timestep)
+    rkCompose<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pbref,pb1ref,pb2ref,pb3ref,fixed_timestep_rk4);
+    assert_cuda(cudaGetLastError());
 }
 
-/*
+/**
  * Function to call Leapfrog integration algorithm for one time step
  */
 template <typename pbT>
 void doFixedLeapfrogStep(pbT& pb, bool nFirstStep)
 {
-    computeDerivatives(pb)
+    computeDerivatives(pb);
     do_for_each<fixedTsLeapfrog>(pb,nFirstStep);
 }
 
-/*
+/**
  * Function to call variable leapfrog integration algorithm for one time step
  */
 template <typename pbT>
 void doVariableLeapfrogStep(pbT& pb, bool nFirstStep)
 {
     computeDerivatives(pb);
-    if(doVariableLeapfrogStep(bool nFirstStep))
+    if(nFirstStep)
     {
         variableTsLeapfrog_getNewTimestep<INTEG_BS> <<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS),
                 INTEG_BS >>> (pb.getDeviceReference());
@@ -87,7 +96,7 @@ void simulate(pbT& particleBuffer, bool notFirstStep)
 #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
     doVariableLeapfrogStep(particleBuffer, notFirstStep);
 #elif defined(RK4)
-    doRK4SimulateionStep(particleBuffer,timestep);
+    doRK4SimulationStep(particleBuffer);
 #endif
 }
 

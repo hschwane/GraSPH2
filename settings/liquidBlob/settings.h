@@ -47,7 +47,7 @@ constexpr Dim dimension=Dim::three;
 // kick drift kick leapfrog using fixed timestep
 // density and deviatoric stress are updated during drift step
 #define FIXED_TIMESTEP_LEAPFROG
-constexpr f1_t fixed_timestep=0.002; // timestep for fixed timestep leapfrog integrator
+constexpr f1_t fixed_timestep_lpfrog=0.002; // timestep for fixed timestep leapfrog integrator
 
 // kick drift kick leapfrog using variable timestep
 // density and deviatoric stress are updated during drift step
