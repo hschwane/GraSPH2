@@ -218,7 +218,7 @@ __global__ void variableTsLeapfrog_useNewTimestep(DevParticleRefType pb)
 
 //Wie muss das hier sein? void? global void für cuda benutzung?
 template <typename pbT>
-__global__ void rkIntegrateOnce(pbT& pbTarget, const pbT& pbValues, const pbT& pbDerivatives, f1_t dt)
+__global__ void rkIntegrateOnce(pbT pbTarget, pbT pbValues, pbT pbDerivatives, f1_t dt)
 {
     assert(pbTarget.size() == pbValues.size() && pbTarget.size() == pbDerivatives.size() && "Buffers need to have the same size");
 
@@ -257,7 +257,7 @@ __global__ void rkIntegrateOnce(pbT& pbTarget, const pbT& pbValues, const pbT& p
 }
 
 template <typename pbT>
-__global__ void rkCompose(pbT& pb, const pbT& pbDev1, const pbT& pbDev2, const pbT& pbDev3, f1_t dt)
+__global__ void rkCompose(pbT pb, const pbT pbDev1, const pbT pbDev2, const pbT pbDev3, f1_t dt)
 {
     for(const auto i : mpu::gridStrideRange(pb.size()))
     {

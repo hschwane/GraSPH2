@@ -46,7 +46,7 @@ void doRK4SimulationStep(pbT& pb)
     //... and do the same for the last step
     rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb3ref,pbref,pb2ref,fixed_timestep_rk4);
     assert_cuda(cudaGetLastError());
-    computeDerivatives(pb2);
+    computeDerivatives(pb3);
 
     //Finally, we calculate the final values using the derivatives buffer
     rkCompose<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pbref,pb1ref,pb2ref,pb3ref,fixed_timestep_rk4);

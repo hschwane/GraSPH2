@@ -155,6 +155,13 @@ if (USE_FAST_MATH)
     target_compile_definitions(GraSPH2 PRIVATE "USING_CUDA_FAST_MATH")
 endif ()
 
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-g>)
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-G>)
+else()
+    target_compile_options(GraSPH2 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
+endif()
+
 if(HDF5_FOUND)
     target_compile_definitions(GraSPH2 PRIVATE "HDF5_AVAILABLE")
 endif()
