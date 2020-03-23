@@ -17,10 +17,10 @@
 #include <integration.h>
 //--------------------
 /*
- * Function to call Runge-Kutta integration algorithm for one time step
+ * Function to call Runge-Kutta integration algorithm for one fixed time step
  */
 template <typename pbT>
-void doRK4SimulationStep(pbT& pb)
+void doRK3FixedSimulationStep(pbT& pb)
 {
     //Create new buffers with same size as input buffer to store derivatives
     static pbT pb1(pb.size()),pb2(pb.size()),pb3(pb.size());
@@ -28,29 +28,77 @@ void doRK4SimulationStep(pbT& pb)
     auto pbref = pb.getDeviceReference();
     auto pb1ref = pb1.getDeviceReference();
     auto pb2ref = pb2.getDeviceReference();
-    auto pb3ref = pb3.getDeviceReference();
 
     //First step: compute derivatives
     computeDerivatives(pb);
 
     //Second Step: Use derivatives from first step to calculate new points pb1 and compute the derivatives...
-    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb1ref,pbref,pbref,0.5*fixed_timestep_rk4);
+    rk3Integrate_k2<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb1ref,pbref,pbref,0.5*fixed_timestep_rk3);
     assert_cuda(cudaGetLastError());
     computeDerivatives(pb1);
 
     //... to use them as input in third step...
-    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb2ref,pbref,pb1ref,0.5*fixed_timestep_rk4);
+    rk3Integrate_k3<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb2ref,pbref,pb1ref,fixed_timestep_rk3);
     assert_cuda(cudaGetLastError());
     computeDerivatives(pb2);
 
-    //... and do the same for the last step
-    rkIntegrateOnce<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb3ref,pbref,pb2ref,fixed_timestep_rk4);
+    //Finally, we calculate the final values using the derivatives buffer
+    rk3Compose<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pbref,pb1ref,pb2ref,fixed_timestep_rk3);
     assert_cuda(cudaGetLastError());
-    computeDerivatives(pb3);
+}
+
+/*
+ * Function to call Runge-Kutta integration algorithm for one variable time step
+ */
+template <typename pbT>
+void doRK3VariableSimulationStep(pbT& pb)
+{
+    //Create new buffers with same size as input buffer to store derivatives
+    static pbT pb1(pb.size()),pb2(pb.size()),pb3(pb.size());
+
+    auto pbref = pb.getDeviceReference();
+    auto pb1ref = pb1.getDeviceReference();
+    auto pb2ref = pb2.getDeviceReference();
+
+    computeDerivatives(pb);
+    //Use Euler Midpoint Method to calculate error so that we have a value to compare
+    rkIntegrateOnce<INTEG_BS> <<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS),
+            INTEG_BS >>> (pb1ref,pbref,pbref,0.5*getCurrentTimestep());
+    assert_cuda(cudaGetLastError());
+    //Now compose eulers Method...
+    midpoint_compose();
+
+    //Then we want to update our timestep as Schäfer et al. 2016, so we calculate RK3 Values
+    //Second Step: Use derivatives from first step to calculate new points pb1 and compute the derivatives...
+    rk3Integrate_k2<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb1ref,pbref,pbref,0.5*getCurrentTimestep());
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb1);
+
+    //... to use them as input in third step...
+    rk3Integrate_k3<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb2ref,pbref,pb1ref,getCurrentTimestep());
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb2);
 
     //Finally, we calculate the final values using the derivatives buffer
-    rkCompose<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pbref,pb1ref,pb2ref,pb3ref,fixed_timestep_rk4);
+    rk3Compose<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pbref,pb1ref,pb2ref,getCurrentTimestep());
     assert_cuda(cudaGetLastError());
+    //with the calculated values of both midpoint and rk3 we calculate an error and calculate the new timestep
+    variableTsRK3_getNewTimestep<INTEG_BS> <<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS),
+            INTEG_BS >>> (pb.getDeviceReference());
+    assert_cuda(cudaGetLastError());
+
+    // second part which will use the new timestep
+    computeDerivatives(pb);
+    //Then we want to update our timestep as Schäfer et al. 2016, so we calculate RK3 Values
+    //Second Step: Use derivatives from first step to calculate new points pb1 and compute the derivatives...
+    rk3Integrate_k2<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb1ref,pbref,pbref,0.5*getCurrentTimestep());
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb1);
+
+    //... to use them as input in third step...
+    rk3Integrate_k3<<< mpu::numBlocks(pb.size() / INTEG_PPT, INTEG_BS), INTEG_BS >>>(pb2ref,pbref,pb1ref,getCurrentTimestep());
+    assert_cuda(cudaGetLastError());
+    computeDerivatives(pb2);
 }
 
 /**
@@ -95,8 +143,8 @@ void simulate(pbT& particleBuffer, bool notFirstStep)
     doFixedLeapfrogStep(particleBuffer, notFirstStep);
 #elif defined(VARIABLE_TIMESTEP_LEAPFROG)
     doVariableLeapfrogStep(particleBuffer, notFirstStep);
-#elif defined(RK4)
-    doRK4SimulationStep(particleBuffer);
+#elif defined(RK3fixed)
+    doRK3FixedSimulationStep(particleBuffer);
 #endif
 }
 

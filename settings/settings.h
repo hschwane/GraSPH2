@@ -61,10 +61,13 @@ constexpr f1_t accel_accuracy = 0.01; // the bigger this number the larger times
 #define VELOCITY_CRITERION
 constexpr f1_t velocity_accuracy = 0.09; // the bigger this number the larger timesteps are allowed based on the velocity criterion
 
-// runge kutta 4
-#define RK4
-constexpr f1_t fixed_timestep_rk4=0.002; // timestep for fixed timestep leapfrog integrator
-
+// runge kutta 3
+#define RK3fixed
+constexpr f1_t fixed_timestep_rk3=0.002; // timestep for fixed timestep leapfrog integrator
+//#define RK3variable
+constexpr f1_t initial_timestep=0.002;
+constexpr f1_t min_timestep=0.00002
+constexpr  f1_t relative_error = 0.02;
 
 //--------------------
 // initial conditions
