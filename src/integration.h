@@ -229,20 +229,20 @@ __global__ void variableTsRK3_getNewTimestep(pbT pbValues, pbT pbMidpoint, pbT p
     {
         // Calculate error
 #if defined(ACCELERATION_CRITERION)
-        err = (pbMidpoint.acc - pbRK3.acc)/(pbValues + dt * k1); //BETRAG FEHLT
+        err = abs(pbMidpoint.acc - pbRK3.acc)/abs(pbValues + dt * k1);
 #endif
 #if defined(VELOCITY_CRITERION)
-        err = (pbMidpoint.vel - pbRK3.vel)/(pbValues + dt * k1); // BETRAG FEHLT
+        err = abs(pbMidpoint.vel - pbRK3.vel)/abs(pbValues + dt * k1);
 #endif
         //Calculate timestep
         if(err < relative_error)
         {
-            temp_dt = dt * (relative_error / err)^0.3; //BETRAG FEHLT
+            temp_dt = dt * abs(relative_error / err)^0.3;
             mindt =  min( mindt, temp_dt);
         }
         else
         {
-            temp_dt = 0.9_ft * dt * (relative_error / err)^0.25; //BETRAG FEHLT
+            temp_dt = 0.9_ft * dt * abs(relative_error / err)^0.25;
             mindt =  min( mindt, temp_dt);
         }
     }
